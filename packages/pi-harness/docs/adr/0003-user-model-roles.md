@@ -1,4 +1,4 @@
-# ADR-0003: Configure Dynamic Model Roles at User Scope
+# ADR-0003: Configure Dynamic Model Roles in Pi Settings
 
 - Status: accepted
 - Date: 2026-08-17
@@ -13,9 +13,9 @@ Model Roles are stored in Pi settings under the top-level `harness` key. Global 
 
 Every Role has an editable name, description, and exactly one `{ model, thinking }` selection. The description is shown to the Router in the dynamically generated resolver schema. There is no ordered candidate list and no automatic cross-model fallback.
 
-`/harness config` opens a TUI backed by Pi's current model registry. Users may add, rename, edit, or delete any Role, including the three initial templates.
+`/harness config` opens a TUI backed by Pi's current model registry. Users first select Global or, for a trusted project, Project scope. Project Roles inherit Global Roles until the first project edit materializes a complete project override; resetting the Project override restores inheritance. Users may add, rename, edit, or delete any Role, including the three initial templates.
 
-Only Roles whose model exists, is currently authenticated and available, and accepts the configured thinking level appear in the resolver schema. Resolver execution repeats these checks to catch changes after schema generation. When no Role is available, `resolve_delegation` is not registered and the Router reports the configuration block with `/harness config`. A malformed configuration is reported and preserved rather than overwritten.
+Only Roles whose model exists, is currently authenticated and available, and accepts the configured thinking level appear in the resolver schema. Resolver execution repeats these checks to catch changes after schema generation. When no Role is available, `resolve_delegation` is not registered and the Router reports the configuration block with `/harness config`. Automatic loading never overwrites malformed configuration. The TUI may replace a malformed `harness` object only after explicit confirmation and never overwrites an invalid settings JSON document.
 
 ## Consequences
 

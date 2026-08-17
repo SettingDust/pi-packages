@@ -2,7 +2,7 @@
 
 ## 1. Runtime Surface
 
-The `pi-harness` extension replaces Pi's default main-session system prompt with the Router operating contract and always registers `/harness config`, which opens the user-level Model Role configuration TUI.
+The `pi-harness` extension replaces Pi's default main-session system prompt with the Router operating contract and always registers `/harness config`, which opens the Model Role configuration TUI.
 
 When at least one Model Role is currently available, the extension also registers `resolve_delegation`, which prepares but does not start a Handler invocation.
 
@@ -159,6 +159,8 @@ Pi settings contain the configuration under the top-level `harness` key:
 
 Global settings provide the baseline. When the project is trusted, its `harness` object shallowly overlays the global object; an explicitly configured project `roles` field therefore replaces the global `roles` field.
 
-On first configuration, the TUI offers `basic`, `standard`, and `advanced` as templates. They have no reserved status. Every Role's name, description, model, and thinking level may be edited, and every Role may be added or deleted.
+The TUI first selects Global or Project scope; Project is available only for trusted projects. Without a project override, the Project view inherits Global Roles. The first project mutation copies the full inherited set into a project override, and resetting that override restores inheritance. Writes use a settings-file lock and preserve unrelated Pi settings.
 
-A Role is available only when its model exists in Pi's current model registry, required authentication is present, and its thinking value is accepted for that model. Only available Roles enter the dynamic `modelRole` enum. When none are available, the extension omits `resolve_delegation` and directs the user to `/harness config`. Invalid configuration is reported without overwriting the source file.
+On first configuration, the TUI offers `basic`, `standard`, and `advanced` as templates. One selected base model is used for all three, with the closest supported low, medium, and high thinking levels. The templates have no reserved status. Every Role's name, description, model, and thinking level may be edited, and every Role may be added or deleted.
+
+A Role is available only when its model exists in Pi's current model registry, required authentication is present, and its thinking value is accepted for that model. Only available Roles enter the dynamic `modelRole` enum. When none are available, the extension omits `resolve_delegation` and directs the user to `/harness config`. Automatic loading reports invalid configuration without overwriting it. The TUI requires explicit confirmation before replacing an invalid `harness` object and does not overwrite malformed settings JSON.

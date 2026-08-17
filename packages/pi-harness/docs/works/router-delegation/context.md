@@ -11,7 +11,7 @@
 - Its Tool schema is generated from current Pi Skills and only currently usable Model Roles. No separate role discovery tool exists; zero usable Roles means the resolver tool is omitted until `/harness config` fixes configuration.
 - Handoffs and Handler Results use YAML. Context references are checked but not inlined by the Resolver. Results use `completed`, `partial`, `blocked`, or `failed`; artifact references are validated only when reused as later Handoff context.
 - Model Roles live under Pi Settings' top-level `harness` key. Global configuration is the baseline; a trusted project's `harness` object shallowly overlays it. `basic`, `standard`, and `advanced` are only first-configuration templates; every Role can be added, renamed, edited, or deleted and maps to one description, model, and thinking setting without fallback. Malformed configuration is preserved and reported.
-- `/harness config` owns the Role TUI.
+- `/harness config` owns the Role TUI. It supports Global and trusted-Project scopes, inherited Global Roles, full Project override materialization on first edit, and reset-to-inheritance.
 - Every Pi model-visible Skill enters the dynamic primary/companion enums. These are per-Handoff relationships; Skills may conditionally load other Skills, and no static controller/leaf classification or filter exists.
 - The package owns a complete 29-Skill initial method library. Clarification may be delegated to gather context and formulate questions, but only Router asks the user.
 - `agents/handler.md` is a bundled, backend-neutral Handler definition. Router directly adapts its name/path, YAML prompt, model, and thinking to a compatible environment delegate tool; the package owns no wrapper or backend registry.
@@ -20,9 +20,10 @@
 - No batch join, wait tool, conflict detection, worktree, or locking is required. Concurrent independence is Router judgment.
 - The pure protocol prototype is implemented in `src/protocol.ts`; its deterministic checks cover dynamic schema refresh, strict Handoff/Role/reference validation, YAML without reference inlining, and four-state Result parsing.
 - The Extension core is implemented in `extensions/pi-harness.ts`: it reads global and trusted-project `harness` settings, uses Pi's authenticated model snapshot and loaded model-visible Skills, replaces the Router prompt, refreshes the resolver Tool each pass, and removes it from active tools when configuration is blocked.
+- The `/harness config` TUI and locked settings persistence are implemented in `src/config-command.ts` and `src/settings-store.ts`.
 
 ## Open Work
 
-- Add the `/harness config` Role TUI and refresh behavior.
+- Build the package's initial Skill library and run real delegation-backend integration.
 
 ## Explicit v0.1 Omissions

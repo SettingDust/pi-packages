@@ -9,6 +9,7 @@ import {
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { loadHarnessRoles } from "../src/config.js";
+import { runHarnessConfig } from "../src/config-command.js";
 import { resolveDelegation, type HarnessRoles, type ModelRole, type Resolution, type SkillSummary } from "../src/index.js";
 
 const packageRoot = dirname(dirname(fileURLToPath(import.meta.url)));
@@ -16,8 +17,24 @@ const handlerPath = join(packageRoot, "agents", "handler.md");
 const resolverName = "resolve_delegation";
 
 type RoleLoader = typeof loadHarnessRoles;
+type ConfigRunner = typeof runHarnessConfig;
 
-export default function activateHarness(pi: ExtensionAPI, loadRoles: RoleLoader = loadHarnessRoles): void {
+export default function activateHarness(
+  pi: ExtensionAPI,
+  loadRoles: RoleLoader = loadHarnessRoles,
+  configure: ConfigRunner = runHarnessConfig,
+): void {
+  pi.registerCommand("harness", {
+    description: "Configure Pi Harness Model Roles",
+    handler: async (args, ctx) => {
+      if (args.trim() && args.trim() !== "config") {
+        ctx.ui.notify("Usage: /harness config", "error");
+        return;
+      }
+      await configure(ctx);
+    },
+  });
+
   pi.on("before_agent_start", (event, ctx) => {
     const skills = visibleSkills(event);
     const roles = currentRoles(ctx, loadRoles);

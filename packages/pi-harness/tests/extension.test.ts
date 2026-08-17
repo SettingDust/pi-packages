@@ -56,11 +56,16 @@ function context(): ExtensionContext {
 describe("Pi Harness Extension", () => {
   test("replaces the Router prompt and refreshes the resolver schema", async () => {
     let before: BeforeHandler | undefined;
+    let command: ((args: string, ctx: unknown) => Promise<void>) | undefined;
+    let configured = false;
     let active = ["read"];
     const tools = new Map<string, RegisteredTool>();
     const pi = {
       on(name: string, handler: BeforeHandler) {
         if (name === "before_agent_start") before = handler;
+      },
+      registerCommand(name: string, definition: { handler: (args: string, ctx: unknown) => Promise<void> }) {
+        if (name === "harness") command = definition.handler;
       },
       registerTool(tool: RegisteredTool) {
         tools.set(tool.name, tool);
@@ -82,8 +87,11 @@ describe("Pi Harness Extension", () => {
     };
     const loadRoles = () => roles;
 
-    activateHarness(pi, loadRoles);
+    activateHarness(pi, loadRoles, async () => { configured = true; });
     expect(before).toBeDefined();
+    expect(command).toBeDefined();
+    await command!("config", context());
+    expect(configured).toBeTrue();
     const first = await before!(event([skill("research"), skill("hidden", true)]), context()) as { systemPrompt: string };
     expect(first.systemPrompt).toStartWith("You are the Pi Harness Router.");
     expect(first.systemPrompt).not.toContain("default Pi prompt");

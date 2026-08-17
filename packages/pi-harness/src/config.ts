@@ -11,7 +11,7 @@ type SettingsManagerLike = {
   drainErrors(): Array<{ scope: "global" | "project" }>;
 };
 
-type ModelLike = {
+export type ModelLike = {
   provider: string;
   id: string;
   reasoning: boolean;
@@ -91,11 +91,16 @@ function effectiveHarness(globalSettings: unknown, projectSettings: unknown): { 
   };
 }
 
+export function supportedThinkingLevels(model: ModelLike): string[] {
+  if (!model.reasoning) return ["off"];
+  return THINKING_LEVELS.filter((thinking) => {
+    const mapped = model.thinkingLevelMap?.[thinking];
+    return mapped !== null && (thinking !== "xhigh" || mapped !== undefined);
+  });
+}
+
 function supportsThinking(model: ModelLike, thinking: string): boolean {
-  if (!model.reasoning) return thinking === "off";
-  if (!THINKING_LEVELS.includes(thinking as (typeof THINKING_LEVELS)[number])) return false;
-  const mapped = model.thinkingLevelMap?.[thinking as (typeof THINKING_LEVELS)[number]];
-  return mapped !== null && (thinking !== "xhigh" || mapped !== undefined);
+  return supportedThinkingLevels(model).includes(thinking);
 }
 
 function isObject(value: unknown): value is Settings {

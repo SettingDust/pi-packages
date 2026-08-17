@@ -37,6 +37,9 @@ describe("Pi Settings Role configuration", () => {
     if (result.status === "ready") expect(result.roles.map(({ name }) => name)).toEqual(["advanced"]);
   });
 
+  test("accepts an empty harness object as zero Roles", () => {
+    expect(normalizeHarnessRoles({ harness: {} }, {}, models)).toEqual({ status: "ready", roles: [] });
+  });
   test("keeps unavailable and invalid-thinking Roles for precise runtime blocking", () => {
     const result = normalizeHarnessRoles(
       settings({
