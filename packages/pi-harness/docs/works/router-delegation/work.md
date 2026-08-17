@@ -20,8 +20,8 @@ Implement the first publishable `pi-harness` package: an always-on Router extens
 
 ## Current Stage
 
-The Extension core and `/harness config` Role TUI are implemented. The TUI supports Global and trusted-Project scopes, project inheritance and reset, Role CRUD, initial templates, authenticated model selection, model-compatible thinking levels, and locked persistence. The next package work is the initial Skill library and real delegation-backend integration.
+The Extension core, `/harness config` Role TUI, and initial 29-Skill method library are implemented. Pi discovers every built-in Skill as model-visible with no diagnostics. The remaining package integration work is exercising the full Router-to-Handler loop with a real compatible delegation backend.
 
 ## Completion Signal
 
-`bun run --cwd packages/pi-harness typecheck` and `bun run --cwd packages/pi-harness test` pass for the protocol, Pi Settings loader and writer, scoped Role TUI, dynamic Extension binding, and Handler contract.
+`bun run --cwd packages/pi-harness typecheck` and `bun run --cwd packages/pi-harness test` pass for the protocol, Pi Settings loader and writer, scoped Role TUI, dynamic Extension binding, Handler contract, and Pi-backed Skill discovery.

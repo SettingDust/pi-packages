@@ -21,9 +21,10 @@
 - The pure protocol prototype is implemented in `src/protocol.ts`; its deterministic checks cover dynamic schema refresh, strict Handoff/Role/reference validation, YAML without reference inlining, and four-state Result parsing.
 - The Extension core is implemented in `extensions/pi-harness.ts`: it reads global and trusted-project `harness` settings, uses Pi's authenticated model snapshot and loaded model-visible Skills, replaces the Router prompt, refreshes the resolver Tool each pass, and removes it from active tools when configuration is blocked.
 - The `/harness config` TUI and locked settings persistence are implemented in `src/config-command.ts` and `src/settings-store.ts`.
+- The initial 29-Skill library is implemented under `skills/`, exposed through package metadata, and validated through Pi's own Skill loader with no diagnostics.
 
 ## Open Work
 
-- Build the package's initial Skill library and run real delegation-backend integration.
+- Run real delegation-backend integration for the Router-to-Handler loop.
 
 ## Explicit v0.1 Omissions
