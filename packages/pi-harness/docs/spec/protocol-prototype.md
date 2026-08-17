@@ -26,8 +26,8 @@ Prove the contract in isolation before using Pi runtime APIs or a delegate backe
 
 ## Validation Result
 
-Implemented in `src/protocol.ts` with deterministic checks in `tests/protocol.test.ts`. Both `bun run --cwd packages/pi-harness typecheck` and `bun run --cwd packages/pi-harness test` pass; the test command currently reports 20 passing checks and no failures.
+Implemented in `src/protocol.ts` with deterministic checks in `tests/protocol.test.ts`. The package test command also covers Pi Settings Role normalization and Extension binding in `tests/config.test.ts` and `tests/extension.test.ts`.
 
 ## Residual Risk
 
-This prototype does not establish that Pi's `before_agent_start`, runtime tool replacement, model registry, TUI, or notification APIs behave as required. It also cannot evaluate prompt-only Router restraint, Skill instruction conflicts, concurrency conflicts, unbounded routing loops, or backend Result delivery. Those are separate integration and evaluation tasks.
+The Extension core now binds `before_agent_start`, dynamic tool replacement, loaded Skills, and Pi's model registry using the same supported APIs already exercised by Pi Dust Harness. Live TUI behavior, prompt-only Router restraint, Skill instruction conflicts, concurrency conflicts, unbounded routing loops, and backend Result delivery remain separate integration and evaluation work.

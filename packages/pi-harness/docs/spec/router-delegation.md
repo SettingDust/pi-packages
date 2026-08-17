@@ -141,19 +141,23 @@ activeTasks:
 
 ## 10. Model Role Configuration
 
-The user-level configuration has this shape:
+Pi settings contain the configuration under the top-level `harness` key:
 
 ```json
 {
-  "roles": {
-    "basic": {
-      "description": "Narrow, low-risk work that is easy to verify.",
-      "model": "provider/model",
-      "thinking": "low"
+  "harness": {
+    "roles": {
+      "role-name": {
+        "description": "When the Router should choose this Role",
+        "model": "provider/model-id",
+        "thinking": "off | minimal | low | medium | high | xhigh"
+      }
     }
   }
 }
 ```
+
+Global settings provide the baseline. When the project is trusted, its `harness` object shallowly overlays the global object; an explicitly configured project `roles` field therefore replaces the global `roles` field.
 
 On first configuration, the TUI offers `basic`, `standard`, and `advanced` as templates. They have no reserved status. Every Role's name, description, model, and thinking level may be edited, and every Role may be added or deleted.
 

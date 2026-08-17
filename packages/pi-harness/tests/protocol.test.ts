@@ -101,6 +101,15 @@ describe("delegation resolution", () => {
     expect(result.handler.name).toBe("handler");
   });
 
+  test("defaults omitted companionSkills to an empty list", async () => {
+    const candidate = { ...handoff(), companionSkills: undefined };
+    const result = await resolveDelegation({ handoff: candidate, modelRole: "standard" }, options);
+    expect(result.status).toBe("resolved");
+    if (result.status === "resolved") {
+      expect((Bun.YAML.parse(result.prompt) as Handoff).companionSkills).toEqual([]);
+    }
+  });
+
   test("blocks missing references before serialization", async () => {
     const result = await resolveDelegation(
       { handoff: handoff({ context: [{ ref: "missing.md", purpose: "Required evidence." }] }), modelRole: "standard" },
@@ -121,6 +130,19 @@ describe("delegation resolution", () => {
   test.each([
     ["unknown", "missing", roles, "unknown_role"],
     ["unavailable", "offline", roles, "unavailable_model"],
+    [
+      "unsupported thinking",
+      "invalid-thinking",
+      [...roles, {
+        name: "invalid-thinking",
+        description: "Invalid thinking.",
+        model: "test/model",
+        thinking: "xhigh",
+        available: false,
+        unavailableCode: "invalid_thinking" as const,
+      }],
+      "invalid_thinking",
+    ],
     [
       "empty description",
       "broken-description",

@@ -9,7 +9,7 @@ The Router needs to select model investment without knowing provider authenticat
 
 ## Decision
 
-Model Roles are stored only in `~/.pi/agent/config/pi-harness.json`. On first configuration, the package offers `basic`, `standard`, and `advanced` as initial templates. They are ordinary Roles, not reserved names.
+Model Roles are stored in Pi settings under the top-level `harness` key. Global settings provide the baseline; when the project is trusted, its `harness` object shallowly overlays the global object, matching Pi Loom's settings behavior. On first configuration, the package offers `basic`, `standard`, and `advanced` as initial templates. They are ordinary Roles, not reserved names.
 
 Every Role has an editable name, description, and exactly one `{ model, thinking }` selection. The description is shown to the Router in the dynamically generated resolver schema. There is no ordered candidate list and no automatic cross-model fallback.
 

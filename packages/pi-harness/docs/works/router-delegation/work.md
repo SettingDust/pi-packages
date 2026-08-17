@@ -20,8 +20,8 @@ Implement the first publishable `pi-harness` package: an always-on Router extens
 
 ## Current Stage
 
-The pure protocol prototype is implemented and passes deterministic schema, resolution, YAML, Role, reference, and Result checks. The next work selects and implements the smallest live Pi integration slice.
+The Extension core is implemented: it reads Roles from Pi Settings, discovers model-visible Skills from `before_agent_start`, replaces the Router prompt, dynamically refreshes `resolve_delegation`, and bundles the backend-neutral Handler Agent. The next work is the `/harness config` Role TUI.
 
 ## Completion Signal
 
-Achieved for the pure prototype: `bun run --cwd packages/pi-harness typecheck` and `bun run --cwd packages/pi-harness test` pass. A later integration slice must demonstrate the same behavior through actual Pi extension APIs.
+`bun run --cwd packages/pi-harness typecheck` and `bun run --cwd packages/pi-harness test` pass for the protocol, Pi Settings loader, dynamic Extension binding, and Handler contract.

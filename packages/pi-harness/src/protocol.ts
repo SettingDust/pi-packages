@@ -14,6 +14,7 @@ export interface ModelRole {
   model: string;
   thinking: ThinkingLevel;
   available: boolean;
+  unavailableCode?: "unavailable_model" | "invalid_thinking";
 }
 
 export interface ContextRef {
@@ -155,7 +156,7 @@ export async function resolveDelegation(
   const role = options.roles.find(({ name }) => name === modelRole);
   if (!role) return blocked("unknown_role", `Unknown Model Role: ${modelRole}`);
   if (!nonEmptyString(role.description)) return blocked("invalid_config", `Model Role is malformed: ${modelRole}`);
-  if (!role.available) return blocked("unavailable_model", `Model Role is unavailable: ${modelRole}`);
+  if (!role.available) return blocked(role.unavailableCode ?? "unavailable_model", `Model Role is unavailable: ${modelRole}`);
   if (!role.model.trim()) return blocked("unavailable_model", `Model Role has no model: ${modelRole}`);
   if (!role.thinking.trim()) return blocked("invalid_thinking", `Model Role has no thinking level: ${modelRole}`);
 
@@ -234,11 +235,12 @@ function validateInput(input: unknown):
     return { ok: false, code: "invalid_config", message: "Resolver input requires handoff and modelRole" };
   }
   const handoff = input.handoff;
+  const companionSkills = handoff.companionSkills ?? [];
   if (
     !nonEmptyString(handoff.objective) ||
     !nonEmptyString(handoff.primarySkill) ||
-    !Array.isArray(handoff.companionSkills) ||
-    !handoff.companionSkills.every(nonEmptyString) ||
+    !Array.isArray(companionSkills) ||
+    !companionSkills.every(nonEmptyString) ||
     !Array.isArray(handoff.context)
   ) {
     return { ok: false, code: "invalid_config", message: "Handoff has invalid required fields" };
@@ -261,7 +263,7 @@ function validateInput(input: unknown):
       handoff: {
         objective: handoff.objective,
         primarySkill: handoff.primarySkill,
-        companionSkills: [...handoff.companionSkills],
+        companionSkills: [...companionSkills],
         context,
         ...(handoff.constraints ? { constraints: [...handoff.constraints] } : {}),
         ...(handoff.deliverables ? { deliverables: [...handoff.deliverables] } : {}),

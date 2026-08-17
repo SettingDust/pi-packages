@@ -4,13 +4,16 @@
   "description": "A Router and delegated-work protocol for Pi",
   "keywords": ["pi-package"],
   "type": "module",
-  "files": ["dist", "extensions", "skills", "agents", "docs"],
+  "files": ["src", "extensions", "agents", "docs"],
   "scripts": {
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "test": "bun test"
   },
+  "peerDependencies": {
+    "@earendil-works/pi-ai": "*",
+    "@earendil-works/pi-coding-agent": "*"
+  },
   "pi": {
-    "extensions": ["./extensions"],
-    "skills": ["./skills"]
+    "extensions": ["./extensions"]
   }
 }
