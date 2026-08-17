@@ -36,12 +36,12 @@ function skill(name: string, disableModelInvocation = false): Skill {
   } as Skill;
 }
 
-function event(skills: Skill[]): BeforeAgentStartEvent {
+function event(skills: Skill[], customPrompt?: string): BeforeAgentStartEvent {
   return {
     type: "before_agent_start",
     prompt: "Implement the change",
-    systemPrompt: "default Pi prompt",
-    systemPromptOptions: { cwd: "/workspace", skills },
+    systemPrompt: customPrompt === undefined ? "default Pi prompt" : `${customPrompt}\nCurrent working directory: /workspace`,
+    systemPromptOptions: { cwd: "/workspace", skills, ...(customPrompt === undefined ? {} : { customPrompt }) },
   };
 }
 
@@ -54,7 +54,7 @@ function context(): ExtensionContext {
 }
 
 describe("Pi Harness Extension", () => {
-  test("replaces the Router prompt and refreshes the resolver schema", async () => {
+  test("replaces only the standard main prompt and refreshes the resolver schema", async () => {
     let before: BeforeHandler | undefined;
     let command: ((args: string, ctx: unknown) => Promise<void>) | undefined;
     let configured = false;
@@ -130,6 +130,11 @@ describe("Pi Harness Extension", () => {
     const secondSchema = JSON.stringify(tools.get("resolve_delegation")!.parameters);
     expect(secondSchema).toContain("implement");
     expect(secondSchema).not.toContain("research");
+
+    expect(await before!(event([skill("implement")], "# Pi Harness Handler"), context())).toBeUndefined();
+    expect(active).toEqual(["read"]);
+    expect(await before!(event([skill("implement")], "# Other Agent"), context())).toBeUndefined();
+    expect(active).toEqual(["read"]);
 
     roles = { status: "blocked", message: "bad harness settings" };
     const blocked = await before!(event([skill("implement")]), context()) as { systemPrompt: string };

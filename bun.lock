@@ -27,6 +27,17 @@
       "name": "pi-herdr",
       "version": "0.1.0",
     },
+    "packages/pi-herdr-subagents": {
+      "name": "pi-herdr-subagents",
+      "version": "0.1.0",
+      "dependencies": {
+        "pi-herdr": "workspace:*",
+      },
+      "peerDependencies": {
+        "@earendil-works/pi-ai": "*",
+        "@earendil-works/pi-coding-agent": "*",
+      },
+    },
   },
   "packages": {
     "@anthropic-ai/sdk": ["@anthropic-ai/sdk@0.91.1", "", { "dependencies": { "json-schema-to-ts": "^3.1.1" }, "peerDependencies": { "zod": "^3.25.0 || ^4.0.0" }, "optionalPeers": ["zod"], "bin": { "anthropic-ai-sdk": "bin/cli" } }, "sha512-LAmu761tSN9r66ixvmciswUj/ZC+1Q4iAfpedTfSVLeswRwnY3n2Nb6Tsk+cLPP28aLOPWeMgIuTuCcMC6W/iw=="],
@@ -268,6 +279,8 @@
     "pi-harness": ["pi-harness@workspace:packages/pi-harness"],
 
     "pi-herdr": ["pi-herdr@workspace:packages/pi-herdr"],
+
+    "pi-herdr-subagents": ["pi-herdr-subagents@workspace:packages/pi-herdr-subagents"],
 
     "proper-lockfile": ["proper-lockfile@4.1.2", "", { "dependencies": { "graceful-fs": "^4.2.4", "retry": "^0.12.0", "signal-exit": "^3.0.2" } }, "sha512-TjNPblN4BwAWMXU8s9AEz4JmQxnD1NNL7bNOY/AKUzyamc379FWASUhc/K1pL2noVb+XmZKLL68cjzLsiOAMaA=="],
 

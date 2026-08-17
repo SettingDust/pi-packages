@@ -1,0 +1,128 @@
+import { execFile } from "node:child_process";
+import { existsSync, mkdirSync, readFileSync, renameSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { basename, dirname, join, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
+import { promisify } from "node:util";
+import { StringEnum, Type } from "@earendil-works/pi-ai";
+import { defineTool, getAgentDir, type ExtensionAPI, type ExtensionContext } from "@earendil-works/pi-coding-agent";
+import { createHerdrClient, type HerdrClient } from "pi-herdr";
+
+const exec = promisify(execFile);
+export const paneChildExtensionPath = resolve(dirname(fileURLToPath(import.meta.url)), "../extensions/pane-child.ts");
+export type AgentDefinition = { name: string; path: string; body: string; description: string };
+export type TaskStatus = "running" | "completed" | "failed" | "cancelled";
+export type SubagentTask = {
+  subagentId: string; generation: number; agent: string; agentBody: string; cwd: string; label: string; model?: string; thinking?: string;
+  sessionFile: string; resultPath: string; tabId: string; paneId: string; status: TaskStatus;
+  result?: string; error?: string;
+};
+export type HerdrTransport = {
+  createTab(input: { cwd: string; label: string; env?: Record<string, string> }): Promise<{ tabId: string; paneId: string }>;
+  run(paneId: string, command: string, args: string[]): Promise<void>;
+  sendText(paneId: string, text: string): Promise<void>;
+  closePane(paneId: string): Promise<void>;
+};
+
+type Json = Record<string, unknown>;
+function unwrap(value: Json): Json { return value.result && typeof value.result === "object" && !Array.isArray(value.result) ? value.result as Json : value; }
+
+export function createHerdrTransport(client: HerdrClient<{ cwd?: string }> = createHerdrClient<{ cwd?: string }>(async (command, args, options) => {
+  try { const result = await exec(command, args, { cwd: options.cwd, maxBuffer: 4 * 1024 * 1024 }); return { code: 0, stdout: result.stdout, stderr: result.stderr }; }
+  catch (error) { const failure = error as { code?: number; stdout?: string; stderr?: string; message?: string }; return { code: typeof failure.code === "number" ? failure.code : 1, stdout: failure.stdout ?? "", stderr: failure.stderr ?? failure.message ?? String(error) }; }
+})): HerdrTransport {
+  return {
+    async createTab(input) {
+      const args = ["tab", "create", "--cwd", input.cwd, "--label", input.label, "--no-focus"];
+      for (const [name, value] of Object.entries(input.env ?? {})) args.push("--env", `${name}=${value}`);
+      const raw = unwrap(await client.json(args, {}));
+      const panes = Array.isArray(raw.panes) ? raw.panes : [];
+      const pane = panes[0] as Json | undefined;
+      const tabId = String(raw.id ?? raw.tabId ?? "");
+      const paneId = String(raw.paneId ?? pane?.id ?? "");
+      if (!tabId || !paneId) throw new Error("Herdr tab create returned no tab or pane identity");
+      return { tabId, paneId };
+    },
+    async run(paneId, command, args) { await client.run(["pane", "run", paneId, command, ...args], {}); },
+    async sendText(paneId, text) { await client.run(["pane", "send-text", paneId, text], {}); },
+    async closePane(paneId) { await client.run(["pane", "close", paneId], {}); },
+  };
+}
+
+function parseAgent(text: string, path: string): AgentDefinition {
+  const normalized = text.replaceAll("\r\n", "\n");
+  const match = normalized.match(/^---\n([\s\S]*?)\n---\n?([\s\S]*)$/);
+  const fields: Record<string, string> = {};
+  for (const line of (match?.[1] ?? "").split("\n")) { const i = line.indexOf(":"); if (i > 0) fields[line.slice(0, i).trim()] = line.slice(i + 1).trim().replace(/^['"]|['"]$/g, ""); }
+  return { name: fields.name || basename(path, ".md"), path, body: (match?.[2] ?? normalized).trim(), description: fields.description || fields.name || basename(path, ".md") };
+}
+function markdownFiles(root: string): string[] { if (!existsSync(root)) return []; return [...new Bun.Glob("**/*.md").scanSync({ cwd: root, absolute: true })]; }
+
+export class AgentRegistry {
+  private agents = new Map<string, AgentDefinition>();
+  setFiles(files: Array<{ path: string; content: string }>): void { this.agents.clear(); this.addFiles(files); }
+  discover(cwd: string, packageFiles: Array<{ path: string; content: string }> = []): void {
+    this.agents.clear(); this.addFiles(packageFiles);
+    for (const root of [join(getAgentDir(), "agents"), join(cwd, ".pi", "agents")]) for (const path of markdownFiles(root)) { const agent = parseAgent(readFileSync(path, "utf8"), path); this.agents.set(agent.name, agent); }
+  }
+  private addFiles(files: Array<{ path: string; content: string }>): void { for (const file of files) { const agent = parseAgent(file.content, file.path); this.agents.set(agent.name, agent); } }
+  list(): AgentDefinition[] { return [...this.agents.values()]; }
+  get(name: string): AgentDefinition | undefined { return this.agents.get(name); }
+}
+
+async function writeAtomic(path: string, value: unknown): Promise<void> {
+  mkdirSync(dirname(path), { recursive: true, mode: 0o700 });
+  const temporary = `${path}.${process.pid}.tmp`;
+  await Bun.write(temporary, JSON.stringify(value));
+  renameSync(temporary, path);
+}
+function writeFileSyncSafe(path: string, _content: string): string { return path; }
+
+export class SubagentRuntime {
+  private tasks = new Map<string, SubagentTask>(); private sequence = 0;
+  constructor(private readonly transport: HerdrTransport, private readonly root = join(tmpdir(), "pi-herdr-subagents")) { mkdirSync(root, { recursive: true, mode: 0o700 }); }
+  async spawn(input: { cwd: string; agent: AgentDefinition; prompt: string; label: string; model?: string; thinking?: string }): Promise<SubagentTask> { return this.start({ subagentId: `subagent-${++this.sequence}`, generation: 1, ...input }); }
+  async resume(subagentId: string, prompt: string): Promise<SubagentTask> { const old = this.get(subagentId); if (old.status === "running") throw new Error("Cannot resume a running subagent"); return this.start({ subagentId, generation: old.generation + 1, cwd: old.cwd, prompt, label: old.label, model: old.model, thinking: old.thinking, sessionFile: old.sessionFile, agent: { name: old.agent, path: "", body: old.agentBody, description: old.agent } }); }
+  private async start(input: { subagentId: string; generation: number; cwd: string; agent: AgentDefinition; prompt: string; label: string; model?: string; thinking?: string; sessionFile?: string }): Promise<SubagentTask> {
+    const dir = join(this.root, input.subagentId); mkdirSync(dir, { recursive: true, mode: 0o700 });
+    const sessionFile = input.sessionFile ?? join(dir, "session.jsonl"); const resultPath = join(dir, `result-${input.generation}.json`);
+    const surface = await this.transport.createTab({ cwd: input.cwd, label: input.label, env: { PI_HERDR_SUBAGENT_ID: input.subagentId, PI_HERDR_SUBAGENT_GENERATION: String(input.generation), PI_HERDR_SUBAGENT_RESULT_PATH: resultPath } });
+    const task: SubagentTask = { subagentId: input.subagentId, generation: input.generation, agent: input.agent.name, agentBody: input.agent.body, cwd: input.cwd, label: input.label, model: input.model, thinking: input.thinking, sessionFile, resultPath, ...surface, status: "running" };
+    const args = ["--session", sessionFile, "-e", paneChildExtensionPath, "--system-prompt", input.agent.body, "--tools", "read,bash,edit,write,subagent_done"];
+    if (input.model) args.push("--model", input.thinking ? `${input.model}:${input.thinking}` : input.model);
+    args.push(`${input.prompt}\n\nReturn the Handler Result as YAML, then call subagent_done with that exact YAML string.`);
+    await this.transport.run(task.paneId, "pi", args); this.tasks.set(task.subagentId, task); return { ...task };
+  }
+  private get(id: string): SubagentTask { const task = this.tasks.get(id); if (!task) throw new Error(`Unknown subagent: ${id}`); return task; }
+  inspect(id: string): SubagentTask { return { ...this.get(id) }; }
+  async join(id: string, generation = this.get(id).generation): Promise<SubagentTask> { const task = this.get(id); if (task.generation !== generation) throw new Error("Subagent generation is no longer current"); while (task.status === "running") { if (existsSync(task.resultPath)) { const record = JSON.parse(readFileSync(task.resultPath, "utf8")) as Json; if (record.subagentId !== id || record.generation !== generation) throw new Error("Subagent result identity mismatch"); task.result = typeof record.result === "string" ? record.result : undefined; task.status = record.status === "failed" ? "failed" : "completed"; task.error = typeof record.error === "string" ? record.error : undefined; break; } await Bun.sleep(50); } return { ...task }; }
+  async steer(id: string, message: string): Promise<SubagentTask> { const task = this.get(id); if (task.status !== "running") throw new Error("Subagent is not running"); await this.transport.sendText(task.paneId, message); return { ...task }; }
+  async cancel(id: string): Promise<SubagentTask> { const task = this.get(id); if (task.status === "running") { await this.transport.closePane(task.paneId); task.status = "cancelled"; void writeAtomic(task.resultPath, { subagentId: id, generation: task.generation, status: "cancelled" }); } return { ...task }; }
+  async remove(id: string): Promise<void> { const task = this.get(id); if (task.status === "running") await this.transport.closePane(task.paneId); this.tasks.delete(id); rmSync(join(this.root, id), { recursive: true, force: true }); }
+}
+
+export function createSubagentTools(runtime: SubagentRuntime, registry: AgentRegistry, cwd: string) {
+  const agent = registry.list().map(value => value.name); const agentSchema = agent.length ? StringEnum(agent) : Type.String({ minLength: 1 });
+  const tool = (name: string, description: string, parameters: any, execute: (params: any) => Promise<unknown>) => defineTool({ name, label: name, description, parameters, async execute(_id, params) { const details = await execute(params); return { content: [{ type: "text", text: JSON.stringify(details) }], details }; } });
+  return [
+    tool("subagent_spawn", "Start one background subagent.", Type.Object({ agent: agentSchema, prompt: Type.String({ minLength: 1 }), label: Type.String({ minLength: 1 }), model: Type.Optional(Type.String()), thinking: Type.Optional(Type.String()) }), async params => { const definition = registry.get(params.agent); if (!definition) throw new Error(`Unknown agent: ${params.agent}`); return runtime.spawn({ cwd, agent: definition, ...params }); }),
+    tool("subagent_resume", "Resume a completed or failed subagent.", Type.Object({ subagentId: Type.String(), prompt: Type.String({ minLength: 1 }) }), params => runtime.resume(params.subagentId, params.prompt)),
+    tool("subagent_inspect", "Return a non-blocking subagent snapshot.", Type.Object({ subagentId: Type.String() }), params => Promise.resolve(runtime.inspect(params.subagentId))),
+    tool("subagent_join", "Wait for a subagent Result.", Type.Object({ subagentId: Type.String(), generation: Type.Optional(Type.Number()) }), params => runtime.join(params.subagentId, params.generation)),
+    tool("subagent_steer", "Send a message to a running subagent.", Type.Object({ subagentId: Type.String(), message: Type.String({ minLength: 1 }) }), params => runtime.steer(params.subagentId, params.message)),
+    tool("subagent_cancel", "Best-effort cancel a running subagent.", Type.Object({ subagentId: Type.String() }), params => runtime.cancel(params.subagentId)),
+    tool("subagent_remove", "Close and remove a subagent and its artifacts.", Type.Object({ subagentId: Type.String() }), async params => { await runtime.remove(params.subagentId); return { status: "removed" }; }),
+  ];
+}
+
+export default function subagentsExtension(pi: ExtensionAPI, dependencies: { runtime?: SubagentRuntime; registry?: AgentRegistry } = {}): void {
+  if (process.env.PI_HERDR_SUBAGENT_RESULT_PATH) return;
+  const registry = dependencies.registry ?? new AgentRegistry(); const runtime = dependencies.runtime ?? new SubagentRuntime(createHerdrTransport());
+  pi.on("before_agent_start", (event, ctx) => {
+    const contextFiles = (event.systemPromptOptions as unknown as { contextFiles?: Array<{ path: string; content: string }> }).contextFiles ?? [];
+    registry.discover(ctx.cwd, contextFiles);
+    const tools = createSubagentTools(runtime, registry, ctx.cwd);
+    for (const tool of tools) pi.registerTool(tool);
+    pi.setActiveTools([...pi.getActiveTools().filter(name => !name.startsWith("subagent_")), ...tools.map(tool => tool.name)]);
+  });
+}

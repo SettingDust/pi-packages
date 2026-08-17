@@ -18,6 +18,7 @@
   },
   "pi": {
     "extensions": ["./extensions"],
-    "skills": ["./skills"]
+    "skills": ["./skills"],
+    "agents": ["./agents"]
   }
 }

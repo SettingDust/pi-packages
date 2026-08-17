@@ -1,0 +1,22 @@
+{
+  "name": "pi-herdr-subagents",
+  "version": "0.1.0",
+  "description": "Independent Herdr-backed Pi subagent runtime",
+  "keywords": ["pi-package", "pi", "herdr", "subagent"],
+  "type": "module",
+  "files": ["src", "extensions", "README.md"],
+  "scripts": {
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "test": "bun test"
+  },
+  "dependencies": {
+    "pi-herdr": "workspace:*"
+  },
+  "peerDependencies": {
+    "@earendil-works/pi-ai": "*",
+    "@earendil-works/pi-coding-agent": "*"
+  },
+  "pi": {
+    "extensions": ["./extensions"]
+  }
+}

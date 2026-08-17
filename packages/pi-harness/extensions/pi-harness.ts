@@ -36,6 +36,11 @@ export default function activateHarness(
   });
 
   pi.on("before_agent_start", (event, ctx) => {
+    if (event.systemPromptOptions.customPrompt !== undefined) {
+      pi.setActiveTools(pi.getActiveTools().filter((name) => name !== resolverName));
+      return;
+    }
+
     const skills = visibleSkills(event);
     const roles = currentRoles(ctx, loadRoles);
     refreshResolver(pi, skills, roles, loadRoles);

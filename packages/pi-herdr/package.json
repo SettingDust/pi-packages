@@ -4,6 +4,7 @@
   "description": "Typed Herdr CLI client for Pi packages",
   "keywords": ["pi-package", "pi", "herdr", "cli"],
   "type": "module",
+  "exports": "./src/index.ts",
   "files": ["src", "README.md"],
   "scripts": {
     "typecheck": "tsc --noEmit -p tsconfig.json",
