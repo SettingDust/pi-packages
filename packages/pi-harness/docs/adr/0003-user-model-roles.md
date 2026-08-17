@@ -1,0 +1,22 @@
+# ADR-0003: Configure Dynamic Model Roles at User Scope
+
+- Status: accepted
+- Date: 2026-08-17
+
+## Context
+
+The Router needs to select model investment without knowing provider authentication details or committing a user's model inventory to a repository.
+
+## Decision
+
+Model Roles are stored only in `~/.pi/agent/config/pi-harness.json`. On first configuration, the package offers `basic`, `standard`, and `advanced` as initial templates. They are ordinary Roles, not reserved names.
+
+Every Role has an editable name, description, and exactly one `{ model, thinking }` selection. The description is shown to the Router in the dynamically generated resolver schema. There is no ordered candidate list and no automatic cross-model fallback.
+
+`/harness config` opens a TUI backed by Pi's current model registry. Users may add, rename, edit, or delete any Role, including the three initial templates.
+
+Only Roles whose model exists, is currently authenticated and available, and accepts the configured thinking level appear in the resolver schema. Resolver execution repeats these checks to catch changes after schema generation. When no Role is available, `resolve_delegation` is not registered and the Router reports the configuration block with `/harness config`. A malformed configuration is reported and preserved rather than overwritten.
+
+## Consequences
+
+Projects refer only to semantic Role names in live Router decisions; their documents never record user-specific model IDs. An unavailable, unauthenticated, missing, or invalid Role blocks resolution instead of silently substituting another model. The dynamic resolver schema exposes currently usable Roles without requiring a separate role-discovery tool.
