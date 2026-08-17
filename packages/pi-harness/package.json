@@ -1,0 +1,16 @@
+{
+  "name": "pi-harness",
+  "version": "0.1.0",
+  "description": "A Router and delegated-work protocol for Pi",
+  "keywords": ["pi-package"],
+  "type": "module",
+  "files": ["dist", "extensions", "skills", "agents", "docs"],
+  "scripts": {
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "test": "bun test"
+  },
+  "pi": {
+    "extensions": ["./extensions"],
+    "skills": ["./skills"]
+  }
+}
