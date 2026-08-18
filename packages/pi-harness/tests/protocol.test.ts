@@ -43,7 +43,7 @@ beforeAll(async () => {
   cwd = await mkdtemp(join(tmpdir(), "pi-harness-"));
   readableRef = join(cwd, "context.md");
   await writeFile(readableRef, "context", "utf8");
-  options = { skills, roles, cwd, handlerPath: "agents/handler.md" };
+  options = { skills, roles, cwd };
 });
 
 afterAll(async () => {
@@ -98,7 +98,7 @@ describe("delegation resolution", () => {
     expect(result.prompt).not.toContain("modelRole");
     expect(result.model).toBe("test/standard");
     expect(result.thinking).toBe("medium");
-    expect(result.handler.name).toBe("handler");
+    expect(result).not.toHaveProperty("handler");
   });
 
   test("defaults omitted companionSkills to an empty list", async () => {

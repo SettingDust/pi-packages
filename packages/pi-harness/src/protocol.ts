@@ -65,7 +65,6 @@ export interface BlockedResolution {
 
 export interface ResolvedInvocation {
   status: "resolved";
-  handler: { name: string; path: string };
   prompt: string;
   model: string;
   thinking: ThinkingLevel;
@@ -127,8 +126,6 @@ export interface ResolveOptions {
   skills: SkillSummary[];
   roles: ModelRole[];
   cwd: string;
-  handlerPath: string;
-  handlerName?: string;
 }
 
 export async function resolveDelegation(
@@ -183,7 +180,6 @@ export async function resolveDelegation(
 
   return {
     status: "resolved",
-    handler: { name: options.handlerName ?? "handler", path: resolve(options.handlerPath) },
     prompt: Bun.YAML.stringify(normalizedHandoff),
     model: role.model,
     thinking: role.thinking,

@@ -16,7 +16,7 @@ Prove the contract in isolation before using Pi runtime APIs or a delegate backe
 
 1. Schema generation includes all supplied model-visible Skills and excludes unavailable Roles.
 2. Replacing Skills or Role availability produces a new schema without stale enum values.
-3. A valid Handoff returns `status: resolved`, preserves objective/Skills/contexts in YAML, keeps referenced file content out of the prompt, and omits `modelRole` from the prompt.
+3. A valid Handoff returns `status: resolved`, preserves objective/Skills/contexts in YAML, keeps referenced file content out of the prompt, omits `modelRole` from the prompt, and returns only the prompt and resolved model settings.
 4. Missing/unreadable references return `invalid_reference` before serialization completes.
 5. Unknown Skills, repeated companion Skills, and a companion equal to primary return `invalid_skill`.
 6. Missing, malformed, unavailable, or invalid-thinking Roles return the corresponding blocked code without fallback.

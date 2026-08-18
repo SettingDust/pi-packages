@@ -6,7 +6,7 @@ The `pi-harness` extension replaces Pi's default main-session system prompt with
 
 When at least one Model Role is currently available, the extension also registers `resolve_delegation`, which prepares but does not start a Handler invocation.
 
-The package bundles `agents/handler.md`. This is a backend-neutral Handler Agent definition, not a required runtime registration mechanism.
+The package bundles `agents/handler.md` and declares it through `pi.agents`. A compatible delegate environment resolves the fixed `handler` Agent from its own Agent registry. The Resolver never returns a Handler name or path, and the Router never selects a Handler.
 
 ## 2. Dynamic Resolver Schema
 
@@ -45,9 +45,6 @@ A successful resolution returns:
 
 ```yaml
 status: resolved
-handler:
-  name: handler
-  path: absolute-path-to-installed-package/agents/handler.md
 prompt: yaml-handoff
 model: provider/model
 thinking: configured-thinking-level
@@ -61,7 +58,7 @@ code: invalid_config | invalid_skill | invalid_reference | unknown_role | unavai
 message: actionable explanation
 ```
 
-The `prompt` value is YAML representing the validated Handoff only. `handler.path` lets a prompt-only backend read and include the Handler definition; a backend that supports selecting an Agent may use `handler.name` instead. Expected validation blocks are results, not thrown tool errors.
+The `prompt` value is YAML representing the validated Handoff only. Handler identity is a fixed delegate-environment contract: the environment resolves `handler` from its own Agent registry. Expected validation blocks are results, not thrown tool errors.
 
 ## 5. Handoff Prompt
 
@@ -78,7 +75,7 @@ deliverables:
   - ...
 ```
 
-Handoff prompts do not contain the Router's candidate set, Model Role, backend implementation details, or copied contents of referenced files.
+Handoff prompts do not contain the Router's candidate set, Model Role, Handler identity, backend implementation details, or copied contents of referenced files.
 
 ## 6. Handler Result
 
@@ -112,7 +109,7 @@ Handler-time reference failures and work failures are Handler Results, not Resol
 
 A Router pass begins from either a user input or a Handler completion notification. The Router may use user input, package configuration, Skill information, and prior Handler Results, but it must not perform project-domain reading, research, editing, execution, or independent verification.
 
-The Router must respond directly only for coordination work: clarification, a status or Result summary, completion, blocking conditions, or risk escalation. When substantive work is necessary, it selects one primary Skill, optional companion Skills, a Model Role, and Handoff context, then calls `resolve_delegation`. The environment may then launch the returned invocation.
+The Router must respond directly only for coordination work: clarification, a status or Result summary, completion, blocking conditions, or risk escalation. When substantive work is necessary, it selects one primary Skill, optional companion Skills, a Model Role, and Handoff context, then calls `resolve_delegation`. The environment may then launch the fixed registry-resolved Handler using the returned invocation.
 
 The Router may resolve and launch several Handlers concurrently when it judges the work independent. It is responsible for that judgment. No v0.1 runtime mechanism prevents overlapping edits or other conflicting work.
 

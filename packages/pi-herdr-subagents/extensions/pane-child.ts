@@ -1,4 +1,5 @@
 import { renameSync } from "node:fs";
+import { writeFile } from "node:fs/promises";
 import { Type } from "@earendil-works/pi-ai";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 
@@ -12,7 +13,7 @@ export default function paneChild(pi: ExtensionAPI): void {
     if (settled) return;
     settled = true;
     const temporary = `${resultPath}.${process.pid}.tmp`;
-    Bun.write(temporary, JSON.stringify({ subagentId, generation, status: "completed", result }))
+    void writeFile(temporary, JSON.stringify({ subagentId, generation, status: "completed", result }))
       .then(() => { renameSync(temporary, resultPath); ctx.shutdown(); });
   };
   pi.registerTool({

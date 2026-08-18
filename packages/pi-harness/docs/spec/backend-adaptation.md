@@ -6,9 +6,6 @@ After `resolve_delegation` succeeds, the Router receives:
 
 ```yaml
 status: resolved
-handler:
-  name: handler
-  path: absolute-path-to-installed-package/agents/handler.md
 prompt: yaml-handoff
 model: provider/model
 thinking: configured-thinking-level
@@ -16,21 +13,18 @@ thinking: configured-thinking-level
 
 The Router maps these values to an environment-provided delegate tool. The Resolver does not discover, select, or call that tool.
 
+The Handler is fixed as the Agent named `handler`. A compatible backend resolves that Agent from its own registry; the Router neither selects it nor receives its name or path from the Resolver.
+
 ## 2. Compatibility Requirements
 
 Before calling a delegate tool, the Router must establish from its schema and description that it can:
 
-1. start an independent Handler execution;
+1. start an independent execution using its registry-resolved `handler` Agent;
 2. guarantee the resolved `model` and `thinking` values;
-3. provide the Handler Agent instructions;
+3. load the fixed Handler Agent instructions from its own Agent registry;
 4. provide the selected Pi Skills and read access to every Handoff reference;
 5. return a stable `taskId`; and
 6. return or later notify the Router of the Handler's YAML Result.
-
-A tool may satisfy Agent instruction delivery in either form:
-
-- **Named Agent:** pass `handler.name` through the tool's Agent-selection capability.
-- **Prompt only:** read `handler.path` as coordination material and compose its content with `prompt` using the tool's supported instruction/task fields.
 
 The package does not prescribe argument names. A backend is incompatible when any requirement cannot be established. The Router reports that block and must not omit or replace required values.
 
@@ -40,14 +34,13 @@ When the independent `pi-herdr-subagents` tools are active, Router maps one reso
 
 ```yaml
 subagent_spawn:
-  agent: handler
   prompt: resolved.prompt
   label: concise delegated objective
   model: resolved.model
   thinking: resolved.thinking
 ```
 
-The tool returns a stable `subagentId`. Completion notifications identify `subagentId` and the finished generation without exposing the Result body. Router calls `subagent_join({ subagentId })` to collect and validate that generation's private result pointer. `subagent_resume` retains the same `subagentId`; inspect, steer, cancel, and remove remain backend lifecycle operations rather than Harness workflow decisions.
+`subagent_spawn` resolves the fixed `handler` from its local Agent registry. The tool returns a stable `subagentId`. Completion notifications identify `subagentId` and the finished generation without exposing the Result body. Router calls `subagent_join({ subagentId })` to collect and validate that generation's private result pointer. `subagent_resume` retains the same `subagentId`; inspect, steer, cancel, and remove remain backend lifecycle operations rather than Harness workflow decisions.
 
 ## 3. Launch Result
 
@@ -77,7 +70,7 @@ The Router parses a well-formed YAML Result into the normalized Result envelope.
 
 ## 5. Failure Behavior
 
-- Missing backend capability blocks launch before work starts.
+- Missing backend capability or the fixed `handler` Agent blocks launch before work starts.
 - A backend launch error is a backend failure, not a Resolver failure.
 - An unavailable configured model or thinking level must not fall back silently.
 - A malformed or missing Handler Result is not treated as successful work.

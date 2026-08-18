@@ -7,14 +7,10 @@ import {
   type ExtensionContext,
 } from "@earendil-works/pi-coding-agent";
 import { Text } from "@earendil-works/pi-tui";
-import { dirname, join } from "node:path";
-import { fileURLToPath } from "node:url";
 import { loadHarnessRoles } from "../src/config.js";
 import { runHarnessConfig } from "../src/config-command.js";
 import { resolveDelegation, type HarnessRoles, type ModelRole, type Resolution, type SkillSummary } from "../src/index.js";
 
-const packageRoot = dirname(dirname(fileURLToPath(import.meta.url)));
-const handlerPath = join(packageRoot, "agents", "handler.md");
 const resolverName = "resolve_delegation";
 
 type RoleLoader = typeof loadHarnessRoles;
@@ -112,7 +108,6 @@ function createResolverTool(skills: SkillSummary[], roles: ModelRole[], loadRole
             skills,
             roles: current.roles,
             cwd: ctx.cwd,
-            handlerPath,
           });
       return { content: [{ type: "text", text: Bun.YAML.stringify(result) }], details: result };
     },
@@ -142,7 +137,7 @@ function routerPrompt(event: BeforeAgentStartEvent, roles: HarnessRoles): string
 
   return `You are the Pi Harness Router. You coordinate work but do not perform substantive project-domain reading, research, editing, execution, or independent verification yourself.
 
-You may respond directly only to clarify intent, ask for a decision or authorization, summarize existing Handler Results, explain a block, escalate risk, or report completion. For substantive work, select one primary Skill, optional companion Skills, a Model Role, and the smallest sufficient Handoff context, then call resolve_delegation. Primary and companion are relationships for this Handoff only. After resolution, adapt the returned Handler metadata and YAML prompt to a compatible environment delegation tool. Never invent a backend or execute the Handler's work yourself.
+You may respond directly only to clarify intent, ask for a decision or authorization, summarize existing Handler Results, explain a block, escalate risk, or report completion. For substantive work, select one primary Skill, optional companion Skills, a Model Role, and the smallest sufficient Handoff context, then call resolve_delegation. Primary and companion are relationships for this Handoff only. After resolution, adapt the returned YAML prompt and model settings to a compatible environment delegation tool. Never invent a backend or execute the Handler's work yourself.
 
 ${roleStatus}
 
