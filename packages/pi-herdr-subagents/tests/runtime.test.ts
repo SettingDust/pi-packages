@@ -5,13 +5,14 @@ import { dirname, join } from "node:path";
 import { createHerdrClient } from "pi-herdr";
 import { AgentRegistry, SubagentRuntime, createHerdrTransport, createSubagentTools, type HerdrTransport } from "../src/index.js";
 
-function fakeTransport() {
+function fakeTransport(paneExists = true) {
   const calls: unknown[] = [];
   const transport: HerdrTransport = {
     async createTab(input) { calls.push({ op: "create", input }); return { tabId: "tab-1", paneId: "pane-1" }; },
     async run(paneId, command, args) { calls.push({ op: "run", paneId, command, args }); },
     async sendText(paneId, text) { calls.push({ op: "send", paneId, text }); },
     async closePane(paneId) { calls.push({ op: "close", paneId }); },
+    async paneExists(paneId) { calls.push({ op: "exists", paneId }); return paneExists; },
   };
   return { calls, transport };
 }
@@ -33,6 +34,15 @@ describe("pi-herdr-subagents runtime", () => {
     await expect(transport.createTab({ cwd: "/repo", label: "task" })).resolves.toEqual({ tabId: "wF:t5", paneId: "wF:p6" });
   });
 
+  test("positively verifies retained panes", async () => {
+    const present = createHerdrTransport(createHerdrClient(async () => ({ code: 0, stdout: "{}", stderr: "" })));
+    await expect(present.paneExists("pane-1")).resolves.toBeTrue();
+    const missing = createHerdrTransport(createHerdrClient(async () => ({
+      code: 1, stderr: "", stdout: JSON.stringify({ error: { code: "pane_not_found" } }),
+    })));
+    await expect(missing.paneExists("pane-1")).resolves.toBeFalse();
+  });
+
   test("launches Pi through an exact-arguments Node bootstrap", async () => {
     const registry = handlerRegistry("Execute the Handoff.");
     const { calls, transport } = fakeTransport();
@@ -40,6 +50,8 @@ describe("pi-herdr-subagents runtime", () => {
     const runtime = new SubagentRuntime(transport, registry, root);
     const task = await runtime.spawn({ agent: "handler", cwd: "/repo", prompt: "Do\nthe work", label: "task", model: "test/model", thinking: "high" });
     expect(task).toMatchObject({ subagentId: "subagent-1", generation: 1, sessionFile: join(root, "tasks", "subagent-1-g1.jsonl"), status: "running" });
+    const manifest = JSON.parse(readFileSync(join(dirname(task.resultPath), "task.json"), "utf8"));
+    expect(manifest).toMatchObject({ version: 1, subagentId: task.subagentId, generation: 1, status: "running", paneId: "pane-1" });
     expect(calls[0]).toMatchObject({ op: "create", input: { cwd: "/repo", env: { PI_HERDR_SUBAGENT_ID: "subagent-1", PI_HERDR_SUBAGENT_GENERATION: "1" } } });
     const launch = calls[1] as { op: string; command: string; args: string[] };
     expect(launch).toMatchObject({ op: "run", command: "powershell.exe" });
@@ -65,16 +77,23 @@ describe("pi-herdr-subagents runtime", () => {
     await expect(runtime.join(task.subagentId)).resolves.toMatchObject({ status: "completed", result: expect.stringContaining("status: completed") });
   });
 
-  test("resume preserves identity and session, while steer, cancel, and remove own lifecycle", async () => {
+  test("resume preserves parent-session identity, while steer, cancel, and remove own lifecycle", async () => {
     const { calls, transport } = fakeTransport();
-    const root = mkdtempSync(join(tmpdir(), "subagents-test-"));
-    const runtime = new SubagentRuntime(transport, handlerRegistry(), root);
-    const first = await runtime.spawn({ agent: "handler", cwd: "/repo", prompt: "one", label: "task" });
+    const parentDir = mkdtempSync(join(tmpdir(), "subagents-parent-"));
+    const parentSessionFile = join(parentDir, "parent.jsonl");
+    const runtime = new SubagentRuntime(transport, handlerRegistry());
+    const first = await runtime.spawn({ agent: "handler", cwd: "/repo", prompt: "one", label: "task", parentSessionFile });
+    writeFileSync(first.sessionFile, "");
     writeFileSync(first.resultPath, JSON.stringify({ subagentId: first.subagentId, generation: 1, status: "failed", error: "retry" }));
     const completed = await runtime.join(first.subagentId);
     expect(completed.status).toBe("failed");
     const second = await runtime.resume(first.subagentId, "two");
-    expect(second).toMatchObject({ subagentId: first.subagentId, generation: 2, sessionFile: first.sessionFile });
+    expect(second).toMatchObject({
+      subagentId: first.subagentId,
+      generation: 2,
+      sessionFile: first.sessionFile,
+      resultPath: join(parentDir, "parent", "tasks", "subagent-1-artifacts", "result-2.json"),
+    });
     await expect(runtime.steer(first.subagentId, "focus")).resolves.toMatchObject({ generation: 2 });
     await expect(runtime.cancel(first.subagentId)).resolves.toMatchObject({ status: "cancelled" });
     await runtime.remove(first.subagentId);
@@ -134,6 +153,124 @@ describe("pi-herdr-subagents runtime", () => {
 
     await expect(runtime.spawn({ agent: "handler", cwd: "/repo", prompt: "Do the work", label: "task" }))
       .rejects.toThrow("Required Agent is unavailable: handler");
+  });
+
+  test("does not reuse persisted task artifacts after runtime reconstruction", async () => {
+    const parentDir = mkdtempSync(join(tmpdir(), "subagents-rebuilt-"));
+    const parentSessionFile = join(parentDir, "parent.jsonl");
+    const first = await new SubagentRuntime(fakeTransport().transport, handlerRegistry()).spawn({
+      agent: "handler", cwd: "/repo", prompt: "first", label: "first", parentSessionFile,
+    });
+    writeFileSync(first.sessionFile, "");
+    writeFileSync(first.resultPath, JSON.stringify({
+      subagentId: first.subagentId, generation: first.generation, status: "completed", result: "old result",
+    }));
+
+    const rebuilt = new SubagentRuntime(fakeTransport().transport, handlerRegistry());
+    const second = await rebuilt.spawn({ agent: "handler", cwd: "/repo", prompt: "second", label: "second", parentSessionFile });
+    expect(second).toMatchObject({ subagentId: "subagent-2", generation: 1, status: "running" });
+    expect(second.resultPath).not.toBe(first.resultPath);
+
+    writeFileSync(second.resultPath, JSON.stringify({
+      subagentId: second.subagentId, generation: second.generation, status: "completed", result: "new result",
+    }));
+    await expect(rebuilt.join(second.subagentId)).resolves.toMatchObject({ status: "completed", result: "new result" });
+    await rebuilt.remove(second.subagentId);
+    expect(existsSync(dirname(first.resultPath))).toBeTrue();
+  });
+
+  test("recovers a running pane without relaunching it", async () => {
+    const parentDir = mkdtempSync(join(tmpdir(), "subagents-recover-running-"));
+    const parentSessionFile = join(parentDir, "parent.jsonl");
+    const first = await new SubagentRuntime(fakeTransport().transport, handlerRegistry()).spawn({
+      agent: "handler", cwd: "/repo", prompt: "work", label: "running", parentSessionFile,
+    });
+    writeFileSync(first.sessionFile, "");
+
+    const { calls, transport } = fakeTransport(true);
+    const rebuilt = new SubagentRuntime(transport, handlerRegistry());
+    await rebuilt.recover("/repo", parentSessionFile);
+    expect(rebuilt.inspect(first.subagentId)).toMatchObject({ generation: 1, status: "running", paneId: first.paneId });
+    await rebuilt.steer(first.subagentId, "continue");
+    expect(calls.filter(call => ["create", "run"].includes((call as { op: string }).op))).toHaveLength(0);
+    expect(calls).toContainEqual({ op: "exists", paneId: first.paneId });
+    expect(calls).toContainEqual({ op: "send", paneId: first.paneId, text: "continue" });
+  });
+
+  test("recovers a terminal Result before checking the retained pane", async () => {
+    const parentDir = mkdtempSync(join(tmpdir(), "subagents-recover-result-"));
+    const parentSessionFile = join(parentDir, "parent.jsonl");
+    const first = await new SubagentRuntime(fakeTransport().transport, handlerRegistry()).spawn({
+      agent: "handler", cwd: "/repo", prompt: "work", label: "done", parentSessionFile,
+    });
+    writeFileSync(first.resultPath, JSON.stringify({
+      subagentId: first.subagentId, generation: first.generation, status: "cancelled",
+    }));
+
+    const { calls, transport } = fakeTransport(false);
+    const rebuilt = new SubagentRuntime(transport, handlerRegistry());
+    await rebuilt.recover("/repo", parentSessionFile);
+    await expect(rebuilt.join(first.subagentId)).resolves.toMatchObject({ status: "cancelled", generation: 1 });
+    expect(calls).toHaveLength(0);
+  });
+
+  test("persists pane_closed when a running task's pane is missing", async () => {
+    const parentDir = mkdtempSync(join(tmpdir(), "subagents-recover-missing-"));
+    const parentSessionFile = join(parentDir, "parent.jsonl");
+    const first = await new SubagentRuntime(fakeTransport().transport, handlerRegistry()).spawn({
+      agent: "handler", cwd: "/repo", prompt: "work", label: "missing", parentSessionFile,
+    });
+    writeFileSync(first.sessionFile, "");
+
+    const rebuilt = new SubagentRuntime(fakeTransport(false).transport, handlerRegistry());
+    await rebuilt.recover("/repo", parentSessionFile);
+    await expect(rebuilt.join(first.subagentId)).resolves.toMatchObject({ status: "failed", error: "pane_closed" });
+    const manifest = JSON.parse(readFileSync(join(dirname(first.resultPath), "task.json"), "utf8"));
+    expect(manifest).toMatchObject({ version: 1, subagentId: first.subagentId, status: "failed", error: "pane_closed" });
+    await rebuilt.remove(first.subagentId);
+    expect(existsSync(dirname(first.resultPath))).toBeFalse();
+  });
+
+  test("recovers only the current generation and rejects a mismatched Result", async () => {
+    const parentDir = mkdtempSync(join(tmpdir(), "subagents-recover-generation-"));
+    const parentSessionFile = join(parentDir, "parent.jsonl");
+    const original = new SubagentRuntime(fakeTransport().transport, handlerRegistry());
+    const first = await original.spawn({ agent: "handler", cwd: "/repo", prompt: "one", label: "generation", parentSessionFile });
+    writeFileSync(first.sessionFile, "");
+    writeFileSync(first.resultPath, JSON.stringify({ subagentId: first.subagentId, generation: 1, status: "failed", error: "retry" }));
+    await original.join(first.subagentId);
+    const second = await original.resume(first.subagentId, "two");
+
+    const running = new SubagentRuntime(fakeTransport(true).transport, handlerRegistry());
+    await running.recover("/repo", parentSessionFile);
+    expect(running.inspect(first.subagentId)).toMatchObject({ generation: 2, status: "running", sessionFile: first.sessionFile });
+
+    writeFileSync(second.resultPath, JSON.stringify({ subagentId: first.subagentId, generation: 1, status: "completed", result: "stale" }));
+    const rebuilt = new SubagentRuntime(fakeTransport(true).transport, handlerRegistry());
+    await rebuilt.recover("/repo", parentSessionFile);
+    await expect(rebuilt.join(first.subagentId, 2)).resolves.toMatchObject({ status: "failed", error: "result_identity_mismatch" });
+    const third = await rebuilt.resume(first.subagentId, "three");
+    expect(third).toMatchObject({ generation: 3, sessionFile: first.sessionFile });
+  });
+
+  test("recovery is idempotent and scoped to the current parent session", async () => {
+    const parentA = join(mkdtempSync(join(tmpdir(), "subagents-scope-a-")), "parent.jsonl");
+    const parentB = join(mkdtempSync(join(tmpdir(), "subagents-scope-b-")), "parent.jsonl");
+    const first = await new SubagentRuntime(fakeTransport().transport, handlerRegistry()).spawn({
+      agent: "handler", cwd: "/repo", prompt: "a", label: "parent-a", parentSessionFile: parentA,
+    });
+    const second = await new SubagentRuntime(fakeTransport().transport, handlerRegistry()).spawn({
+      agent: "handler", cwd: "/repo", prompt: "b", label: "parent-b", parentSessionFile: parentB,
+    });
+    writeFileSync(first.resultPath, JSON.stringify({ subagentId: first.subagentId, generation: 1, status: "failed", error: "a" }));
+    writeFileSync(second.resultPath, JSON.stringify({ subagentId: second.subagentId, generation: 1, status: "failed", error: "b" }));
+
+    const rebuilt = new SubagentRuntime(fakeTransport().transport, handlerRegistry());
+    await rebuilt.recover("/repo", parentA);
+    await rebuilt.recover("/repo", parentA);
+    expect(rebuilt.inspect("subagent-1")).toMatchObject({ label: "parent-a", error: "a" });
+    await rebuilt.recover("/repo", parentB);
+    expect(rebuilt.inspect("subagent-1")).toMatchObject({ label: "parent-b", error: "b" });
   });
 });
 

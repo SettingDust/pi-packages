@@ -41,7 +41,7 @@ subagent_spawn:
   thinking: resolved.thinking
 ```
 
-`subagent_spawn` resolves its supplied `agent` from its local Agent registry; the Router always supplies `handler`. The tool returns a stable `subagentId`. Completion notifications identify `subagentId` and the finished generation without exposing the Result body. Router calls `subagent_join({ subagentId })` to collect and validate that generation's private result pointer. `subagent_resume` retains the same `subagentId`; inspect, steer, cancel, and remove remain backend lifecycle operations rather than Harness workflow decisions.
+`subagent_spawn` resolves its supplied `agent` from its local Agent registry; the Router always supplies `handler`. The tool returns a stable `subagentId` and must reserve an identity not represented by persisted task-session or artifact names in its task directory, including after backend runtime reconstruction. Completion notifications identify `subagentId` and the finished generation without exposing the Result body. Router calls `subagent_join({ subagentId })` to collect and validate that generation's private result pointer. `subagent_resume` retains the same `subagentId`; inspect, steer, cancel, and remove remain backend lifecycle operations rather than Harness workflow decisions.
 
 ## 3. Launch Result
 

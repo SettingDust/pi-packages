@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import { execFile } from "node:child_process";
 import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync } from "node:fs";
 import { writeFile } from "node:fs/promises";
@@ -9,7 +10,7 @@ import { promisify } from "node:util";
 import { StringEnum, Type } from "@earendil-works/pi-ai";
 import { defineTool, getAgentDir, type ExtensionAPI, type ExtensionContext, type Theme } from "@earendil-works/pi-coding-agent";
 import { Text } from "@earendil-works/pi-tui";
-import { createHerdrClient, type HerdrClient } from "pi-herdr";
+import { commandFailure, createHerdrClient, hasHerdrErrorCode, type HerdrClient } from "pi-herdr";
 
 const exec = promisify(execFile);
 export const paneChildExtensionPath = resolve(dirname(fileURLToPath(import.meta.url)), "../extensions/pane-child.ts");
@@ -18,13 +19,19 @@ export type TaskStatus = "running" | "completed" | "failed" | "cancelled";
 export type SubagentTask = {
   subagentId: string; generation: number; agent: string; cwd: string; label: string; model?: string; thinking?: string;
   sessionFile: string; resultPath: string; tabId: string; paneId: string; status: TaskStatus;
-  result?: string; error?: string;
+  createdAt: string; updatedAt: string; result?: string; error?: string;
+};
+export type TaskRecordV1 = {
+  version: 1; subagentId: string; generation: number; agent: string; cwd: string; label: string; model?: string; thinking?: string;
+  sessionFile: string; tabId?: string; paneId?: string; status: "starting" | TaskStatus;
+  createdAt: string; updatedAt: string; error?: string;
 };
 export type HerdrTransport = {
   createTab(input: { cwd: string; label: string; env?: Record<string, string> }): Promise<{ tabId: string; paneId: string }>;
   run(paneId: string, command: string, args: string[]): Promise<void>;
   sendText(paneId: string, text: string): Promise<void>;
   closePane(paneId: string): Promise<void>;
+  paneExists(paneId: string): Promise<boolean>;
 };
 
 type Json = Record<string, unknown>;
@@ -78,6 +85,12 @@ export function createHerdrTransport(client: HerdrClient<{ cwd?: string }> = cre
     async run(paneId, command, args) { await client.run(["pane", "run", paneId, powerShellInvocation(command, args)], {}); },
     async sendText(paneId, text) { await client.run(["pane", "send-text", paneId, text], {}); },
     async closePane(paneId) { await client.run(["pane", "close", paneId], {}); },
+    async paneExists(paneId) {
+      const result = await client.exec(["pane", "get", paneId], {});
+      if (result.code === 0 && !result.killed) return true;
+      if (hasHerdrErrorCode(result, "pane_not_found") || `${result.stderr}\n${result.stdout}`.toLowerCase().includes("pane not found")) return false;
+      throw new Error(commandFailure(["pane", "get", paneId], result));
+    },
   };
 }
 
@@ -117,7 +130,7 @@ export class AgentRegistry {
 
 async function writeAtomic(path: string, value: unknown): Promise<void> {
   mkdirSync(dirname(path), { recursive: true, mode: 0o700 });
-  const temporary = `${path}.${process.pid}.tmp`;
+  const temporary = `${path}.${process.pid}-${randomUUID()}.tmp`;
   await writeFile(temporary, JSON.stringify(value));
   renameSync(temporary, path);
 }
@@ -125,6 +138,7 @@ async function writeAtomic(path: string, value: unknown): Promise<void> {
 export class SubagentRuntime {
   private tasks = new Map<string, SubagentTask>();
   private sequence = 0;
+  private activeTasksDir?: string;
 
   constructor(private readonly transport: HerdrTransport, private readonly registry: AgentRegistry, private readonly root?: string) {}
 
@@ -137,14 +151,58 @@ export class SubagentRuntime {
     thinking?: string;
     parentSessionFile?: string;
   }): Promise<SubagentTask> {
-    return this.start({ subagentId: `subagent-${++this.sequence}`, generation: 1, ...input });
+    this.resolveAgent(input.agent);
+    const tasksDir = this.tasksDir(input.cwd, input.parentSessionFile);
+    this.selectScope(tasksDir);
+    const { subagentId, artifactDir } = this.reserveSubagentId(tasksDir);
+    return this.start({ subagentId, generation: 1, artifactDir, ...input });
+  }
+
+  async recover(cwd: string, parentSessionFile?: string): Promise<void> {
+    const tasksDir = this.tasksDir(cwd, parentSessionFile);
+    this.selectScope(tasksDir);
+    this.tasks.clear();
+    if (!existsSync(tasksDir)) return;
+    for (const entry of readdirSync(tasksDir, { withFileTypes: true })) {
+      const match = entry.name.match(/^(subagent-\d+)-artifacts$/);
+      if (!entry.isDirectory() || !match) continue;
+      const subagentId = match[1]!;
+      const artifactDir = join(tasksDir, entry.name);
+      const record = this.readTaskRecord(join(artifactDir, "task.json"), tasksDir, artifactDir, subagentId);
+      if (!record) continue;
+      const task = this.taskFromRecord(record, artifactDir);
+      const result = existsSync(task.resultPath) ? this.readResult(task) : undefined;
+      if (result?.valid) {
+        task.status = result.status;
+        task.result = result.result;
+        task.error = result.error;
+      } else if (result && !result.valid) {
+        task.status = "failed";
+        task.error = result.error;
+      } else if (record.status !== "running" && record.status !== "starting") {
+        task.status = record.status;
+      } else if (task.paneId) {
+        try {
+          if (await this.transport.paneExists(task.paneId)) task.status = "running";
+          else { task.status = "failed"; task.error = "pane_closed"; }
+        } catch (error) {
+          task.status = "failed";
+          task.error = `pane_verification_failed: ${error instanceof Error ? error.message : String(error)}`;
+        }
+      } else {
+        task.status = "failed";
+        task.error = "pane_closed";
+      }
+      this.tasks.set(task.subagentId, task);
+      await this.persist(task);
+    }
   }
 
   async resume(subagentId: string, prompt: string): Promise<SubagentTask> {
     const old = this.get(subagentId);
     if (old.status === "running") throw new Error("Cannot resume a running subagent");
     return this.start({
-      subagentId,
+      subagentId: old.subagentId,
       generation: old.generation + 1,
       agent: old.agent,
       cwd: old.cwd,
@@ -153,7 +211,40 @@ export class SubagentRuntime {
       model: old.model,
       thinking: old.thinking,
       sessionFile: old.sessionFile,
+      artifactDir: dirname(old.resultPath),
+      createdAt: old.createdAt,
     });
+  }
+
+  private tasksDir(cwd: string, parentSessionFile?: string): string {
+    const base = this.root ?? (parentSessionFile
+      ? parentSessionFile.replace(/\.jsonl$/i, "")
+      : join(cwd, ".pi", "subagent-sessions"));
+    return join(base, "tasks");
+  }
+
+  private selectScope(tasksDir: string): void {
+    const scope = resolve(tasksDir);
+    if (scope === this.activeTasksDir) return;
+    this.activeTasksDir = scope;
+    this.tasks.clear();
+    this.sequence = 0;
+  }
+
+  private reserveSubagentId(tasksDir: string): { subagentId: string; artifactDir: string } {
+    mkdirSync(tasksDir, { recursive: true, mode: 0o700 });
+    while (true) {
+      const subagentId = `subagent-${++this.sequence}`;
+      if (existsSync(join(tasksDir, `${subagentId}-g1.jsonl`))) continue;
+      const artifactDir = join(tasksDir, `${subagentId}-artifacts`);
+      try {
+        mkdirSync(artifactDir, { mode: 0o700 });
+        return { subagentId, artifactDir };
+      } catch (error) {
+        if ((error as { code?: unknown }).code === "EEXIST") continue;
+        throw error;
+      }
+    }
   }
 
   private async start(input: {
@@ -167,47 +258,61 @@ export class SubagentRuntime {
     thinking?: string;
     parentSessionFile?: string;
     sessionFile?: string;
+    artifactDir?: string;
+    createdAt?: string;
   }): Promise<SubagentTask> {
     const agent = this.resolveAgent(input.agent);
-    const base = this.root ?? (input.parentSessionFile
-      ? input.parentSessionFile.replace(/\.jsonl$/i, "")
-      : join(input.cwd, ".pi", "subagent-sessions"));
-    const tasksDir = join(base, "tasks");
-    const artifactDir = join(tasksDir, `${input.subagentId}-artifacts`);
+    const tasksDir = input.artifactDir ? dirname(input.artifactDir) : this.tasksDir(input.cwd, input.parentSessionFile);
+    this.selectScope(tasksDir);
+    const artifactDir = input.artifactDir ?? join(tasksDir, `${input.subagentId}-artifacts`);
     mkdirSync(artifactDir, { recursive: true, mode: 0o700 });
     const sessionFile = input.sessionFile ?? join(tasksDir, `${input.subagentId}-g1.jsonl`);
     const resultPath = join(artifactDir, `result-${input.generation}.json`);
-    const surface = await this.transport.createTab({
-      cwd: input.cwd,
-      label: input.label,
-      env: {
-        PI_HERDR_SUBAGENT_ID: input.subagentId,
-        PI_HERDR_SUBAGENT_GENERATION: String(input.generation),
-        PI_HERDR_SUBAGENT_RESULT_PATH: resultPath,
-      },
-    });
-    const task: SubagentTask = {
-      subagentId: input.subagentId,
-      generation: input.generation,
-      agent: input.agent,
-      cwd: input.cwd,
-      label: input.label,
-      model: input.model,
-      thinking: input.thinking,
-      sessionFile,
-      resultPath,
-      ...surface,
-      status: "running",
+    const now = new Date().toISOString();
+    const createdAt = input.createdAt ?? now;
+    const starting: TaskRecordV1 = {
+      version: 1, subagentId: input.subagentId, generation: input.generation, agent: input.agent, cwd: input.cwd, label: input.label,
+      ...(input.model ? { model: input.model } : {}), ...(input.thinking ? { thinking: input.thinking } : {}), sessionFile,
+      status: "starting", createdAt, updatedAt: now,
     };
+    await writeAtomic(join(artifactDir, "task.json"), starting);
+
+    let surface: { tabId: string; paneId: string };
+    try {
+      surface = await this.transport.createTab({
+        cwd: input.cwd,
+        label: input.label,
+        env: {
+          PI_HERDR_SUBAGENT_ID: input.subagentId,
+          PI_HERDR_SUBAGENT_GENERATION: String(input.generation),
+          PI_HERDR_SUBAGENT_RESULT_PATH: resultPath,
+        },
+      });
+    } catch (error) {
+      await writeAtomic(join(artifactDir, "task.json"), { ...starting, status: "failed", error: String(error), updatedAt: new Date().toISOString() });
+      throw error;
+    }
+    const task: SubagentTask = {
+      subagentId: input.subagentId, generation: input.generation, agent: input.agent, cwd: input.cwd, label: input.label,
+      model: input.model, thinking: input.thinking, sessionFile, resultPath, ...surface, status: "running", createdAt, updatedAt: now,
+    };
+    this.tasks.set(task.subagentId, task);
+    await this.persist(task);
     const args = ["--session", sessionFile, "-e", paneChildExtensionPath, "--system-prompt", agent.body, "--tools", "read,bash,edit,write,subagent_done"];
     if (input.model) args.push("--model", input.thinking ? `${input.model}:${input.thinking}` : input.model);
     args.push(`${input.prompt}\n\nReturn the Handler Result as YAML, then call subagent_done with that exact YAML string.`);
     const launchScript = join(artifactDir, `launch-${input.generation}.ps1`);
     const bootstrapScript = join(artifactDir, `launch-${input.generation}.cjs`);
-    await writeFile(bootstrapScript, buildNodeLaunchScript(input.cwd, "pi", args));
-    await writeFile(launchScript, `\ufeff$ErrorActionPreference = 'Stop'\r\n${powerShellInvocation(bootstrapRuntime(), [bootstrapScript])}\r\nexit $LASTEXITCODE\r\n`);
-    await this.transport.run(task.paneId, "powershell.exe", ["-NoLogo", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", launchScript]);
-    this.tasks.set(task.subagentId, task);
+    try {
+      await writeFile(bootstrapScript, buildNodeLaunchScript(input.cwd, "pi", args));
+      await writeFile(launchScript, `\ufeff$ErrorActionPreference = 'Stop'\r\n${powerShellInvocation(bootstrapRuntime(), [bootstrapScript])}\r\nexit $LASTEXITCODE\r\n`);
+      await this.transport.run(task.paneId, "powershell.exe", ["-NoLogo", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", launchScript]);
+    } catch (error) {
+      task.status = "failed";
+      task.error = String(error);
+      await this.persist(task);
+      throw error;
+    }
     return { ...task };
   }
 
@@ -232,11 +337,17 @@ export class SubagentRuntime {
     if (task.generation !== generation) throw new Error("Subagent generation is no longer current");
     while (task.status === "running") {
       if (existsSync(task.resultPath)) {
-        const record = JSON.parse(readFileSync(task.resultPath, "utf8")) as Json;
-        if (record.subagentId !== id || record.generation !== generation) throw new Error("Subagent result identity mismatch");
-        task.result = typeof record.result === "string" ? record.result : undefined;
-        task.status = record.status === "failed" ? "failed" : "completed";
-        task.error = typeof record.error === "string" ? record.error : undefined;
+        const result = this.readResult(task);
+        if (!result.valid) {
+          task.status = "failed";
+          task.error = result.error;
+          await this.persist(task);
+          break;
+        }
+        task.status = result.status;
+        task.result = result.result;
+        task.error = result.error;
+        await this.persist(task);
         break;
       }
       await delay(50);
@@ -257,6 +368,7 @@ export class SubagentRuntime {
       await this.transport.closePane(task.paneId);
       task.status = "cancelled";
       await writeAtomic(task.resultPath, { subagentId: id, generation: task.generation, status: "cancelled" });
+      await this.persist(task);
     }
     return { ...task };
   }
@@ -268,7 +380,72 @@ export class SubagentRuntime {
     rmSync(task.sessionFile, { force: true });
     rmSync(dirname(task.resultPath), { recursive: true, force: true });
   }
+
+  private recordPath(task: SubagentTask): string { return join(dirname(task.resultPath), "task.json"); }
+
+  private async persist(task: SubagentTask): Promise<void> {
+    task.updatedAt = new Date().toISOString();
+    const record: TaskRecordV1 = {
+      version: 1, subagentId: task.subagentId, generation: task.generation, agent: task.agent, cwd: task.cwd, label: task.label,
+      ...(task.model ? { model: task.model } : {}), ...(task.thinking ? { thinking: task.thinking } : {}), sessionFile: task.sessionFile,
+      tabId: task.tabId || undefined, paneId: task.paneId || undefined, status: task.status, createdAt: task.createdAt, updatedAt: task.updatedAt,
+      ...(task.error ? { error: task.error } : {}),
+    };
+    await writeAtomic(this.recordPath(task), record);
+  }
+
+  private taskFromRecord(record: TaskRecordV1, artifactDir: string): SubagentTask {
+    return {
+      subagentId: record.subagentId, generation: record.generation, agent: record.agent, cwd: record.cwd, label: record.label,
+      model: record.model, thinking: record.thinking, sessionFile: record.sessionFile,
+      resultPath: join(artifactDir, `result-${record.generation}.json`), tabId: record.tabId ?? "", paneId: record.paneId ?? "",
+      status: record.status === "starting" ? "running" : record.status, createdAt: record.createdAt, updatedAt: record.updatedAt, error: record.error,
+    };
+  }
+
+  private readTaskRecord(path: string, tasksDir: string, artifactDir: string, subagentId: string): TaskRecordV1 | undefined {
+    try {
+      const value = JSON.parse(readFileSync(path, "utf8")) as Partial<TaskRecordV1>;
+      if (value.version !== 1 || value.subagentId !== subagentId || !/^subagent-\d+$/.test(subagentId) || !Number.isInteger(value.generation) || value.generation! < 1) return;
+      if (typeof value.agent !== "string" || typeof value.cwd !== "string" || typeof value.label !== "string" || typeof value.sessionFile !== "string") return;
+      if (value.model !== undefined && typeof value.model !== "string") return;
+      if (value.thinking !== undefined && typeof value.thinking !== "string") return;
+      const expectedSession = join(tasksDir, `${subagentId}-g1.jsonl`);
+      if (resolve(value.sessionFile) !== resolve(expectedSession)) return;
+      if (typeof value.createdAt !== "string" || typeof value.updatedAt !== "string" || !isTaskRecordStatus(value.status)) return;
+      if (value.tabId !== undefined && typeof value.tabId !== "string") return;
+      if (value.paneId !== undefined && typeof value.paneId !== "string") return;
+      if (value.error !== undefined && typeof value.error !== "string") return;
+      if (resolve(artifactDir) !== resolve(join(tasksDir, `${subagentId}-artifacts`))) return;
+      return value as TaskRecordV1;
+    } catch { return; }
+  }
+
+  private readResult(task: SubagentTask):
+    | { valid: true; status: TaskStatus; result?: string; error?: string }
+    | { valid: false; error: string } {
+    try {
+      const value = JSON.parse(readFileSync(task.resultPath, "utf8")) as Json;
+      if (value.subagentId !== task.subagentId || value.generation !== task.generation) return { valid: false, error: "result_identity_mismatch" };
+      if (!isTerminalStatus(value.status)) return { valid: false, error: "invalid_result_status" };
+      if (value.status === "completed" && typeof value.result !== "string") return { valid: false, error: "invalid_result" };
+      if (value.result !== undefined && typeof value.result !== "string") return { valid: false, error: "invalid_result" };
+      if (value.error !== undefined && typeof value.error !== "string") return { valid: false, error: "invalid_result" };
+      return { valid: true, status: value.status, result: value.result as string | undefined, error: value.error as string | undefined };
+    } catch { return { valid: false, error: "invalid_result" }; }
+  }
 }
+
+function isTaskStatus(value: unknown): value is TaskStatus {
+  return value === "running" || value === "completed" || value === "failed" || value === "cancelled";
+}
+function isTaskRecordStatus(value: unknown): value is TaskRecordV1["status"] {
+  return value === "starting" || isTaskStatus(value);
+}
+function isTerminalStatus(value: unknown): value is Exclude<TaskStatus, "running"> {
+  return value === "completed" || value === "failed" || value === "cancelled";
+}
+
 
 type ThemeLike = Partial<Pick<Theme, "fg" | "bold">>;
 type ToolResult = { details?: unknown; content?: readonly { type?: string; text?: string }[] };
@@ -353,7 +530,9 @@ export default function subagentsExtension(pi: ExtensionAPI, dependencies: { run
   const registry = dependencies.registry ?? new AgentRegistry(); const runtime = dependencies.runtime ?? new SubagentRuntime(createHerdrTransport(), registry);
   pi.on("before_agent_start", async (_event, ctx) => {
     await registry.discover(ctx.cwd);
-    const tools = createSubagentTools(runtime, ctx.cwd, ctx.sessionManager?.getSessionFile?.());
+    const parentSessionFile = ctx.sessionManager?.getSessionFile?.();
+    await runtime.recover(ctx.cwd, parentSessionFile);
+    const tools = createSubagentTools(runtime, ctx.cwd, parentSessionFile);
     for (const tool of tools) pi.registerTool(tool);
     pi.setActiveTools([...pi.getActiveTools().filter(name => !name.startsWith("subagent_")), ...tools.map(tool => tool.name)]);
   });
