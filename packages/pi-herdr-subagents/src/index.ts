@@ -6,18 +6,17 @@ import { basename, dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { setTimeout as delay } from "node:timers/promises";
 import { promisify } from "node:util";
-import { Type } from "@earendil-works/pi-ai";
+import { StringEnum, Type } from "@earendil-works/pi-ai";
 import { defineTool, getAgentDir, type ExtensionAPI, type ExtensionContext, type Theme } from "@earendil-works/pi-coding-agent";
 import { Text } from "@earendil-works/pi-tui";
 import { createHerdrClient, type HerdrClient } from "pi-herdr";
 
 const exec = promisify(execFile);
-const handlerName = "handler";
 export const paneChildExtensionPath = resolve(dirname(fileURLToPath(import.meta.url)), "../extensions/pane-child.ts");
 export type AgentDefinition = { name: string; path: string; body: string; description: string };
 export type TaskStatus = "running" | "completed" | "failed" | "cancelled";
 export type SubagentTask = {
-  subagentId: string; generation: number; handlerBody: string; cwd: string; label: string; model?: string; thinking?: string;
+  subagentId: string; generation: number; agent: string; cwd: string; label: string; model?: string; thinking?: string;
   sessionFile: string; resultPath: string; tabId: string; paneId: string; status: TaskStatus;
   result?: string; error?: string;
 };
@@ -130,6 +129,7 @@ export class SubagentRuntime {
   constructor(private readonly transport: HerdrTransport, private readonly registry: AgentRegistry, private readonly root?: string) {}
 
   async spawn(input: {
+    agent: string;
     cwd: string;
     prompt: string;
     label: string;
@@ -146,6 +146,7 @@ export class SubagentRuntime {
     return this.start({
       subagentId,
       generation: old.generation + 1,
+      agent: old.agent,
       cwd: old.cwd,
       prompt,
       label: old.label,
@@ -158,6 +159,7 @@ export class SubagentRuntime {
   private async start(input: {
     subagentId: string;
     generation: number;
+    agent: string;
     cwd: string;
     prompt: string;
     label: string;
@@ -166,7 +168,7 @@ export class SubagentRuntime {
     parentSessionFile?: string;
     sessionFile?: string;
   }): Promise<SubagentTask> {
-    const handler = this.resolveHandler();
+    const agent = this.resolveAgent(input.agent);
     const base = this.root ?? (input.parentSessionFile
       ? input.parentSessionFile.replace(/\.jsonl$/i, "")
       : join(input.cwd, ".pi", "subagent-sessions"));
@@ -187,7 +189,7 @@ export class SubagentRuntime {
     const task: SubagentTask = {
       subagentId: input.subagentId,
       generation: input.generation,
-      handlerBody: handler.body,
+      agent: input.agent,
       cwd: input.cwd,
       label: input.label,
       model: input.model,
@@ -197,7 +199,7 @@ export class SubagentRuntime {
       ...surface,
       status: "running",
     };
-    const args = ["--session", sessionFile, "-e", paneChildExtensionPath, "--system-prompt", handler.body, "--tools", "read,bash,edit,write,subagent_done"];
+    const args = ["--session", sessionFile, "-e", paneChildExtensionPath, "--system-prompt", agent.body, "--tools", "read,bash,edit,write,subagent_done"];
     if (input.model) args.push("--model", input.thinking ? `${input.model}:${input.thinking}` : input.model);
     args.push(`${input.prompt}\n\nReturn the Handler Result as YAML, then call subagent_done with that exact YAML string.`);
     const launchScript = join(artifactDir, `launch-${input.generation}.ps1`);
@@ -209,10 +211,12 @@ export class SubagentRuntime {
     return { ...task };
   }
 
-  private resolveHandler(): AgentDefinition {
-    const handler = this.registry.get(handlerName);
-    if (!handler) throw new Error(`Required Agent is unavailable: ${handlerName}`);
-    return handler;
+  agentNames(): string[] { return this.registry.list().map(({ name }) => name); }
+
+  private resolveAgent(name: string): AgentDefinition {
+    const agent = this.registry.get(name);
+    if (!agent) throw new Error(`Required Agent is unavailable: ${name}`);
+    return agent;
   }
 
   private get(id: string): SubagentTask {
@@ -289,8 +293,8 @@ function fallback(result: ToolResult): string {
 }
 
 function renderSpawnCall(args: unknown, theme?: ThemeLike): Text {
-  const input = args as { label?: string };
-  const suffix = input.label;
+  const input = args as { agent?: string; label?: string };
+  const suffix = [input.agent, input.label].filter(Boolean).join(" · ");
   return new Text(`${title(theme, "spawn")}${suffix ? paint(theme, "dim", `  ${suffix}`) : ""}`, 0, 0);
 }
 
@@ -334,7 +338,7 @@ export function createSubagentTools(runtime: SubagentRuntime, cwd: string, paren
     },
   });
   return [
-    tool("subagent_spawn", "Start one background subagent with the fixed Handler Agent.", Type.Object({ prompt: Type.String({ minLength: 1 }), label: Type.String({ minLength: 1 }), model: Type.Optional(Type.String()), thinking: Type.Optional(Type.String()) }), params => runtime.spawn({ ...params, cwd, parentSessionFile }), { renderCall: renderSpawnCall, renderResult: renderSpawnResult }),
+    tool("subagent_spawn", "Start one background subagent with a locally resolved registry Agent.", Type.Object({ agent: StringEnum(runtime.agentNames()), prompt: Type.String({ minLength: 1 }), label: Type.String({ minLength: 1 }), model: Type.Optional(Type.String()), thinking: Type.Optional(Type.String()) }), params => runtime.spawn({ ...params, cwd, parentSessionFile }), { renderCall: renderSpawnCall, renderResult: renderSpawnResult }),
     tool("subagent_resume", "Resume a completed or failed subagent.", Type.Object({ subagentId: Type.String(), prompt: Type.String({ minLength: 1 }) }), params => runtime.resume(params.subagentId, params.prompt)),
     tool("subagent_inspect", "Return a non-blocking subagent snapshot.", Type.Object({ subagentId: Type.String() }), params => Promise.resolve(runtime.inspect(params.subagentId))),
     tool("subagent_join", "Wait for a subagent Result.", Type.Object({ subagentId: Type.String(), generation: Type.Optional(Type.Number()) }), async (params, update) => { update?.(runtime.inspect(params.subagentId)); return runtime.join(params.subagentId, params.generation); }, { renderCall: renderJoinCall, renderResult: renderJoinResult }),

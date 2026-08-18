@@ -11,9 +11,9 @@ The main session must select useful work without accidentally doing delegated wo
 
 The package separates four responsibilities:
 
-- **Router**: responds directly when appropriate; otherwise selects Skills, Model Role, context, constraints, and deliverables, then calls `resolve_delegation`. It owns subsequent workflow decisions after Handler Results return.
+- **Router**: responds directly when appropriate; otherwise selects Skills, Model Role, context, constraints, and deliverables, then calls `resolve_delegation`. When a delegate tool accepts an Agent argument, it passes the fixed literal `handler`, never a path or Agent body. It owns subsequent workflow decisions after Handler Results return.
 - **Resolver**: validates a structured Handoff, validates Skills and local references, resolves a configured Model Role, serializes the Handoff to YAML, and returns prompt and model metadata. It does not identify or start a Handler, inspect backend availability, or make another model call.
-- **Environment / delegate backend**: resolves the fixed `handler` Agent from its own Agent registry, starts it using its own subagent, terminal, remote-worker, or other mechanism, and adapts the resolved prompt and model settings to its own interface.
+- **Environment / delegate backend**: resolves the Router-supplied fixed `handler` Agent from its own Agent registry, starts it using its own subagent, terminal, remote-worker, or other mechanism, and adapts the resolved prompt and model settings to its own interface.
 - **Handler**: reads the Handoff, follows its selected Skills, performs the delegated work, and returns a normalized Result. It does not select the next workflow action.
 
 The package replaces Pi's default system prompt, making the main session a Router whenever the extension is enabled. The Router retains Pi tool access for coordination materials but is prohibited by its system prompt from doing project-domain work.

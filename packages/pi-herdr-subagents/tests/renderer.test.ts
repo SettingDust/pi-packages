@@ -13,7 +13,7 @@ function render(component: { render(width: number): string[] }): string {
   return component.render(120).map(line => line.trimEnd()).join("\n");
 }
 
-test("renders fixed-Handler spawn and join actions", async () => {
+test("renders named-Agent spawn and join actions", async () => {
   const transport: HerdrTransport = {
     async createTab() { return { tabId: "tab-1", paneId: "pane-1" }; },
     async run() {},
@@ -26,9 +26,9 @@ test("renders fixed-Handler spawn and join actions", async () => {
   const tools = createSubagentTools(new SubagentRuntime(transport, registry, root), "/repo") as any[];
   const spawn = tools.find(tool => tool.name === "subagent_spawn")!;
   const joinTool = tools.find(tool => tool.name === "subagent_join")!;
-  const spawnArgs = { prompt: "Do the work", label: "Implement renderer" };
+  const spawnArgs = { agent: "handler", prompt: "Do the work", label: "Implement renderer" };
 
-  expect(render(spawn.renderCall(spawnArgs, theme))).toBe("subagent spawn  Implement renderer");
+  expect(render(spawn.renderCall(spawnArgs, theme))).toBe("subagent spawn  handler · Implement renderer");
   const spawned = await spawn.execute("spawn-1", spawnArgs);
   expect(render(spawn.renderResult(spawned, {}, theme))).toBe(" Started Implement renderer\n  subagent-1");
 

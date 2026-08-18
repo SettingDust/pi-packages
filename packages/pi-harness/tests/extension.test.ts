@@ -101,6 +101,7 @@ describe("Pi Harness Extension", () => {
     expect(first.systemPrompt).toStartWith("You are the Pi Harness Router.");
     expect(first.systemPrompt).not.toContain("default Pi prompt");
     expect(first.systemPrompt).toContain("research");
+    expect(first.systemPrompt).toContain("When calling subagent_spawn, always pass agent: \"handler\"");
     expect(first.systemPrompt).not.toContain("hidden method");
     expect(active).toEqual(["read", "resolve_delegation"]);
 

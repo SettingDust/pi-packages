@@ -6,7 +6,7 @@ The `pi-harness` extension replaces Pi's default main-session system prompt with
 
 When at least one Model Role is currently available, the extension also registers `resolve_delegation`, which prepares but does not start a Handler invocation.
 
-The package bundles `agents/handler.md` and declares it through `pi.agents`. A compatible delegate environment resolves the fixed `handler` Agent from its own Agent registry. The Resolver never returns a Handler name or path, and the Router never selects a Handler.
+The package bundles `agents/handler.md` and declares it through `pi.agents`. A compatible delegate environment resolves the fixed `handler` Agent from its own Agent registry. The Resolver never returns a Handler name or path. When a delegate tool accepts an Agent argument, the Router passes the fixed literal `handler`, never a Handler path or body.
 
 ## 2. Dynamic Resolver Schema
 
@@ -58,7 +58,7 @@ code: invalid_config | invalid_skill | invalid_reference | unknown_role | unavai
 message: actionable explanation
 ```
 
-The `prompt` value is YAML representing the validated Handoff only. Handler identity is a fixed delegate-environment contract: the environment resolves `handler` from its own Agent registry. Expected validation blocks are results, not thrown tool errors.
+The `prompt` value is YAML representing the validated Handoff only. Handler identity is a fixed delegate-environment contract: for a tool that accepts an Agent argument, the Router supplies `handler` and the environment resolves it from its own Agent registry. The Resolver returns no Handler name, path, or body. Expected validation blocks are results, not thrown tool errors.
 
 ## 5. Handoff Prompt
 
@@ -109,7 +109,7 @@ Handler-time reference failures and work failures are Handler Results, not Resol
 
 A Router pass begins from either a user input or a Handler completion notification. The Router may use user input, package configuration, Skill information, and prior Handler Results, but it must not perform project-domain reading, research, editing, execution, or independent verification.
 
-The Router must respond directly only for coordination work: clarification, a status or Result summary, completion, blocking conditions, or risk escalation. When substantive work is necessary, it selects one primary Skill, optional companion Skills, a Model Role, and Handoff context, then calls `resolve_delegation`. The environment may then launch the fixed registry-resolved Handler using the returned invocation.
+The Router must respond directly only for coordination work: clarification, a status or Result summary, completion, blocking conditions, or risk escalation. When substantive work is necessary, it selects one primary Skill, optional companion Skills, a Model Role, and Handoff context, then calls `resolve_delegation`. It maps the resolved prompt, model, and thinking to the environment tool; when calling `subagent_spawn`, it supplies `agent: handler` and no Handler path or body. The environment resolves that Agent locally and launches the Handler.
 
 The Router may resolve and launch several Handlers concurrently when it judges the work independent. It is responsible for that judgment. No v0.1 runtime mechanism prevents overlapping edits or other conflicting work.
 

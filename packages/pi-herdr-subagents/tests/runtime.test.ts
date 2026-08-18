@@ -38,7 +38,7 @@ describe("pi-herdr-subagents runtime", () => {
     const { calls, transport } = fakeTransport();
     const root = mkdtempSync(join(tmpdir(), "subagents-test-"));
     const runtime = new SubagentRuntime(transport, registry, root);
-    const task = await runtime.spawn({ cwd: "/repo", prompt: "Do\nthe work", label: "task", model: "test/model", thinking: "high" });
+    const task = await runtime.spawn({ agent: "handler", cwd: "/repo", prompt: "Do\nthe work", label: "task", model: "test/model", thinking: "high" });
     expect(task).toMatchObject({ subagentId: "subagent-1", generation: 1, sessionFile: join(root, "tasks", "subagent-1-g1.jsonl"), status: "running" });
     expect(calls[0]).toMatchObject({ op: "create", input: { cwd: "/repo", env: { PI_HERDR_SUBAGENT_ID: "subagent-1", PI_HERDR_SUBAGENT_GENERATION: "1" } } });
     const launch = calls[1] as { op: string; command: string; args: string[] };
@@ -69,7 +69,7 @@ describe("pi-herdr-subagents runtime", () => {
     const { calls, transport } = fakeTransport();
     const root = mkdtempSync(join(tmpdir(), "subagents-test-"));
     const runtime = new SubagentRuntime(transport, handlerRegistry(), root);
-    const first = await runtime.spawn({ cwd: "/repo", prompt: "one", label: "task" });
+    const first = await runtime.spawn({ agent: "handler", cwd: "/repo", prompt: "one", label: "task" });
     writeFileSync(first.resultPath, JSON.stringify({ subagentId: first.subagentId, generation: 1, status: "failed", error: "retry" }));
     const completed = await runtime.join(first.subagentId);
     expect(completed.status).toBe("failed");
@@ -83,16 +83,22 @@ describe("pi-herdr-subagents runtime", () => {
     expect(calls.filter(value => (value as { op?: string }).op === "close")).toHaveLength(1);
   });
 
-  test("executes the spawn tool with the fixed Handler under the parent session", async () => {
-    const registry = handlerRegistry();
+  test("executes the named-Agent spawn tool under the parent session", async () => {
+    const registry = new AgentRegistry();
+    registry.setFiles([
+      { path: "/handler.md", content: "---\nname: handler\n---\nHandler" },
+      { path: "/reviewer.md", content: "---\nname: reviewer\n---\nReviewer" },
+    ]);
     const { transport } = fakeTransport();
     const parentDir = mkdtempSync(join(tmpdir(), "subagents-parent-"));
     const parentSessionFile = join(parentDir, "parent.jsonl");
     const tools = createSubagentTools(new SubagentRuntime(transport, registry), "/repo", parentSessionFile);
     expect(tools.map(tool => tool.name)).toEqual(["subagent_spawn", "subagent_resume", "subagent_inspect", "subagent_join", "subagent_steer", "subagent_cancel", "subagent_remove"]);
-    expect((tools[0]!.parameters as { properties: Record<string, unknown> }).properties).not.toHaveProperty("agent");
+    const parameters = tools[0]!.parameters as { properties: Record<string, { enum?: unknown }> };
+    expect(parameters.properties.agent?.enum).toEqual(["handler", "reviewer"]);
 
     const spawned = await (tools[0]!.execute as any)("call-1", {
+      agent: "handler",
       prompt: "Do the work",
       label: "task",
       model: "test/model",
@@ -106,11 +112,27 @@ describe("pi-herdr-subagents runtime", () => {
     });
   });
 
-  test("requires the default Handler Agent in its registry", async () => {
+  test("resolves the requested Agent locally without exposing its body", async () => {
+    const registry = new AgentRegistry();
+    registry.setFiles([{ path: "/reviewer.md", content: "---\nname: reviewer\n---\nReview the work." }]);
     const { transport } = fakeTransport();
-    const runtime = new SubagentRuntime(transport, new AgentRegistry(), mkdtempSync(join(tmpdir(), "subagents-missing-handler-")));
+    const root = mkdtempSync(join(tmpdir(), "subagents-agent-"));
+    const runtime = new SubagentRuntime(transport, registry, root);
 
-    await expect(runtime.spawn({ cwd: "/repo", prompt: "Do the work", label: "task" }))
+    const task = await runtime.spawn({ agent: "reviewer", cwd: "/repo", prompt: "Review", label: "review" });
+    expect(task).toMatchObject({ agent: "reviewer" });
+    expect(task).not.toHaveProperty("handlerBody");
+    const bootstrap = readFileSync(join(root, "tasks", "subagent-1-artifacts", "launch-1.cjs"), "utf8");
+    const encoded = bootstrap.match(/Buffer\.from\(\"([^\"]+)\"/)?.[1];
+    const spec = JSON.parse(Buffer.from(encoded!, "base64").toString("utf8")) as { args: string[] };
+    expect(spec.args).toContain("Review the work.");
+  });
+
+  test("requires the requested Agent in its registry", async () => {
+    const { transport } = fakeTransport();
+    const runtime = new SubagentRuntime(transport, new AgentRegistry(), mkdtempSync(join(tmpdir(), "subagents-missing-agent-")));
+
+    await expect(runtime.spawn({ agent: "handler", cwd: "/repo", prompt: "Do the work", label: "task" }))
       .rejects.toThrow("Required Agent is unavailable: handler");
   });
 });

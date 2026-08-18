@@ -13,15 +13,15 @@ thinking: configured-thinking-level
 
 The Router maps these values to an environment-provided delegate tool. The Resolver does not discover, select, or call that tool.
 
-The Handler is fixed as the Agent named `handler`. A compatible backend resolves that Agent from its own registry; the Router neither selects it nor receives its name or path from the Resolver.
+The Handler is fixed as the Agent named `handler`. For a tool that accepts an Agent argument, the Router supplies that fixed literal; the compatible backend resolves it from its own registry. The Resolver returns no Handler name, path, or body.
 
 ## 2. Compatibility Requirements
 
 Before calling a delegate tool, the Router must establish from its schema and description that it can:
 
-1. start an independent execution using its registry-resolved `handler` Agent;
+1. start an independent execution using the Router-supplied fixed `handler` Agent;
 2. guarantee the resolved `model` and `thinking` values;
-3. load the fixed Handler Agent instructions from its own Agent registry;
+3. resolve that Agent's instructions from its own registry;
 4. provide the selected Pi Skills and read access to every Handoff reference;
 5. return a stable `taskId`; and
 6. return or later notify the Router of the Handler's YAML Result.
@@ -34,13 +34,14 @@ When the independent `pi-herdr-subagents` tools are active, Router maps one reso
 
 ```yaml
 subagent_spawn:
+  agent: handler
   prompt: resolved.prompt
   label: concise delegated objective
   model: resolved.model
   thinking: resolved.thinking
 ```
 
-`subagent_spawn` resolves the fixed `handler` from its local Agent registry. The tool returns a stable `subagentId`. Completion notifications identify `subagentId` and the finished generation without exposing the Result body. Router calls `subagent_join({ subagentId })` to collect and validate that generation's private result pointer. `subagent_resume` retains the same `subagentId`; inspect, steer, cancel, and remove remain backend lifecycle operations rather than Harness workflow decisions.
+`subagent_spawn` resolves its supplied `agent` from its local Agent registry; the Router always supplies `handler`. The tool returns a stable `subagentId`. Completion notifications identify `subagentId` and the finished generation without exposing the Result body. Router calls `subagent_join({ subagentId })` to collect and validate that generation's private result pointer. `subagent_resume` retains the same `subagentId`; inspect, steer, cancel, and remove remain backend lifecycle operations rather than Harness workflow decisions.
 
 ## 3. Launch Result
 
