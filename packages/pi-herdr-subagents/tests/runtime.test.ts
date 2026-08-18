@@ -1,18 +1,19 @@
 import { describe, expect, test } from "bun:test";
+import { spawnSync } from "node:child_process";
 import { existsSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { createHerdrClient } from "pi-herdr";
-import { AgentRegistry, SubagentRuntime, createHerdrTransport, createSubagentTools, type HerdrTransport } from "../src/index.js";
+import activateSubagents, { AgentRegistry, SubagentRuntime, createHerdrTransport, createSubagentTools, type CompletionNotification, type HerdrTransport } from "../src/index.js";
 
-function fakeTransport(paneExists = true) {
+function fakeTransport(paneExists: boolean | (() => boolean) = true) {
   const calls: unknown[] = [];
   const transport: HerdrTransport = {
     async createTab(input) { calls.push({ op: "create", input }); return { tabId: "tab-1", paneId: "pane-1" }; },
     async run(paneId, command, args) { calls.push({ op: "run", paneId, command, args }); },
     async sendText(paneId, text) { calls.push({ op: "send", paneId, text }); },
     async closePane(paneId) { calls.push({ op: "close", paneId }); },
-    async paneExists(paneId) { calls.push({ op: "exists", paneId }); return paneExists; },
+    async paneExists(paneId) { calls.push({ op: "exists", paneId }); return typeof paneExists === "function" ? paneExists() : paneExists; },
   };
   return { calls, transport };
 }
@@ -21,6 +22,14 @@ function handlerRegistry(body = "Handler"): AgentRegistry {
   const registry = new AgentRegistry();
   registry.setFiles([{ path: "/handler.md", content: `---\nname: handler\n---\n${body}` }]);
   return registry;
+}
+
+async function waitFor(predicate: () => boolean, timeout = 2500): Promise<void> {
+  const deadline = Date.now() + timeout;
+  while (!predicate()) {
+    if (Date.now() >= deadline) throw new Error("Timed out waiting for runtime settlement");
+    await Bun.sleep(20);
+  }
 }
 
 describe("pi-herdr-subagents runtime", () => {
@@ -64,7 +73,10 @@ describe("pi-herdr-subagents runtime", () => {
     expect(script).not.toContain("Execute the Handoff.");
     expect(script).not.toContain("Do\nthe work");
     const bootstrap = readFileSync(bootstrapPath, "utf8");
+    expect(spawnSync("node", ["--check", bootstrapPath]).status).toBe(0);
     expect(bootstrap).toContain("spawnSync(spec.command, spec.args");
+    expect(bootstrap).toContain("child_exited_without_result");
+    expect(bootstrap).toContain('status: "failed"');
     const encoded = bootstrap.match(/Buffer\.from\(\"([^\"]+)\"/)?.[1];
     const spec = JSON.parse(Buffer.from(encoded!, "base64").toString("utf8")) as { command: string; args: string[] };
     expect(spec.command).toBe(process.execPath);
@@ -271,6 +283,147 @@ describe("pi-herdr-subagents runtime", () => {
     expect(rebuilt.inspect("subagent-1")).toMatchObject({ label: "parent-a", error: "a" });
     await rebuilt.recover("/repo", parentB);
     expect(rebuilt.inspect("subagent-1")).toMatchObject({ label: "parent-b", error: "b" });
+  });
+  test("actively settles completed and failed Results without join or inspect", async () => {
+    const root = mkdtempSync(join(tmpdir(), "subagents-notify-result-"));
+    const notifications: CompletionNotification[] = [];
+    const runtime = new SubagentRuntime(fakeTransport().transport, handlerRegistry(), root, notification => { notifications.push(notification); });
+    const completed = await runtime.spawn({ agent: "handler", cwd: "/repo", prompt: "work", label: "complete" });
+    writeFileSync(completed.resultPath, JSON.stringify({
+      subagentId: completed.subagentId, generation: completed.generation, status: "completed", result: "full YAML must stay private",
+    }));
+    await waitFor(() => notifications.length === 1);
+    expect(runtime.inspect(completed.subagentId)).toMatchObject({ status: "completed", result: "full YAML must stay private" });
+    expect(notifications[0]).toEqual({ subagentId: completed.subagentId, generation: 1, status: "completed", label: "complete" });
+    expect(notifications[0]).not.toHaveProperty("result");
+
+    const failed = await runtime.spawn({ agent: "handler", cwd: "/repo", prompt: "work", label: "fail" });
+    writeFileSync(failed.resultPath, JSON.stringify({
+      subagentId: failed.subagentId, generation: failed.generation, status: "failed", error: "child failed",
+    }));
+    await waitFor(() => notifications.length === 2);
+    expect(notifications[1]).toEqual({ subagentId: failed.subagentId, generation: 1, status: "failed", label: "fail", reason: "child failed" });
+    runtime.stop();
+  });
+
+  test("notifies cancellation and an unexpectedly closed pane", async () => {
+    let panePresent = true;
+    const notifications: CompletionNotification[] = [];
+    const runtime = new SubagentRuntime(
+      fakeTransport(() => panePresent).transport,
+      handlerRegistry(),
+      mkdtempSync(join(tmpdir(), "subagents-notify-terminal-")),
+      notification => { notifications.push(notification); },
+    );
+    const cancelled = await runtime.spawn({ agent: "handler", cwd: "/repo", prompt: "work", label: "cancel" });
+    await runtime.cancel(cancelled.subagentId);
+    expect(notifications[0]).toEqual({ subagentId: cancelled.subagentId, generation: 1, status: "cancelled", label: "cancel" });
+
+    const closed = await runtime.spawn({ agent: "handler", cwd: "/repo", prompt: "work", label: "closed" });
+    panePresent = false;
+    await waitFor(() => notifications.length === 2);
+    expect(runtime.inspect(closed.subagentId)).toMatchObject({ status: "failed", error: "pane_closed" });
+    expect(notifications[1]).toEqual({ subagentId: closed.subagentId, generation: 1, status: "failed", label: "closed", reason: "pane_closed" });
+    runtime.stop();
+  });
+
+  test("notifies launch failure before spawn rejects", async () => {
+    const notifications: CompletionNotification[] = [];
+    const transport = fakeTransport().transport;
+    transport.createTab = async () => { throw new Error("launch unavailable"); };
+    const runtime = new SubagentRuntime(
+      transport,
+      handlerRegistry(),
+      mkdtempSync(join(tmpdir(), "subagents-notify-launch-")),
+      notification => { notifications.push(notification); },
+    );
+    await expect(runtime.spawn({ agent: "handler", cwd: "/repo", prompt: "work", label: "launch" })).rejects.toThrow("launch unavailable");
+    expect(notifications).toEqual([{
+      subagentId: "subagent-1", generation: 1, status: "failed", label: "launch", reason: "Error: launch unavailable",
+    }]);
+  });
+
+  test("backfills a missed notification after restart and deduplicates repeated recovery", async () => {
+    const parentSessionFile = join(mkdtempSync(join(tmpdir(), "subagents-notify-recover-")), "parent.jsonl");
+    const original = new SubagentRuntime(fakeTransport().transport, handlerRegistry());
+    const task = await original.spawn({ agent: "handler", cwd: "/repo", prompt: "work", label: "recover", parentSessionFile });
+    original.stop();
+    writeFileSync(task.resultPath, JSON.stringify({
+      subagentId: task.subagentId, generation: task.generation, status: "completed", result: "full result",
+    }));
+
+    const notifications: CompletionNotification[] = [];
+    const rebuilt = new SubagentRuntime(fakeTransport().transport, handlerRegistry(), undefined, notification => { notifications.push(notification); });
+    await rebuilt.recover("/repo", parentSessionFile);
+    expect(notifications).toEqual([{ subagentId: task.subagentId, generation: 1, status: "completed", label: "recover" }]);
+    await rebuilt.recover("/repo", parentSessionFile);
+    const restartedAgain = new SubagentRuntime(fakeTransport().transport, handlerRegistry(), undefined, notification => { notifications.push(notification); });
+    await restartedAgain.recover("/repo", parentSessionFile);
+    expect(notifications).toHaveLength(1);
+  });
+
+  test("session startup backfills missed notifications and honors parent-session markers", async () => {
+    const parentSessionFile = join(mkdtempSync(join(tmpdir(), "subagents-notify-startup-")), "parent.jsonl");
+    const original = new SubagentRuntime(fakeTransport().transport, handlerRegistry());
+    const consumed = await original.spawn({ agent: "handler", cwd: "/repo", prompt: "one", label: "consumed", parentSessionFile });
+    const missed = await original.spawn({ agent: "handler", cwd: "/repo", prompt: "two", label: "missed", parentSessionFile });
+    original.stop();
+    for (const task of [consumed, missed]) writeFileSync(task.resultPath, JSON.stringify({
+      subagentId: task.subagentId, generation: task.generation, status: "completed", result: "full result",
+    }));
+
+    const registry = handlerRegistry();
+    const runtime = new SubagentRuntime(fakeTransport().transport, registry);
+    const handlers: Record<string, (event: unknown, ctx: any) => Promise<void>> = {};
+    const messages: Array<{ message: any; options: any }> = [];
+    const childResultPath = process.env.PI_HERDR_SUBAGENT_RESULT_PATH;
+    delete process.env.PI_HERDR_SUBAGENT_RESULT_PATH;
+    activateSubagents({
+      on(event: string, handler: (event: unknown, ctx: any) => Promise<void>) { handlers[event] = handler; },
+      sendMessage(message: unknown, options: unknown) { messages.push({ message, options }); },
+    } as any, { runtime, registry });
+    if (childResultPath) process.env.PI_HERDR_SUBAGENT_RESULT_PATH = childResultPath;
+    const consumedEntry = {
+      type: "custom_message",
+      customType: "pi-herdr-subagent-completion",
+      details: { subagentId: consumed.subagentId, generation: 1, status: "completed", label: "consumed" },
+    };
+    const ctx = {
+      cwd: "/repo",
+      sessionManager: { getSessionFile: () => parentSessionFile, getEntries: () => [consumedEntry] },
+    };
+    await handlers.session_start!({}, ctx);
+    expect(messages).toHaveLength(1);
+    expect(messages[0]!.message.details).toMatchObject({ subagentId: missed.subagentId, label: "missed" });
+    ctx.sessionManager.getEntries = () => [consumedEntry, { ...messages[0]!.message, type: "custom_message" }];
+    await handlers.session_start!({}, ctx);
+    expect(messages).toHaveLength(1);
+  });
+
+  test("injects a summary-only Pi completion message that triggers the parent", async () => {
+    const registry = handlerRegistry();
+    const runtime = new SubagentRuntime(fakeTransport().transport, registry, mkdtempSync(join(tmpdir(), "subagents-notify-pi-")));
+    const messages: Array<{ message: any; options: any }> = [];
+    const childResultPath = process.env.PI_HERDR_SUBAGENT_RESULT_PATH;
+    delete process.env.PI_HERDR_SUBAGENT_RESULT_PATH;
+    activateSubagents({
+      on() {},
+      sendMessage(message: unknown, options: unknown) { messages.push({ message, options }); },
+    } as any, { runtime, registry });
+    if (childResultPath) process.env.PI_HERDR_SUBAGENT_RESULT_PATH = childResultPath;
+    const task = await runtime.spawn({ agent: "handler", cwd: "/repo", prompt: "work", label: "pi" });
+    writeFileSync(task.resultPath, JSON.stringify({
+      subagentId: task.subagentId, generation: task.generation, status: "completed", result: "secret full YAML",
+    }));
+    await waitFor(() => messages.length === 1);
+    expect(messages[0]!.options).toEqual({ triggerTurn: true, deliverAs: "followUp" });
+    expect(messages[0]!.message).toMatchObject({
+      customType: "pi-herdr-subagent-completion",
+      display: true,
+      details: { subagentId: task.subagentId, generation: 1, status: "completed", label: "pi" },
+    });
+    expect(JSON.stringify(messages[0])).not.toContain("secret full YAML");
+    runtime.stop();
   });
 });
 

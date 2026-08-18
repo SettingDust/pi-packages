@@ -21,10 +21,14 @@ export type SubagentTask = {
   sessionFile: string; resultPath: string; tabId: string; paneId: string; status: TaskStatus;
   createdAt: string; updatedAt: string; result?: string; error?: string;
 };
+export type CompletionNotification = {
+  subagentId: string; generation: number; status: Exclude<TaskStatus, "running">; label: string; reason?: string;
+};
+export type CompletionNotifier = (notification: CompletionNotification) => void | Promise<void>;
 export type TaskRecordV1 = {
   version: 1; subagentId: string; generation: number; agent: string; cwd: string; label: string; model?: string; thinking?: string;
   sessionFile: string; tabId?: string; paneId?: string; status: "starting" | TaskStatus;
-  createdAt: string; updatedAt: string; error?: string;
+  createdAt: string; updatedAt: string; error?: string; notifiedGeneration?: number;
 };
 export type HerdrTransport = {
   createTab(input: { cwd: string; label: string; env?: Record<string, string> }): Promise<{ tabId: string; paneId: string }>;
@@ -54,9 +58,20 @@ function buildNodeLaunchScript(cwd: string, command: string, args: string[]): st
   const spec = Buffer.from(JSON.stringify({ cwd, command: invocation.command, args: [...invocation.args, ...args] }), "utf8").toString("base64");
   return [
     `const { spawnSync } = require("node:child_process");`,
+    `const { existsSync, renameSync, writeFileSync } = require("node:fs");`,
     `const spec = JSON.parse(Buffer.from(${JSON.stringify(spec)}, "base64").toString("utf8"));`,
+    `const fail = error => {`,
+    `  const path = process.env.PI_HERDR_SUBAGENT_RESULT_PATH;`,
+    `  const subagentId = process.env.PI_HERDR_SUBAGENT_ID;`,
+    `  const generation = Number(process.env.PI_HERDR_SUBAGENT_GENERATION);`,
+    `  if (!path || !subagentId || !Number.isInteger(generation) || existsSync(path)) return;`,
+    `  const temporary = path + "." + process.pid + ".tmp";`,
+    `  writeFileSync(temporary, JSON.stringify({ subagentId, generation, status: "failed", error }));`,
+    `  renameSync(temporary, path);`,
+    `};`,
     `const result = spawnSync(spec.command, spec.args, { cwd: spec.cwd, env: process.env, stdio: "inherit" });`,
-    `if (result.error) throw result.error;`,
+    `if (result.error) { fail("launch_failed: " + result.error.message); throw result.error; }`,
+    `fail(result.status === 0 ? "child_exited_without_result" : "child_exit_" + (result.status ?? 1));`,
     `process.exit(result.status ?? 1);`,
     "",
   ].join("\r\n");
@@ -139,8 +154,18 @@ export class SubagentRuntime {
   private tasks = new Map<string, SubagentTask>();
   private sequence = 0;
   private activeTasksDir?: string;
+  private monitors = new Map<string, AbortController>();
+  private notified = new Set<string>();
+  private completionNotifier?: CompletionNotifier;
 
-  constructor(private readonly transport: HerdrTransport, private readonly registry: AgentRegistry, private readonly root?: string) {}
+  constructor(
+    private readonly transport: HerdrTransport,
+    private readonly registry: AgentRegistry,
+    private readonly root?: string,
+    completionNotifier?: CompletionNotifier,
+  ) { this.completionNotifier = completionNotifier; }
+
+  setCompletionNotifier(notifier: CompletionNotifier): void { this.completionNotifier = notifier; }
 
   async spawn(input: {
     agent: string;
@@ -158,10 +183,12 @@ export class SubagentRuntime {
     return this.start({ subagentId, generation: 1, artifactDir, ...input });
   }
 
-  async recover(cwd: string, parentSessionFile?: string): Promise<void> {
+  async recover(cwd: string, parentSessionFile?: string, notifiedKeys: Iterable<string> = []): Promise<void> {
     const tasksDir = this.tasksDir(cwd, parentSessionFile);
     this.selectScope(tasksDir);
+    this.stop();
     this.tasks.clear();
+    for (const key of notifiedKeys) this.notified.add(key);
     if (!existsSync(tasksDir)) return;
     for (const entry of readdirSync(tasksDir, { withFileTypes: true })) {
       const match = entry.name.match(/^(subagent-\d+)-artifacts$/);
@@ -171,6 +198,7 @@ export class SubagentRuntime {
       const record = this.readTaskRecord(join(artifactDir, "task.json"), tasksDir, artifactDir, subagentId);
       if (!record) continue;
       const task = this.taskFromRecord(record, artifactDir);
+      if (record.notifiedGeneration === record.generation) this.notified.add(this.taskKey(task));
       const result = existsSync(task.resultPath) ? this.readResult(task) : undefined;
       if (result?.valid) {
         task.status = result.status;
@@ -195,6 +223,8 @@ export class SubagentRuntime {
       }
       this.tasks.set(task.subagentId, task);
       await this.persist(task);
+      if (task.status === "running") this.startMonitor(task);
+      else await this.notifyTerminal(task);
     }
   }
 
@@ -226,8 +256,10 @@ export class SubagentRuntime {
   private selectScope(tasksDir: string): void {
     const scope = resolve(tasksDir);
     if (scope === this.activeTasksDir) return;
+    this.stop();
     this.activeTasksDir = scope;
     this.tasks.clear();
+    this.notified.clear();
     this.sequence = 0;
   }
 
@@ -277,9 +309,13 @@ export class SubagentRuntime {
     };
     await writeAtomic(join(artifactDir, "task.json"), starting);
 
-    let surface: { tabId: string; paneId: string };
+    const task: SubagentTask = {
+      subagentId: input.subagentId, generation: input.generation, agent: input.agent, cwd: input.cwd, label: input.label,
+      model: input.model, thinking: input.thinking, sessionFile, resultPath, tabId: "", paneId: "", status: "running", createdAt, updatedAt: now,
+    };
+    this.tasks.set(task.subagentId, task);
     try {
-      surface = await this.transport.createTab({
+      const surface = await this.transport.createTab({
         cwd: input.cwd,
         label: input.label,
         env: {
@@ -288,15 +324,12 @@ export class SubagentRuntime {
           PI_HERDR_SUBAGENT_RESULT_PATH: resultPath,
         },
       });
+      task.tabId = surface.tabId;
+      task.paneId = surface.paneId;
     } catch (error) {
-      await writeAtomic(join(artifactDir, "task.json"), { ...starting, status: "failed", error: String(error), updatedAt: new Date().toISOString() });
+      await this.settle(task, "failed", undefined, String(error));
       throw error;
     }
-    const task: SubagentTask = {
-      subagentId: input.subagentId, generation: input.generation, agent: input.agent, cwd: input.cwd, label: input.label,
-      model: input.model, thinking: input.thinking, sessionFile, resultPath, ...surface, status: "running", createdAt, updatedAt: now,
-    };
-    this.tasks.set(task.subagentId, task);
     await this.persist(task);
     const args = ["--session", sessionFile, "-e", paneChildExtensionPath, "--system-prompt", agent.body, "--tools", "read,bash,edit,write,subagent_done"];
     if (input.model) args.push("--model", input.thinking ? `${input.model}:${input.thinking}` : input.model);
@@ -308,11 +341,10 @@ export class SubagentRuntime {
       await writeFile(launchScript, `\ufeff$ErrorActionPreference = 'Stop'\r\n${powerShellInvocation(bootstrapRuntime(), [bootstrapScript])}\r\nexit $LASTEXITCODE\r\n`);
       await this.transport.run(task.paneId, "powershell.exe", ["-NoLogo", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", launchScript]);
     } catch (error) {
-      task.status = "failed";
-      task.error = String(error);
-      await this.persist(task);
+      await this.settle(task, "failed", undefined, String(error));
       throw error;
     }
+    this.startMonitor(task);
     return { ...task };
   }
 
@@ -336,21 +368,8 @@ export class SubagentRuntime {
     const task = this.get(id);
     if (task.generation !== generation) throw new Error("Subagent generation is no longer current");
     while (task.status === "running") {
-      if (existsSync(task.resultPath)) {
-        const result = this.readResult(task);
-        if (!result.valid) {
-          task.status = "failed";
-          task.error = result.error;
-          await this.persist(task);
-          break;
-        }
-        task.status = result.status;
-        task.result = result.result;
-        task.error = result.error;
-        await this.persist(task);
-        break;
-      }
-      await delay(50);
+      if (existsSync(task.resultPath)) await this.settleFromResult(task);
+      else await delay(50);
     }
     return { ...task };
   }
@@ -365,20 +384,99 @@ export class SubagentRuntime {
   async cancel(id: string): Promise<SubagentTask> {
     const task = this.get(id);
     if (task.status === "running") {
-      await this.transport.closePane(task.paneId);
-      task.status = "cancelled";
+      this.stopMonitor(task);
+      try { await this.transport.closePane(task.paneId); }
+      catch (error) { this.startMonitor(task); throw error; }
       await writeAtomic(task.resultPath, { subagentId: id, generation: task.generation, status: "cancelled" });
-      await this.persist(task);
+      await this.settle(task, "cancelled");
     }
     return { ...task };
   }
 
   async remove(id: string): Promise<void> {
     const task = this.get(id);
+    this.stopMonitor(task);
     if (task.status === "running") await this.transport.closePane(task.paneId);
     this.tasks.delete(id);
     rmSync(task.sessionFile, { force: true });
     rmSync(dirname(task.resultPath), { recursive: true, force: true });
+  }
+
+  stop(): void {
+    for (const controller of this.monitors.values()) controller.abort();
+    this.monitors.clear();
+  }
+
+  private taskKey(task: Pick<SubagentTask, "subagentId" | "generation">): string {
+    return `${task.subagentId}:${task.generation}`;
+  }
+
+  private startMonitor(task: SubagentTask): void {
+    const key = this.taskKey(task);
+    if (this.monitors.has(key) || task.status !== "running") return;
+    const controller = new AbortController();
+    this.monitors.set(key, controller);
+    void (async () => {
+      while (!controller.signal.aborted && task.status === "running") {
+        try { await delay(500, undefined, { signal: controller.signal, ref: false }); }
+        catch { break; }
+        if (existsSync(task.resultPath)) {
+          await this.settleFromResult(task);
+          break;
+        }
+        try {
+          const paneExists = await this.transport.paneExists(task.paneId);
+          if (controller.signal.aborted) break;
+          if (!paneExists) {
+            await this.settle(task, "failed", undefined, "pane_closed");
+            break;
+          }
+        } catch (error) {
+          if (controller.signal.aborted) break;
+          await this.settle(task, "failed", undefined, `pane_verification_failed: ${error instanceof Error ? error.message : String(error)}`);
+          break;
+        }
+      }
+      if (this.monitors.get(key) === controller) this.monitors.delete(key);
+    })();
+  }
+
+  private stopMonitor(task: Pick<SubagentTask, "subagentId" | "generation">): void {
+    const key = this.taskKey(task);
+    this.monitors.get(key)?.abort();
+    this.monitors.delete(key);
+  }
+
+  private async settleFromResult(task: SubagentTask): Promise<void> {
+    const result = this.readResult(task);
+    if (result.valid) await this.settle(task, result.status, result.result, result.error);
+    else await this.settle(task, "failed", undefined, result.error);
+  }
+
+  private async settle(task: SubagentTask, status: Exclude<TaskStatus, "running">, result?: string, error?: string): Promise<void> {
+    if (task.status !== "running") return;
+    this.stopMonitor(task);
+    task.status = status;
+    task.result = result;
+    task.error = error;
+    await this.persist(task);
+    await this.notifyTerminal(task);
+  }
+
+  private async notifyTerminal(task: SubagentTask): Promise<void> {
+    if (task.status === "running" || !this.completionNotifier || this.notified.has(this.taskKey(task))) return;
+    const notification: CompletionNotification = {
+      subagentId: task.subagentId,
+      generation: task.generation,
+      status: task.status,
+      label: task.label,
+      ...(task.error ? { reason: briefReason(task.error) } : {}),
+    };
+    try {
+      await this.completionNotifier(notification);
+      this.notified.add(this.taskKey(task));
+      await this.persist(task);
+    } catch { /* Recovery retries notifications without a persisted marker. */ }
   }
 
   private recordPath(task: SubagentTask): string { return join(dirname(task.resultPath), "task.json"); }
@@ -390,6 +488,7 @@ export class SubagentRuntime {
       ...(task.model ? { model: task.model } : {}), ...(task.thinking ? { thinking: task.thinking } : {}), sessionFile: task.sessionFile,
       tabId: task.tabId || undefined, paneId: task.paneId || undefined, status: task.status, createdAt: task.createdAt, updatedAt: task.updatedAt,
       ...(task.error ? { error: task.error } : {}),
+      ...(this.notified.has(this.taskKey(task)) ? { notifiedGeneration: task.generation } : {}),
     };
     await writeAtomic(this.recordPath(task), record);
   }
@@ -416,13 +515,14 @@ export class SubagentRuntime {
       if (value.tabId !== undefined && typeof value.tabId !== "string") return;
       if (value.paneId !== undefined && typeof value.paneId !== "string") return;
       if (value.error !== undefined && typeof value.error !== "string") return;
+      if (value.notifiedGeneration !== undefined && value.notifiedGeneration !== value.generation) return;
       if (resolve(artifactDir) !== resolve(join(tasksDir, `${subagentId}-artifacts`))) return;
       return value as TaskRecordV1;
     } catch { return; }
   }
 
   private readResult(task: SubagentTask):
-    | { valid: true; status: TaskStatus; result?: string; error?: string }
+    | { valid: true; status: Exclude<TaskStatus, "running">; result?: string; error?: string }
     | { valid: false; error: string } {
     try {
       const value = JSON.parse(readFileSync(task.resultPath, "utf8")) as Json;
@@ -434,6 +534,11 @@ export class SubagentRuntime {
       return { valid: true, status: value.status, result: value.result as string | undefined, error: value.error as string | undefined };
     } catch { return { valid: false, error: "invalid_result" }; }
   }
+}
+
+function briefReason(reason: string): string {
+  const compact = reason.replace(/\s+/g, " ").trim();
+  return compact.length <= 160 ? compact : `${compact.slice(0, 157)}...`;
 }
 
 function isTaskStatus(value: unknown): value is TaskStatus {
@@ -515,27 +620,60 @@ export function createSubagentTools(runtime: SubagentRuntime, cwd: string, paren
     },
   });
   return [
-    tool("subagent_spawn", "Start one background subagent with a locally resolved registry Agent.", Type.Object({ agent: StringEnum(runtime.agentNames()), prompt: Type.String({ minLength: 1 }), label: Type.String({ minLength: 1 }), model: Type.Optional(Type.String()), thinking: Type.Optional(Type.String()) }), params => runtime.spawn({ ...params, cwd, parentSessionFile }), { renderCall: renderSpawnCall, renderResult: renderSpawnResult }),
+    tool("subagent_spawn", "Start one background subagent; the parent receives a terminal notification without the full Result.", Type.Object({ agent: StringEnum(runtime.agentNames()), prompt: Type.String({ minLength: 1 }), label: Type.String({ minLength: 1 }), model: Type.Optional(Type.String()), thinking: Type.Optional(Type.String()) }), params => runtime.spawn({ ...params, cwd, parentSessionFile }), { renderCall: renderSpawnCall, renderResult: renderSpawnResult }),
     tool("subagent_resume", "Resume a completed or failed subagent.", Type.Object({ subagentId: Type.String(), prompt: Type.String({ minLength: 1 }) }), params => runtime.resume(params.subagentId, params.prompt)),
     tool("subagent_inspect", "Return a non-blocking subagent snapshot.", Type.Object({ subagentId: Type.String() }), params => Promise.resolve(runtime.inspect(params.subagentId))),
-    tool("subagent_join", "Wait for a subagent Result.", Type.Object({ subagentId: Type.String(), generation: Type.Optional(Type.Number()) }), async (params, update) => { update?.(runtime.inspect(params.subagentId)); return runtime.join(params.subagentId, params.generation); }, { renderCall: renderJoinCall, renderResult: renderJoinResult }),
+    tool("subagent_join", "Wait for a subagent and read its full Result.", Type.Object({ subagentId: Type.String(), generation: Type.Optional(Type.Number()) }), async (params, update) => { update?.(runtime.inspect(params.subagentId)); return runtime.join(params.subagentId, params.generation); }, { renderCall: renderJoinCall, renderResult: renderJoinResult }),
     tool("subagent_steer", "Send a message to a running subagent.", Type.Object({ subagentId: Type.String(), message: Type.String({ minLength: 1 }) }), params => runtime.steer(params.subagentId, params.message)),
     tool("subagent_cancel", "Best-effort cancel a running subagent.", Type.Object({ subagentId: Type.String() }), params => runtime.cancel(params.subagentId)),
     tool("subagent_remove", "Close and remove a subagent and its artifacts.", Type.Object({ subagentId: Type.String() }), async params => { await runtime.remove(params.subagentId); return { status: "removed" }; }),
   ];
 }
 
+const completionMessageType = "pi-herdr-subagent-completion";
+
+function notificationKey(value: Pick<CompletionNotification, "subagentId" | "generation">): string {
+  return `${value.subagentId}:${value.generation}`;
+}
+
+function completionNotificationKeys(entries: readonly { type: string; customType?: string; details?: unknown }[]): string[] {
+  const keys: string[] = [];
+  for (const entry of entries) {
+    if (entry.type !== "custom_message" || entry.customType !== completionMessageType || !entry.details || typeof entry.details !== "object") continue;
+    const details = entry.details as Partial<CompletionNotification>;
+    if (typeof details.subagentId === "string" && /^subagent-\d+$/.test(details.subagentId)
+      && Number.isInteger(details.generation) && details.generation! >= 1
+      && isTerminalStatus(details.status) && typeof details.label === "string") keys.push(notificationKey(details as CompletionNotification));
+  }
+  return keys;
+}
+
 export default function subagentsExtension(pi: ExtensionAPI, dependencies: { runtime?: SubagentRuntime; registry?: AgentRegistry } = {}): void {
   if (process.env.PI_HERDR_SUBAGENT_RESULT_PATH) return;
-  const registry = dependencies.registry ?? new AgentRegistry(); const runtime = dependencies.runtime ?? new SubagentRuntime(createHerdrTransport(), registry);
+  const registry = dependencies.registry ?? new AgentRegistry();
+  const runtime = dependencies.runtime ?? new SubagentRuntime(createHerdrTransport(), registry);
+  runtime.setCompletionNotifier(notification => {
+    pi.sendMessage({
+      customType: completionMessageType,
+      content: `Subagent terminal notification: ${JSON.stringify(notification)}. Call subagent_join to read the full Result.`,
+      display: true,
+      details: notification,
+    }, { triggerTurn: true, deliverAs: "followUp" });
+  });
+  const recoverCurrent = async (ctx: ExtensionContext) => {
+    const parentSessionFile = ctx.sessionManager?.getSessionFile?.();
+    await runtime.recover(ctx.cwd, parentSessionFile, completionNotificationKeys(ctx.sessionManager.getEntries()));
+  };
+  pi.on("session_start", async (_event, ctx) => recoverCurrent(ctx));
   pi.on("before_agent_start", async (_event, ctx) => {
     await registry.discover(ctx.cwd);
     const parentSessionFile = ctx.sessionManager?.getSessionFile?.();
-    await runtime.recover(ctx.cwd, parentSessionFile);
+    await recoverCurrent(ctx);
     const tools = createSubagentTools(runtime, ctx.cwd, parentSessionFile);
     for (const tool of tools) pi.registerTool(tool);
     pi.setActiveTools([...pi.getActiveTools().filter(name => !name.startsWith("subagent_")), ...tools.map(tool => tool.name)]);
   });
+  pi.on("session_shutdown", () => runtime.stop());
 }
 
 async function configuredPackageRoots(cwd: string): Promise<string[]> {
