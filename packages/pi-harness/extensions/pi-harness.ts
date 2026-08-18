@@ -6,6 +6,7 @@ import {
   type ExtensionAPI,
   type ExtensionContext,
 } from "@earendil-works/pi-coding-agent";
+import { Text } from "@earendil-works/pi-tui";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { loadHarnessRoles } from "../src/config.js";
@@ -91,6 +92,18 @@ function createResolverTool(skills: SkillSummary[], roles: ModelRole[], loadRole
       }),
       modelRole: roleName,
     }),
+    renderCall(args, theme, context) {
+      const text = (context.lastComponent as Text | undefined) ?? new Text("", 0, 0);
+      const handoff = args.handoff as { objective?: string; primarySkill?: string; companionSkills?: string[] } | undefined;
+      const selectedSkills = [handoff?.primarySkill, ...(handoff?.companionSkills ?? [])].filter((name): name is string => Boolean(name));
+      const lines = [
+        `${theme.fg("toolTitle", theme.bold(resolverName))}${args.modelRole ? theme.fg("muted", `  ${args.modelRole}`) : ""}`,
+        ...(handoff?.objective ? [theme.fg("dim", `  ${handoff.objective}`)] : []),
+        ...(selectedSkills.length ? [theme.fg("muted", `  ${selectedSkills.join(" + ")}`)] : []),
+      ];
+      text.setText(lines.join("\n"));
+      return text;
+    },
     async execute(_toolCallId, params, _signal, _onUpdate, ctx) {
       const current = currentRoles(ctx, loadRoles);
       const result: Resolution = current.status === "blocked"

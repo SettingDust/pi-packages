@@ -16,6 +16,11 @@ type BeforeHandler = (
 type RegisteredTool = {
   name: string;
   parameters: unknown;
+  renderCall?: (
+    args: any,
+    theme: any,
+    context: any,
+  ) => { render(width: number): string[] };
   execute(
     toolCallId: string,
     params: unknown,
@@ -105,6 +110,23 @@ describe("Pi Harness Extension", () => {
     expect(firstSchema).toContain("research");
     expect(firstSchema).not.toContain("hidden");
     expect(firstSchema).toContain("standard");
+
+    const rendered = resolver!.renderCall!(
+      {
+        handoff: {
+          objective: "Inspect the current implementation.",
+          primarySkill: "research",
+          companionSkills: ["review-evidence"],
+          context: [],
+        },
+        modelRole: "standard",
+      },
+      { fg: (_color: string, text: string) => text, bold: (text: string) => text },
+      {},
+    ).render(120).join("\n");
+    expect(rendered).toContain("resolve_delegation  standard");
+    expect(rendered).toContain("Inspect the current implementation.");
+    expect(rendered).toContain("research + review-evidence");
 
     const invocation = await resolver!.execute(
       "call-1",
