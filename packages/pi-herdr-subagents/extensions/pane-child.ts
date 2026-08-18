@@ -9,9 +9,33 @@ export default function paneChild(pi: ExtensionAPI): void {
   const generation = Number(process.env.PI_HERDR_SUBAGENT_GENERATION);
   if (!resultPath || !subagentId || !Number.isInteger(generation)) return;
   let settled = false;
+  const nudgeDelay = Math.max(1000, Number.parseInt(process.env.PI_SUBAGENT_NUDGE_DELAY_MS ?? "5000", 10) || 5000);
+  let nudgeTimer: ReturnType<typeof setTimeout> | undefined;
+  let inputAfterAgentEnd = false;
+  const clearNudge = () => {
+    if (nudgeTimer !== undefined) clearTimeout(nudgeTimer);
+    nudgeTimer = undefined;
+  };
+  const scheduleNudge = () => {
+    clearNudge();
+    if (settled) return;
+    nudgeTimer = setTimeout(() => {
+      nudgeTimer = undefined;
+      if (!settled && !inputAfterAgentEnd) {
+        pi.sendUserMessage("Your task is still active. Call subagent_done when finished.", { deliverAs: "followUp" });
+      }
+    }, nudgeDelay);
+  };
+  const on = pi.on.bind(pi) as (event: string, handler: (...args: any[]) => unknown) => void;
+  on("before_agent_start", clearNudge);
+  on("agent_start", () => { inputAfterAgentEnd = false; clearNudge(); });
+  on("agent_end", scheduleNudge);
+  on("input", () => { inputAfterAgentEnd = true; clearNudge(); });
+  on("session_shutdown", clearNudge);
   const finish = (result: string, ctx: { shutdown(): void }) => {
     if (settled) return;
     settled = true;
+    clearNudge();
     const temporary = `${resultPath}.${process.pid}.tmp`;
     void writeFile(temporary, JSON.stringify({ subagentId, generation, status: "completed", result }))
       .then(() => { renameSync(temporary, resultPath); ctx.shutdown(); });
