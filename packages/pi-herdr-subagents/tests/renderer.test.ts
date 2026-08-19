@@ -27,11 +27,11 @@ test("renders named-Agent spawn and join actions", async () => {
   const tools = createSubagentTools(new SubagentRuntime(transport, registry, root), "/repo") as any[];
   const spawn = tools.find(tool => tool.name === "subagent_spawn")!;
   const joinTool = tools.find(tool => tool.name === "subagent_join")!;
-  const spawnArgs = { agent: "handler", prompt: "Do the work", label: "Implement renderer" };
+  const spawnArgs = { agent: "handler", prompt: "Do the work", label: "Implement renderer", taskSlug: "implement-renderer" };
 
   expect(render(spawn.renderCall(spawnArgs, theme))).toBe("subagent spawn  handler · Implement renderer");
   const spawned = await spawn.execute("spawn-1", spawnArgs);
-  expect(render(spawn.renderResult(spawned, {}, theme))).toBe(" Started Implement renderer\n  subagent-1");
+  expect(render(spawn.renderResult(spawned, {}, theme))).toBe(" Started Implement renderer\n  implement-renderer");
 
   const task = spawned.details;
   writeFileSync(task.resultPath, JSON.stringify({
@@ -41,7 +41,7 @@ test("renders named-Agent spawn and join actions", async () => {
     result: "status: completed\nsummary: done\nreport: renderer works",
   }));
 
-  expect(render(joinTool.renderCall({ subagentId: task.subagentId }, theme))).toBe("subagent join  subagent-1");
+  expect(render(joinTool.renderCall({ subagentId: task.subagentId }, theme))).toBe("subagent join  implement-renderer");
   let partial: unknown;
   const joined = await joinTool.execute("join-1", { subagentId: task.subagentId }, undefined, (update: unknown) => { partial = update; });
   expect(render(joinTool.renderResult(partial, { isPartial: true }, theme))).toBe(" Implement renderer running\n   waiting for result");

@@ -17,10 +17,27 @@ export const paneChildExtensionPath = resolve(dirname(fileURLToPath(import.meta.
 export type AgentDefinition = { name: string; path: string; body: string; description: string };
 export type TaskStatus = "running" | "completed" | "failed" | "cancelled";
 export type SubagentTask = {
-  subagentId: string; generation: number; agent: string; cwd: string; label: string; model?: string; thinking?: string;
+  subagentId: string; taskSlug?: string; generation: number; agent: string; cwd: string; label: string; model?: string; thinking?: string;
   sessionFile: string; resultPath: string; tabId: string; paneId: string; status: TaskStatus;
   createdAt: string; updatedAt: string; result?: string; error?: string;
 };
+
+export type TaskIdAllocationErrorCode = "invalid_task_slug" | "task_id_exhausted" | "filesystem_reservation_failed";
+
+export class TaskIdAllocationError extends Error {
+  readonly code: TaskIdAllocationErrorCode;
+
+  constructor(code: TaskIdAllocationErrorCode, cause?: unknown) {
+    super(code === "invalid_task_slug"
+      ? "Invalid task slug."
+      : code === "task_id_exhausted"
+        ? "Task ID allocation exhausted."
+        : "Task ID filesystem reservation failed.");
+    this.name = "TaskIdAllocationError";
+    this.code = code;
+    if (cause !== undefined) this.cause = cause;
+  }
+}
 export type SubagentTaskObservation = Readonly<{
   subagentId: string;
   generation: number;
@@ -34,7 +51,7 @@ export type CompletionNotification = {
 };
 export type CompletionNotifier = (notification: CompletionNotification) => void | Promise<void>;
 export type TaskRecordV1 = {
-  version: 1; subagentId: string; generation: number; agent: string; cwd: string; label: string; model?: string; thinking?: string;
+  version: 1; subagentId: string; taskSlug?: string; generation: number; agent: string; cwd: string; label: string; model?: string; thinking?: string;
   sessionFile: string; tabId?: string; paneId?: string; status: "starting" | TaskStatus;
   createdAt: string; updatedAt: string; error?: string; notifiedGeneration?: number;
 };
@@ -160,7 +177,6 @@ async function writeAtomic(path: string, value: unknown): Promise<void> {
 
 export class SubagentRuntime {
   private tasks = new Map<string, SubagentTask>();
-  private sequence = 0;
   private activeTasksDir?: string;
   private monitors = new Map<string, AbortController>();
   private notified = new Set<string>();
@@ -196,15 +212,17 @@ export class SubagentRuntime {
     cwd: string;
     prompt: string;
     label: string;
+    taskSlug?: string;
     model?: string;
     thinking?: string;
     parentSessionFile?: string;
   }): Promise<SubagentTask> {
+    const taskSlug = validateTaskSlug(input.taskSlug);
     this.resolveAgent(input.agent);
     const tasksDir = this.tasksDir(input.cwd, input.parentSessionFile);
     this.selectScope(tasksDir);
-    const { subagentId, artifactDir } = this.reserveSubagentId(tasksDir);
-    return this.start({ subagentId, generation: 1, artifactDir, ...input });
+    const { subagentId, artifactDir } = this.reserveSubagentId(tasksDir, taskSlug);
+    return this.start({ subagentId, taskSlug, generation: 1, artifactDir, ...input });
   }
 
   async recover(cwd: string, parentSessionFile?: string, notifiedKeys: Iterable<string> = []): Promise<void> {
@@ -218,7 +236,7 @@ export class SubagentRuntime {
       return;
     }
     for (const entry of readdirSync(tasksDir, { withFileTypes: true })) {
-      const match = entry.name.match(/^(subagent-\d+)-artifacts$/);
+      const match = entry.name.match(/^(.+)-artifacts$/);
       if (!entry.isDirectory() || !match) continue;
       const subagentId = match[1]!;
       const artifactDir = join(tasksDir, entry.name);
@@ -261,6 +279,7 @@ export class SubagentRuntime {
     if (old.status === "running") throw new Error("Cannot resume a running subagent");
     return this.start({
       subagentId: old.subagentId,
+      taskSlug: old.taskSlug,
       generation: old.generation + 1,
       agent: old.agent,
       cwd: old.cwd,
@@ -288,27 +307,29 @@ export class SubagentRuntime {
     this.activeTasksDir = scope;
     this.tasks.clear();
     this.notified.clear();
-    this.sequence = 0;
   }
 
-  private reserveSubagentId(tasksDir: string): { subagentId: string; artifactDir: string } {
-    mkdirSync(tasksDir, { recursive: true, mode: 0o700 });
-    while (true) {
-      const subagentId = `subagent-${++this.sequence}`;
-      if (existsSync(join(tasksDir, `${subagentId}-g1.jsonl`))) continue;
+  private reserveSubagentId(tasksDir: string, taskSlug: string): { subagentId: string; artifactDir: string } {
+    try { mkdirSync(tasksDir, { recursive: true, mode: 0o700 }); }
+    catch (error) { throw new TaskIdAllocationError("filesystem_reservation_failed", error); }
+    for (let suffix = 1; suffix <= 100; suffix++) {
+      const subagentId = suffix === 1 ? taskSlug : `${taskSlug}-${suffix}`;
+      if (existsSync(join(tasksDir, `${subagentId}-g1.jsonl`)) || existsSync(join(tasksDir, `${subagentId}-artifacts`))) continue;
       const artifactDir = join(tasksDir, `${subagentId}-artifacts`);
       try {
         mkdirSync(artifactDir, { mode: 0o700 });
         return { subagentId, artifactDir };
       } catch (error) {
         if ((error as { code?: unknown }).code === "EEXIST") continue;
-        throw error;
+        throw new TaskIdAllocationError("filesystem_reservation_failed", error);
       }
     }
+    throw new TaskIdAllocationError("task_id_exhausted");
   }
 
   private async start(input: {
     subagentId: string;
+    taskSlug?: string;
     generation: number;
     agent: string;
     cwd: string;
@@ -331,14 +352,14 @@ export class SubagentRuntime {
     const now = new Date().toISOString();
     const createdAt = input.createdAt ?? now;
     const starting: TaskRecordV1 = {
-      version: 1, subagentId: input.subagentId, generation: input.generation, agent: input.agent, cwd: input.cwd, label: input.label,
+      version: 1, subagentId: input.subagentId, ...(input.taskSlug ? { taskSlug: input.taskSlug } : {}), generation: input.generation, agent: input.agent, cwd: input.cwd, label: input.label,
       ...(input.model ? { model: input.model } : {}), ...(input.thinking ? { thinking: input.thinking } : {}), sessionFile,
       status: "starting", createdAt, updatedAt: now,
     };
     await writeAtomic(join(artifactDir, "task.json"), starting);
 
     const task: SubagentTask = {
-      subagentId: input.subagentId, generation: input.generation, agent: input.agent, cwd: input.cwd, label: input.label,
+      subagentId: input.subagentId, taskSlug: input.taskSlug, generation: input.generation, agent: input.agent, cwd: input.cwd, label: input.label,
       model: input.model, thinking: input.thinking, sessionFile, resultPath, tabId: "", paneId: "", status: "running", createdAt, updatedAt: now,
     };
     this.tasks.set(task.subagentId, task);
@@ -522,7 +543,7 @@ export class SubagentRuntime {
   private async persist(task: SubagentTask): Promise<void> {
     task.updatedAt = new Date().toISOString();
     const record: TaskRecordV1 = {
-      version: 1, subagentId: task.subagentId, generation: task.generation, agent: task.agent, cwd: task.cwd, label: task.label,
+      version: 1, subagentId: task.subagentId, ...(task.taskSlug ? { taskSlug: task.taskSlug } : {}), generation: task.generation, agent: task.agent, cwd: task.cwd, label: task.label,
       ...(task.model ? { model: task.model } : {}), ...(task.thinking ? { thinking: task.thinking } : {}), sessionFile: task.sessionFile,
       tabId: task.tabId || undefined, paneId: task.paneId || undefined, status: task.status, createdAt: task.createdAt, updatedAt: task.updatedAt,
       ...(task.error ? { error: task.error } : {}),
@@ -533,7 +554,7 @@ export class SubagentRuntime {
 
   private taskFromRecord(record: TaskRecordV1, artifactDir: string): SubagentTask {
     return {
-      subagentId: record.subagentId, generation: record.generation, agent: record.agent, cwd: record.cwd, label: record.label,
+      subagentId: record.subagentId, taskSlug: record.taskSlug, generation: record.generation, agent: record.agent, cwd: record.cwd, label: record.label,
       model: record.model, thinking: record.thinking, sessionFile: record.sessionFile,
       resultPath: join(artifactDir, `result-${record.generation}.json`), tabId: record.tabId ?? "", paneId: record.paneId ?? "",
       status: record.status === "starting" ? "running" : record.status, createdAt: record.createdAt, updatedAt: record.updatedAt, error: record.error,
@@ -543,7 +564,10 @@ export class SubagentRuntime {
   private readTaskRecord(path: string, tasksDir: string, artifactDir: string, subagentId: string): TaskRecordV1 | undefined {
     try {
       const value = JSON.parse(readFileSync(path, "utf8")) as Partial<TaskRecordV1>;
-      if (value.version !== 1 || value.subagentId !== subagentId || !/^subagent-\d+$/.test(subagentId) || !Number.isInteger(value.generation) || value.generation! < 1) return;
+      const legacy = isLegacySubagentId(subagentId);
+      const canonical = typeof value.taskSlug === "string" && isCanonicalFinalId(subagentId, value.taskSlug);
+      if (value.version !== 1 || value.subagentId !== subagentId || (!legacy && !canonical) || !Number.isInteger(value.generation) || value.generation! < 1) return;
+      if (legacy ? value.taskSlug !== undefined : !canonical) return;
       if (typeof value.agent !== "string" || typeof value.cwd !== "string" || typeof value.label !== "string" || typeof value.sessionFile !== "string") return;
       if (value.model !== undefined && typeof value.model !== "string") return;
       if (value.thinking !== undefined && typeof value.thinking !== "string") return;
@@ -572,6 +596,38 @@ export class SubagentRuntime {
       return { valid: true, status: value.status, result: value.result as string | undefined, error: value.error as string | undefined };
     } catch { return { valid: false, error: "invalid_result" }; }
   }
+}
+
+function validateTaskSlug(value: unknown): string {
+  if (typeof value !== "string" || !isCanonicalTaskSlug(value)) throw new TaskIdAllocationError("invalid_task_slug");
+  return value;
+}
+
+function isCanonicalTaskSlug(value: string): boolean {
+  return value.length >= 3 && value.length <= 48 && /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(value) && !value.startsWith("subagent-");
+}
+
+function isLegacySubagentId(value: string): boolean {
+  return /^subagent-[1-9]\d*$/.test(value);
+}
+
+function isCanonicalFinalId(subagentId: string, taskSlug: string): boolean {
+  if (!isCanonicalTaskSlug(taskSlug)) return false;
+  if (subagentId === taskSlug) return true;
+  const suffix = subagentId.slice(taskSlug.length);
+  return /^-(?:[2-9]|[1-9]\d|100)$/.test(suffix);
+}
+
+function canonicalTaskSlugFromFinalId(value: string): string | undefined {
+  if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(value) || value.startsWith("subagent-")) return;
+  if (isCanonicalTaskSlug(value)) return value;
+  const match = value.match(/^(.*)-(\d+)$/);
+  if (!match) return;
+  const suffix = Number(match[2]);
+  if (isCanonicalTaskSlug(match[1]!) && suffix >= 2 && suffix <= 100 && String(suffix) === match[2]) return match[1];
+}
+function isNotificationSubagentId(value: string): boolean {
+  return isLegacySubagentId(value) || canonicalTaskSlugFromFinalId(value) !== undefined;
 }
 
 function briefReason(reason: string): string {
@@ -658,7 +714,8 @@ export function createSubagentTools(runtime: SubagentRuntime, cwd: string, paren
     },
   });
   return [
-    tool("subagent_spawn", "Start one background subagent; the parent receives a terminal notification without the full Result.", Type.Object({ agent: StringEnum(runtime.agentNames()), prompt: Type.String({ minLength: 1 }), label: Type.String({ minLength: 1 }), model: Type.Optional(Type.String()), thinking: Type.Optional(Type.String()) }), params => runtime.spawn({ ...params, cwd, parentSessionFile }), { renderCall: renderSpawnCall, renderResult: renderSpawnResult }),
+    // Optional avoids schema rejection so missing values use the stable runtime error contract.
+    tool("subagent_spawn", "Start one background subagent. taskSlug is required and must be a Router-provided canonical task identity; the parent receives a terminal notification without the full Result.", Type.Object({ agent: StringEnum(runtime.agentNames()), prompt: Type.String({ minLength: 1 }), label: Type.String({ minLength: 1 }), taskSlug: Type.Optional(Type.String()), model: Type.Optional(Type.String()), thinking: Type.Optional(Type.String()) }), params => runtime.spawn({ ...params, cwd, parentSessionFile }), { renderCall: renderSpawnCall, renderResult: renderSpawnResult }),
     tool("subagent_resume", "Resume a completed or failed subagent.", Type.Object({ subagentId: Type.String(), prompt: Type.String({ minLength: 1 }) }), params => runtime.resume(params.subagentId, params.prompt)),
     tool("subagent_inspect", "Return a non-blocking subagent snapshot.", Type.Object({ subagentId: Type.String() }), params => Promise.resolve(runtime.inspect(params.subagentId))),
     tool("subagent_join", "Wait for a subagent and read its full Result.", Type.Object({ subagentId: Type.String(), generation: Type.Optional(Type.Number()) }), async (params, update) => { update?.(runtime.inspect(params.subagentId)); return runtime.join(params.subagentId, params.generation); }, { renderCall: renderJoinCall, renderResult: renderJoinResult }),
@@ -679,7 +736,7 @@ function completionNotificationKeys(entries: readonly { type: string; customType
   for (const entry of entries) {
     if (entry.type !== "custom_message" || entry.customType !== completionMessageType || !entry.details || typeof entry.details !== "object") continue;
     const details = entry.details as Partial<CompletionNotification>;
-    if (typeof details.subagentId === "string" && /^subagent-\d+$/.test(details.subagentId)
+    if (typeof details.subagentId === "string" && isNotificationSubagentId(details.subagentId)
       && Number.isInteger(details.generation) && details.generation! >= 1
       && isTerminalStatus(details.status) && typeof details.label === "string") keys.push(notificationKey(details as CompletionNotification));
   }

@@ -102,6 +102,9 @@ describe("Pi Harness Extension", () => {
     expect(first.systemPrompt).not.toContain("default Pi prompt");
     expect(first.systemPrompt).toContain("research");
     expect(first.systemPrompt).toContain("When calling subagent_spawn, always pass agent: \"handler\"");
+    expect(first.systemPrompt).toContain("derive one concise canonical ASCII taskSlug");
+    expect(first.systemPrompt).toContain("taskSlug is an invocation field, not a Handoff or Resolver field");
+    expect(first.systemPrompt).toContain("separate human-readable label");
     expect(first.systemPrompt).not.toContain("hidden method");
     expect(active).toEqual(["read", "resolve_delegation"]);
 
@@ -148,6 +151,8 @@ describe("Pi Harness Extension", () => {
       model: "test/reasoning",
       thinking: "medium",
     });
+    expect(invocation.details).not.toHaveProperty("taskSlug");
+    expect(JSON.stringify(resolver!.parameters)).not.toContain("taskSlug");
 
     await before!(event([skill("implement")]), context());
     const secondSchema = JSON.stringify(tools.get("resolve_delegation")!.parameters);

@@ -57,17 +57,17 @@ describe("pi-herdr-subagents runtime", () => {
     const { calls, transport } = fakeTransport();
     const root = mkdtempSync(join(tmpdir(), "subagents-test-"));
     const runtime = new SubagentRuntime(transport, registry, root);
-    const task = await runtime.spawn({ agent: "handler", cwd: "/repo", prompt: "Do\nthe work", label: "task", model: "test/model", thinking: "high" });
-    expect(task).toMatchObject({ subagentId: "subagent-1", generation: 1, sessionFile: join(root, "tasks", "subagent-1-g1.jsonl"), status: "running" });
+    const task = await runtime.spawn({ agent: "handler", cwd: "/repo", prompt: "Do\nthe work", label: "task", taskSlug: "task", model: "test/model", thinking: "high" });
+    expect(task).toMatchObject({ subagentId: "task", generation: 1, sessionFile: join(root, "tasks", "task-g1.jsonl"), status: "running" });
     const manifest = JSON.parse(readFileSync(join(dirname(task.resultPath), "task.json"), "utf8"));
     expect(manifest).toMatchObject({ version: 1, subagentId: task.subagentId, generation: 1, status: "running", paneId: "pane-1" });
-    expect(calls[0]).toMatchObject({ op: "create", input: { cwd: "/repo", env: { PI_HERDR_SUBAGENT_ID: "subagent-1", PI_HERDR_SUBAGENT_GENERATION: "1" } } });
+    expect(calls[0]).toMatchObject({ op: "create", input: { cwd: "/repo", env: { PI_HERDR_SUBAGENT_ID: "task", PI_HERDR_SUBAGENT_GENERATION: "1" } } });
     const launch = calls[1] as { op: string; command: string; args: string[] };
     expect(launch).toMatchObject({ op: "run", command: "powershell.exe" });
     const scriptPath = launch.args.at(-1)!;
-    expect(scriptPath).toBe(join(root, "tasks", "subagent-1-artifacts", "launch-1.ps1"));
+    expect(scriptPath).toBe(join(root, "tasks", "task-artifacts", "launch-1.ps1"));
     const script = readFileSync(scriptPath, "utf8");
-    const bootstrapPath = join(root, "tasks", "subagent-1-artifacts", "launch-1.cjs");
+    const bootstrapPath = join(root, "tasks", "task-artifacts", "launch-1.cjs");
     expect(script.charCodeAt(0)).toBe(0xfeff);
     expect(script).toContain(bootstrapPath);
     expect(script).not.toContain("Execute the Handoff.");
@@ -94,7 +94,7 @@ describe("pi-herdr-subagents runtime", () => {
     const parentDir = mkdtempSync(join(tmpdir(), "subagents-parent-"));
     const parentSessionFile = join(parentDir, "parent.jsonl");
     const runtime = new SubagentRuntime(transport, handlerRegistry());
-    const first = await runtime.spawn({ agent: "handler", cwd: "/repo", prompt: "one", label: "task", parentSessionFile });
+    const first = await runtime.spawn({ agent: "handler", cwd: "/repo", prompt: "one", label: "task", taskSlug: "task", parentSessionFile });
     writeFileSync(first.sessionFile, "");
     writeFileSync(first.resultPath, JSON.stringify({ subagentId: first.subagentId, generation: 1, status: "failed", error: "retry" }));
     const completed = await runtime.join(first.subagentId);
@@ -104,7 +104,7 @@ describe("pi-herdr-subagents runtime", () => {
       subagentId: first.subagentId,
       generation: 2,
       sessionFile: first.sessionFile,
-      resultPath: join(parentDir, "parent", "tasks", "subagent-1-artifacts", "result-2.json"),
+      resultPath: join(parentDir, "parent", "tasks", "task-artifacts", "result-2.json"),
     });
     await expect(runtime.steer(first.subagentId, "focus")).resolves.toMatchObject({ generation: 2 });
     await expect(runtime.cancel(first.subagentId)).resolves.toMatchObject({ status: "cancelled" });
@@ -125,20 +125,23 @@ describe("pi-herdr-subagents runtime", () => {
     const parentSessionFile = join(parentDir, "parent.jsonl");
     const tools = createSubagentTools(new SubagentRuntime(transport, registry), "/repo", parentSessionFile);
     expect(tools.map(tool => tool.name)).toEqual(["subagent_spawn", "subagent_resume", "subagent_inspect", "subagent_join", "subagent_steer", "subagent_cancel", "subagent_remove"]);
-    const parameters = tools[0]!.parameters as { properties: Record<string, { enum?: unknown }> };
+    const parameters = tools[0]!.parameters as { required?: string[]; properties: Record<string, { enum?: unknown }> };
     expect(parameters.properties.agent?.enum).toEqual(["handler", "reviewer"]);
+    expect(parameters.properties).toHaveProperty("taskSlug");
+    expect(tools[0]!.description).toContain("taskSlug is required");
 
     const spawned = await (tools[0]!.execute as any)("call-1", {
       agent: "handler",
       prompt: "Do the work",
       label: "task",
+      taskSlug: "tool-spawn",
       model: "test/model",
       thinking: "high",
     });
     expect(spawned.details).toMatchObject({
       model: "test/model",
       thinking: "high",
-      sessionFile: join(parentDir, "parent", "tasks", "subagent-1-g1.jsonl"),
+      sessionFile: join(parentDir, "parent", "tasks", "tool-spawn-g1.jsonl"),
       status: "running",
     });
   });
@@ -150,10 +153,10 @@ describe("pi-herdr-subagents runtime", () => {
     const root = mkdtempSync(join(tmpdir(), "subagents-agent-"));
     const runtime = new SubagentRuntime(transport, registry, root);
 
-    const task = await runtime.spawn({ agent: "reviewer", cwd: "/repo", prompt: "Review", label: "review" });
+    const task = await runtime.spawn({ agent: "reviewer", cwd: "/repo", prompt: "Review", label: "review", taskSlug: "task",});
     expect(task).toMatchObject({ agent: "reviewer" });
     expect(task).not.toHaveProperty("handlerBody");
-    const bootstrap = readFileSync(join(root, "tasks", "subagent-1-artifacts", "launch-1.cjs"), "utf8");
+    const bootstrap = readFileSync(join(root, "tasks", "task-artifacts", "launch-1.cjs"), "utf8");
     const encoded = bootstrap.match(/Buffer\.from\(\"([^\"]+)\"/)?.[1];
     const spec = JSON.parse(Buffer.from(encoded!, "base64").toString("utf8")) as { args: string[] };
     expect(spec.args).toContain("Review the work.");
@@ -163,7 +166,7 @@ describe("pi-herdr-subagents runtime", () => {
     const { transport } = fakeTransport();
     const runtime = new SubagentRuntime(transport, new AgentRegistry(), mkdtempSync(join(tmpdir(), "subagents-missing-agent-")));
 
-    await expect(runtime.spawn({ agent: "handler", cwd: "/repo", prompt: "Do the work", label: "task" }))
+    await expect(runtime.spawn({ agent: "handler", cwd: "/repo", prompt: "Do the work", label: "task", taskSlug: "task",}))
       .rejects.toThrow("Required Agent is unavailable: handler");
   });
 
@@ -171,7 +174,7 @@ describe("pi-herdr-subagents runtime", () => {
     const parentDir = mkdtempSync(join(tmpdir(), "subagents-rebuilt-"));
     const parentSessionFile = join(parentDir, "parent.jsonl");
     const first = await new SubagentRuntime(fakeTransport().transport, handlerRegistry()).spawn({
-      agent: "handler", cwd: "/repo", prompt: "first", label: "first", parentSessionFile,
+      agent: "handler", cwd: "/repo", prompt: "first", label: "first", taskSlug: "task", parentSessionFile,
     });
     writeFileSync(first.sessionFile, "");
     writeFileSync(first.resultPath, JSON.stringify({
@@ -179,8 +182,8 @@ describe("pi-herdr-subagents runtime", () => {
     }));
 
     const rebuilt = new SubagentRuntime(fakeTransport().transport, handlerRegistry());
-    const second = await rebuilt.spawn({ agent: "handler", cwd: "/repo", prompt: "second", label: "second", parentSessionFile });
-    expect(second).toMatchObject({ subagentId: "subagent-2", generation: 1, status: "running" });
+    const second = await rebuilt.spawn({ agent: "handler", cwd: "/repo", prompt: "second", label: "second", taskSlug: "task", parentSessionFile });
+    expect(second).toMatchObject({ subagentId: "task-2", generation: 1, status: "running" });
     expect(second.resultPath).not.toBe(first.resultPath);
 
     writeFileSync(second.resultPath, JSON.stringify({
@@ -195,7 +198,7 @@ describe("pi-herdr-subagents runtime", () => {
     const parentDir = mkdtempSync(join(tmpdir(), "subagents-recover-running-"));
     const parentSessionFile = join(parentDir, "parent.jsonl");
     const first = await new SubagentRuntime(fakeTransport().transport, handlerRegistry()).spawn({
-      agent: "handler", cwd: "/repo", prompt: "work", label: "running", parentSessionFile,
+      agent: "handler", cwd: "/repo", prompt: "work", label: "running", taskSlug: "task", parentSessionFile,
     });
     writeFileSync(first.sessionFile, "");
 
@@ -213,7 +216,7 @@ describe("pi-herdr-subagents runtime", () => {
     const parentDir = mkdtempSync(join(tmpdir(), "subagents-recover-result-"));
     const parentSessionFile = join(parentDir, "parent.jsonl");
     const first = await new SubagentRuntime(fakeTransport().transport, handlerRegistry()).spawn({
-      agent: "handler", cwd: "/repo", prompt: "work", label: "done", parentSessionFile,
+      agent: "handler", cwd: "/repo", prompt: "work", label: "done", taskSlug: "task", parentSessionFile,
     });
     writeFileSync(first.resultPath, JSON.stringify({
       subagentId: first.subagentId, generation: first.generation, status: "cancelled",
@@ -230,7 +233,7 @@ describe("pi-herdr-subagents runtime", () => {
     const parentDir = mkdtempSync(join(tmpdir(), "subagents-recover-missing-"));
     const parentSessionFile = join(parentDir, "parent.jsonl");
     const first = await new SubagentRuntime(fakeTransport().transport, handlerRegistry()).spawn({
-      agent: "handler", cwd: "/repo", prompt: "work", label: "missing", parentSessionFile,
+      agent: "handler", cwd: "/repo", prompt: "work", label: "missing", taskSlug: "task", parentSessionFile,
     });
     writeFileSync(first.sessionFile, "");
 
@@ -247,7 +250,7 @@ describe("pi-herdr-subagents runtime", () => {
     const parentDir = mkdtempSync(join(tmpdir(), "subagents-recover-generation-"));
     const parentSessionFile = join(parentDir, "parent.jsonl");
     const original = new SubagentRuntime(fakeTransport().transport, handlerRegistry());
-    const first = await original.spawn({ agent: "handler", cwd: "/repo", prompt: "one", label: "generation", parentSessionFile });
+    const first = await original.spawn({ agent: "handler", cwd: "/repo", prompt: "one", label: "generation", taskSlug: "task", parentSessionFile });
     writeFileSync(first.sessionFile, "");
     writeFileSync(first.resultPath, JSON.stringify({ subagentId: first.subagentId, generation: 1, status: "failed", error: "retry" }));
     await original.join(first.subagentId);
@@ -269,10 +272,10 @@ describe("pi-herdr-subagents runtime", () => {
     const parentA = join(mkdtempSync(join(tmpdir(), "subagents-scope-a-")), "parent.jsonl");
     const parentB = join(mkdtempSync(join(tmpdir(), "subagents-scope-b-")), "parent.jsonl");
     const first = await new SubagentRuntime(fakeTransport().transport, handlerRegistry()).spawn({
-      agent: "handler", cwd: "/repo", prompt: "a", label: "parent-a", parentSessionFile: parentA,
+      agent: "handler", cwd: "/repo", prompt: "a", label: "parent-a", taskSlug: "task", parentSessionFile: parentA,
     });
     const second = await new SubagentRuntime(fakeTransport().transport, handlerRegistry()).spawn({
-      agent: "handler", cwd: "/repo", prompt: "b", label: "parent-b", parentSessionFile: parentB,
+      agent: "handler", cwd: "/repo", prompt: "b", label: "parent-b", taskSlug: "task", parentSessionFile: parentB,
     });
     writeFileSync(first.resultPath, JSON.stringify({ subagentId: first.subagentId, generation: 1, status: "failed", error: "a" }));
     writeFileSync(second.resultPath, JSON.stringify({ subagentId: second.subagentId, generation: 1, status: "failed", error: "b" }));
@@ -280,15 +283,15 @@ describe("pi-herdr-subagents runtime", () => {
     const rebuilt = new SubagentRuntime(fakeTransport().transport, handlerRegistry());
     await rebuilt.recover("/repo", parentA);
     await rebuilt.recover("/repo", parentA);
-    expect(rebuilt.inspect("subagent-1")).toMatchObject({ label: "parent-a", error: "a" });
+    expect(rebuilt.inspect("task")).toMatchObject({ label: "parent-a", error: "a" });
     await rebuilt.recover("/repo", parentB);
-    expect(rebuilt.inspect("subagent-1")).toMatchObject({ label: "parent-b", error: "b" });
+    expect(rebuilt.inspect("task")).toMatchObject({ label: "parent-b", error: "b" });
   });
   test("actively settles completed and failed Results without join or inspect", async () => {
     const root = mkdtempSync(join(tmpdir(), "subagents-notify-result-"));
     const notifications: CompletionNotification[] = [];
     const runtime = new SubagentRuntime(fakeTransport().transport, handlerRegistry(), root, notification => { notifications.push(notification); });
-    const completed = await runtime.spawn({ agent: "handler", cwd: "/repo", prompt: "work", label: "complete" });
+    const completed = await runtime.spawn({ agent: "handler", cwd: "/repo", prompt: "work", label: "complete", taskSlug: "task",});
     writeFileSync(completed.resultPath, JSON.stringify({
       subagentId: completed.subagentId, generation: completed.generation, status: "completed", result: "full YAML must stay private",
     }));
@@ -297,7 +300,7 @@ describe("pi-herdr-subagents runtime", () => {
     expect(notifications[0]).toEqual({ subagentId: completed.subagentId, generation: 1, status: "completed", label: "complete" });
     expect(notifications[0]).not.toHaveProperty("result");
 
-    const failed = await runtime.spawn({ agent: "handler", cwd: "/repo", prompt: "work", label: "fail" });
+    const failed = await runtime.spawn({ agent: "handler", cwd: "/repo", prompt: "work", label: "fail", taskSlug: "task",});
     writeFileSync(failed.resultPath, JSON.stringify({
       subagentId: failed.subagentId, generation: failed.generation, status: "failed", error: "child failed",
     }));
@@ -315,11 +318,11 @@ describe("pi-herdr-subagents runtime", () => {
       mkdtempSync(join(tmpdir(), "subagents-notify-terminal-")),
       notification => { notifications.push(notification); },
     );
-    const cancelled = await runtime.spawn({ agent: "handler", cwd: "/repo", prompt: "work", label: "cancel" });
+    const cancelled = await runtime.spawn({ agent: "handler", cwd: "/repo", prompt: "work", label: "cancel", taskSlug: "task",});
     await runtime.cancel(cancelled.subagentId);
     expect(notifications[0]).toEqual({ subagentId: cancelled.subagentId, generation: 1, status: "cancelled", label: "cancel" });
 
-    const closed = await runtime.spawn({ agent: "handler", cwd: "/repo", prompt: "work", label: "closed" });
+    const closed = await runtime.spawn({ agent: "handler", cwd: "/repo", prompt: "work", label: "closed", taskSlug: "task",});
     panePresent = false;
     await waitFor(() => notifications.length === 2);
     expect(runtime.inspect(closed.subagentId)).toMatchObject({ status: "failed", error: "pane_closed" });
@@ -337,16 +340,16 @@ describe("pi-herdr-subagents runtime", () => {
       mkdtempSync(join(tmpdir(), "subagents-notify-launch-")),
       notification => { notifications.push(notification); },
     );
-    await expect(runtime.spawn({ agent: "handler", cwd: "/repo", prompt: "work", label: "launch" })).rejects.toThrow("launch unavailable");
+    await expect(runtime.spawn({ agent: "handler", cwd: "/repo", prompt: "work", label: "launch", taskSlug: "task",})).rejects.toThrow("launch unavailable");
     expect(notifications).toEqual([{
-      subagentId: "subagent-1", generation: 1, status: "failed", label: "launch", reason: "Error: launch unavailable",
+      subagentId: "task", generation: 1, status: "failed", label: "launch", reason: "Error: launch unavailable",
     }]);
   });
 
   test("backfills a missed notification after restart and deduplicates repeated recovery", async () => {
     const parentSessionFile = join(mkdtempSync(join(tmpdir(), "subagents-notify-recover-")), "parent.jsonl");
     const original = new SubagentRuntime(fakeTransport().transport, handlerRegistry());
-    const task = await original.spawn({ agent: "handler", cwd: "/repo", prompt: "work", label: "recover", parentSessionFile });
+    const task = await original.spawn({ agent: "handler", cwd: "/repo", prompt: "work", label: "recover", taskSlug: "task", parentSessionFile });
     original.stop();
     writeFileSync(task.resultPath, JSON.stringify({
       subagentId: task.subagentId, generation: task.generation, status: "completed", result: "full result",
@@ -365,8 +368,8 @@ describe("pi-herdr-subagents runtime", () => {
   test("session startup backfills missed notifications and honors parent-session markers", async () => {
     const parentSessionFile = join(mkdtempSync(join(tmpdir(), "subagents-notify-startup-")), "parent.jsonl");
     const original = new SubagentRuntime(fakeTransport().transport, handlerRegistry());
-    const consumed = await original.spawn({ agent: "handler", cwd: "/repo", prompt: "one", label: "consumed", parentSessionFile });
-    const missed = await original.spawn({ agent: "handler", cwd: "/repo", prompt: "two", label: "missed", parentSessionFile });
+    const consumed = await original.spawn({ agent: "handler", cwd: "/repo", prompt: "one", label: "consumed", taskSlug: "task", parentSessionFile });
+    const missed = await original.spawn({ agent: "handler", cwd: "/repo", prompt: "two", label: "missed", taskSlug: "task", parentSessionFile });
     original.stop();
     for (const task of [consumed, missed]) writeFileSync(task.resultPath, JSON.stringify({
       subagentId: task.subagentId, generation: task.generation, status: "completed", result: "full result",
@@ -411,7 +414,7 @@ describe("pi-herdr-subagents runtime", () => {
       sendMessage(message: unknown, options: unknown) { messages.push({ message, options }); },
     } as any, { runtime, registry });
     if (childResultPath) process.env.PI_HERDR_SUBAGENT_RESULT_PATH = childResultPath;
-    const task = await runtime.spawn({ agent: "handler", cwd: "/repo", prompt: "work", label: "pi" });
+    const task = await runtime.spawn({ agent: "handler", cwd: "/repo", prompt: "work", label: "pi", taskSlug: "task",});
     writeFileSync(task.resultPath, JSON.stringify({
       subagentId: task.subagentId, generation: task.generation, status: "completed", result: "secret full YAML",
     }));
@@ -458,7 +461,7 @@ describe("runtime task observation", () => {
     });
 
     expect(events).toEqual([]);
-    const task = await runtime.spawn({ agent: "handler", cwd: "/repo", prompt: "work", label: "observe", model: "secret-model", thinking: "secret-thinking" });
+    const task = await runtime.spawn({ agent: "handler", cwd: "/repo", prompt: "work", label: "observe", taskSlug: "task", model: "secret-model", thinking: "secret-thinking" });
     expect(events).toEqual(["running"]);
     const snapshot = runtime.listTasks();
     expect(snapshot).toHaveLength(1);
@@ -491,7 +494,7 @@ describe("runtime task observation", () => {
     let updates = 0;
     runtime.onTaskUpdate(() => { updates++; });
 
-    const first = await runtime.spawn({ agent: "handler", cwd: "/repo", prompt: "one", label: "resume" });
+    const first = await runtime.spawn({ agent: "handler", cwd: "/repo", prompt: "one", label: "resume", taskSlug: "task",});
     writeFileSync(first.resultPath, JSON.stringify({ subagentId: first.subagentId, generation: 1, status: "failed", error: "retry" }));
     await runtime.join(first.subagentId);
     const beforeResume = updates;
@@ -506,7 +509,7 @@ describe("runtime task observation", () => {
     const failing = new SubagentRuntime(failingTransport, handlerRegistry(), mkdtempSync(join(tmpdir(), "subagents-observation-launch-")));
     let failedUpdates = 0;
     failing.onTaskUpdate(() => { failedUpdates++; });
-    await expect(failing.spawn({ agent: "handler", cwd: "/repo", prompt: "fail", label: "launch" })).rejects.toThrow("launch unavailable");
+    await expect(failing.spawn({ agent: "handler", cwd: "/repo", prompt: "fail", label: "launch", taskSlug: "task",})).rejects.toThrow("launch unavailable");
     expect(failedUpdates).toBe(2);
     runtime.stop();
     failing.stop();
@@ -517,8 +520,8 @@ describe("runtime task observation", () => {
     const parentB = join(mkdtempSync(join(tmpdir(), "subagents-observation-b-")), "parent.jsonl");
     const parentEmpty = join(mkdtempSync(join(tmpdir(), "subagents-observation-empty-")), "parent.jsonl");
     const original = new SubagentRuntime(fakeTransport().transport, handlerRegistry());
-    const taskA = await original.spawn({ agent: "handler", cwd: "/repo", prompt: "a", label: "a", parentSessionFile: parentA });
-    const taskB = await original.spawn({ agent: "handler", cwd: "/repo", prompt: "b", label: "b", parentSessionFile: parentB });
+    const taskA = await original.spawn({ agent: "handler", cwd: "/repo", prompt: "a", label: "a", taskSlug: "task", parentSessionFile: parentA });
+    const taskB = await original.spawn({ agent: "handler", cwd: "/repo", prompt: "b", label: "b", taskSlug: "task", parentSessionFile: parentB });
     original.stop();
     writeFileSync(taskA.sessionFile, "");
     writeFileSync(taskB.sessionFile, "");
@@ -623,11 +626,11 @@ describe("parent running-task widget", () => {
     globalThis.setInterval = ((..._args: any[]) => { timerCalls.interval++; return 0 as any; }) as typeof setInterval;
     globalThis.setTimeout = ((..._args: any[]) => { timerCalls.timeout++; return 0 as any; }) as typeof setTimeout;
     try {
-      const completed = { ...runningTask("subagent-9", "2026-01-01T00:00:00.000Z"), status: "completed" as const };
+      const completed = { ...runningTask("task-9", "2026-01-01T00:00:00.000Z"), status: "completed" as const };
       const state = widgetRuntime([
-        runningTask("subagent-2", "2026-01-02T00:00:00.000Z", "two"),
-        runningTask("subagent-3", "2026-01-01T00:00:00.000Z", "three"),
-        runningTask("subagent-10", "2026-01-02T00:00:00.000Z", "ten"),
+        runningTask("task-2", "2026-01-02T00:00:00.000Z", "two"),
+        runningTask("task-3", "2026-01-01T00:00:00.000Z", "three"),
+        runningTask("task-10", "2026-01-02T00:00:00.000Z", "ten"),
         completed,
       ]);
       const widgetCalls: any[][] = [];
@@ -637,9 +640,9 @@ describe("parent running-task widget", () => {
       expect(widgetCalls.at(-1)).toEqual([
         "pi-herdr-subagent-running",
         [
-          "subagent-3 · three · handler · generation 1 · running",
-          "subagent-10 · ten · handler · generation 1 · running",
-          "subagent-2 · two · handler · generation 1 · running",
+          "task-3 · three · handler · generation 1 · running",
+          "task-10 · ten · handler · generation 1 · running",
+          "task-2 · two · handler · generation 1 · running",
         ],
         { placement: "aboveEditor" },
       ]);
@@ -662,7 +665,7 @@ describe("parent running-task widget", () => {
   });
 
   test("isolates an initial render failure from later refresh, completion delivery, and join", async () => {
-    const state = widgetRuntime([runningTask("subagent-1", "2026-01-01T00:00:00.000Z")]);
+    const state = widgetRuntime([runningTask("task", "2026-01-01T00:00:00.000Z")]);
     let attempts = 0;
     const harness = widgetExtensionHarness(state.runtime, () => {
       attempts++;
@@ -672,13 +675,13 @@ describe("parent running-task widget", () => {
     await expect(harness.handlers.session_start!({}, harness.ctx)).resolves.toBeUndefined();
     expect(() => state.emit()).not.toThrow();
     expect(attempts).toBe(2);
-    await state.notify({ subagentId: "subagent-1", generation: 1, status: "completed", label: "task" });
+    await state.notify({ subagentId: "task", generation: 1, status: "completed", label: "task" });
     expect(harness.messages).toHaveLength(1);
     await expect(state.runtime.join()).resolves.toEqual({ status: "completed" });
   });
 
   test("isolates an update refresh failure and permits the next update", async () => {
-    const state = widgetRuntime([runningTask("subagent-1", "2026-01-01T00:00:00.000Z")]);
+    const state = widgetRuntime([runningTask("task", "2026-01-01T00:00:00.000Z")]);
     let attempts = 0;
     const harness = widgetExtensionHarness(state.runtime, () => {
       attempts++;
@@ -692,7 +695,7 @@ describe("parent running-task widget", () => {
   });
 
   test("isolates an empty-state clear failure and permits a later render", async () => {
-    const running = runningTask("subagent-1", "2026-01-01T00:00:00.000Z");
+    const running = runningTask("task", "2026-01-01T00:00:00.000Z");
     const state = widgetRuntime([running]);
     let attempts = 0;
     const harness = widgetExtensionHarness(state.runtime, (_key, content) => {
@@ -709,7 +712,7 @@ describe("parent running-task widget", () => {
   });
 
   test("shutdown clears, unsubscribes, releases the Context, and stops after a clear failure", async () => {
-    const state = widgetRuntime([runningTask("subagent-1", "2026-01-01T00:00:00.000Z")]);
+    const state = widgetRuntime([runningTask("task", "2026-01-01T00:00:00.000Z")]);
     let attempts = 0;
     const harness = widgetExtensionHarness(state.runtime, (_key, content) => {
       attempts++;
