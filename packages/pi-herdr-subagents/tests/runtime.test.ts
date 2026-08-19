@@ -438,6 +438,28 @@ test("passes pane commands as one quoted PowerShell invocation", async () => {
   expect(calls).toEqual([["pane", "run", "wF:p6", "& 'pi' '--session' 'C:\\A B\\session.jsonl' 'it''s done'"]]);
 });
 
+test("submits each exact steer payload through one pane run argv", async () => {
+  const calls: string[][] = [];
+  const client = createHerdrClient(async (_command, args) => {
+    calls.push([...args]);
+    return { code: 0, stdout: "", stderr: "" };
+  });
+  const transport = createHerdrTransport(client);
+  const paneId = "wF:p6";
+  const messages = [
+    "line one\nline two",
+    "CJK: 中文; emoji: 😀",
+    "quotes: 'single' and \"double\"",
+    "path: C:\\work\\child\\input",
+    "metacharacters: ; & | < > $() ` * ? ! % ^",
+  ];
+
+  for (const message of messages) await transport.sendText(paneId, message);
+
+  expect(calls).toEqual(messages.map(message => ["pane", "run", paneId, message]));
+  expect(calls.some(args => args[0] === "pane" && args[1] === "send-text")).toBeFalse();
+});
+
 test("discovers package Agents from pi.agents directories", async () => {
   const root = mkdtempSync(join(tmpdir(), "subagents-package-"));
   writeFileSync(join(root, "package.json"), JSON.stringify({ pi: { agents: ["./"] } }));
@@ -917,4 +939,65 @@ test("recovery retains an existing pane while resumed creation uses the new tran
   expect(second).toMatchObject({ generation: 2, sessionFile: first.sessionFile, tabId: "w8:t2", paneId: "w8:p2" });
   expect(calls).toContainEqual(["tab", "create", "--workspace", "w8", "--cwd", "/repo", "--label", "recover", "--no-focus", "--env", `PI_HERDR_SUBAGENT_ID=${first.subagentId}`, "--env", "PI_HERDR_SUBAGENT_GENERATION=2", "--env", `PI_HERDR_SUBAGENT_RESULT_PATH=${second.resultPath}`]);
   rebuilt.stop();
+});
+
+
+test("steer forwards a running message and guards unknown or terminal tasks", async () => {
+  const notifications: CompletionNotification[] = [];
+  const { calls, transport } = fakeTransport();
+  const runtime = new SubagentRuntime(transport, handlerRegistry(), mkdtempSync(join(tmpdir(), "subagents-steer-running-")), notification => { notifications.push(notification); });
+  const task = await runtime.spawn({ agent: "handler", cwd: "/repo", prompt: "work", label: "steer", taskSlug: "steer-running" });
+  const message = "keep this exact";
+  const before = runtime.inspect(task.subagentId);
+  await expect(runtime.steer(task.subagentId, message)).resolves.toMatchObject({ subagentId: task.subagentId, generation: task.generation, status: "running" });
+  expect(calls.filter(call => (call as { op?: string }).op === "send")).toEqual([{ op: "send", paneId: task.paneId, text: message }]);
+  expect({ status: runtime.inspect(task.subagentId).status, generation: runtime.inspect(task.subagentId).generation, result: runtime.inspect(task.subagentId).result, error: runtime.inspect(task.subagentId).error })
+    .toEqual({ status: before.status, generation: before.generation, result: before.result, error: before.error });
+  await expect(runtime.steer("unknown", message)).rejects.toThrow("Unknown subagent: unknown");
+  expect(calls.filter(call => (call as { op?: string }).op === "send")).toHaveLength(1);
+  expect(notifications).toEqual([]);
+
+  const steerTool = createSubagentTools(runtime, "/repo").find(tool => tool.name === "subagent_steer")!;
+  const parameters = steerTool.parameters as { required?: string[]; properties: Record<string, { minLength?: number }> };
+  expect(steerTool.name).toBe("subagent_steer");
+  expect(parameters.required).toEqual(["subagentId", "message"]);
+  expect(parameters.properties.message).toMatchObject({ minLength: 1 });
+  runtime.stop();
+
+  for (const status of ["completed", "failed", "cancelled"] as const) {
+    const terminal = fakeTransport();
+    const terminalRuntime = new SubagentRuntime(terminal.transport, handlerRegistry(), mkdtempSync(join(tmpdir(), `subagents-steer-${status}-`)));
+    const terminalTask = await terminalRuntime.spawn({ agent: "handler", cwd: "/repo", prompt: "work", label: status, taskSlug: `steer-${status}` });
+    writeFileSync(terminalTask.resultPath, JSON.stringify({
+      subagentId: terminalTask.subagentId,
+      generation: terminalTask.generation,
+      status,
+      ...(status === "completed" ? { result: "done" } : status === "failed" ? { error: "failed" } : {}),
+    }));
+    await terminalRuntime.join(terminalTask.subagentId);
+
+    await expect(terminalRuntime.steer(terminalTask.subagentId, message)).rejects.toThrow("Subagent is not running");
+    expect(terminal.calls.filter(call => (call as { op?: string }).op === "send")).toHaveLength(0);
+    terminalRuntime.stop();
+  }
+});
+
+test("steer transport rejection leaves the task and notifications unchanged", async () => {
+  const rejection = new Error("steer rejected");
+  let submissions = 0;
+  const { transport } = fakeTransport();
+  transport.sendText = async () => { submissions++; throw rejection; };
+  const notifications: CompletionNotification[] = [];
+  const runtime = new SubagentRuntime(transport, handlerRegistry(), mkdtempSync(join(tmpdir(), "subagents-steer-rejection-")), notification => { notifications.push(notification); });
+  const task = await runtime.spawn({ agent: "handler", cwd: "/repo", prompt: "work", label: "reject", taskSlug: "steer-rejection" });
+  const before = runtime.inspect(task.subagentId);
+
+  await expect(runtime.steer(task.subagentId, "exact rejection payload")).rejects.toBe(rejection);
+
+  const after = runtime.inspect(task.subagentId);
+  expect(submissions).toBe(1);
+  expect({ status: after.status, generation: after.generation, result: after.result, error: after.error })
+    .toEqual({ status: before.status, generation: before.generation, result: before.result, error: before.error });
+  expect(notifications).toEqual([]);
+  runtime.stop();
 });

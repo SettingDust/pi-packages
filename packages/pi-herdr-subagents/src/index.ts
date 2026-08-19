@@ -148,7 +148,7 @@ export function createHerdrTransport(client: HerdrClient<{ cwd?: string }> = cre
       return { tabId, paneId };
     },
     async run(paneId, command, args) { await client.run(["pane", "run", paneId, powerShellInvocation(command, args)], {}); },
-    async sendText(paneId, text) { await client.run(["pane", "send-text", paneId, text], {}); },
+    async sendText(paneId, text) { await client.run(["pane", "run", paneId, text], {}); },
     async closePane(paneId) { await client.run(["pane", "close", paneId], {}); },
     async paneExists(paneId) {
       const result = await client.exec(["pane", "get", paneId], {});

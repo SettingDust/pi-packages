@@ -1,0 +1,82 @@
+{
+  "evidenceSchemaVersion": 2,
+  "reviewDisposition": "accepted-ready",
+  "herdrVersion": "herdr 0.8.0-preview.2026-08-17-1147e60bc0a4",
+  "selectedAttempt": 1,
+  "replacementProvenance": {
+    "retainedRun": "current_replacement_run_only",
+    "attemptAccounting": "Every-attempt statements apply only to the attempts preserved in this current replacement record.",
+    "supersededRecord": {
+      "selectedAttempt": 2,
+      "provenanceRetained": false,
+      "disposition": "unintentionally_overwritten"
+    }
+  },
+  "recordOnlyReplayBoundary": {
+    "certifies": [
+      "sentinel JSON and UTF-8 encodings agree",
+      "retained raw appended records parse as JSON objects",
+      "exactly one Pi-native text-array user entry matches the sentinel",
+      "allowlisted later activity and reconstructed entry ordering"
+    ],
+    "reviewerInspectedMetadata": [
+      "attempt identity",
+      "fresh child provenance",
+      "prompt fixture hash and revision",
+      "readiness status and deadline",
+      "individual cancel and remove fields"
+    ],
+    "limitation": "This record-only replay does not independently certify reviewer-inspected metadata."
+  },
+  "attempts": [
+    {
+      "attempt": 1,
+      "child": {
+        "provenance": "fresh_subagent_spawn",
+        "agentName": "handler",
+        "label": "steer-acceptance-aa9a738d-a7e4-412e-b3a6-13c55b00c175",
+        "subagentId": "steer-acceptance-aa9a738d",
+        "generation": 1,
+        "sessionPath": "C:\\Users\\WINDOWS\\AppData\\Local\\Temp\\steer-acceptance-aa9a738d-a7e4-412e-b3a6-13c55b00c175\\tasks\\steer-acceptance-aa9a738d-g1.jsonl"
+      },
+      "promptFixture": {
+        "name": "steer-await-follow-up-v1",
+        "actualPrompt": "objective: Remain active without calling subagent_done until one subsequent user message arrives. After that message arrives, call subagent_done with a completed YAML Handler Result that states it was received.\nprimarySkill: implement-change\ncontext:\n  - inline: Controlled real Herdr steer acceptance fixture. The later user message is the only completion trigger.\n    purpose: acceptance control\nconstraints:\n  - Do not call subagent_done before a subsequent user message arrives.\ndeliverables:\n  - completed Handler Result after the subsequent user message.",
+        "sha256": "670c651b1ff0fea4318c0d0ededc4c309b5edbe99fe54e0c014405f875bf2334",
+        "revision": "sha256:670c651b1ff0fea4318c0d0ededc4c309b5edbe99fe54e0c014405f875bf2334"
+      },
+      "ready": {
+        "status": "ready",
+        "deadlineAt": "2026-08-19T15:57:52.972Z",
+        "observedAt": "2026-08-19T15:56:17.717Z",
+        "preSteer": {
+          "entryIndex": 4,
+          "byteOffset": 1790
+        }
+      },
+      "outcome": {
+        "status": "accepted",
+        "observedAt": "2026-08-19T15:56:38.112Z"
+      },
+      "cleanup": {
+        "cancel": "succeeded",
+        "remove": "succeeded",
+        "outcome": "succeeded"
+      },
+      "message": {
+        "jsonString": "\"STEER-ACCEPTANCE-aa9a738d-a7e4-412e-b3a6-13c55b00c175\\n中文 😀\\nquotes: 'single' and \\\"double\\\"\"",
+        "utf8Base64": "U1RFRVItQUNDRVBUQU5DRS1hYTlhNzM4ZC1hN2U0LTQxMmUtYjNhNi0xM2M1NWIwMGMxNzUK5Lit5paHIPCfmIAKcXVvdGVzOiAnc2luZ2xlJyBhbmQgImRvdWJsZSI="
+      },
+      "userEntryIndex": 5,
+      "activityEntryIndex": 6,
+      "appendedJsonlRawEntries": [
+        "{\"type\":\"message\",\"id\":\"4a64ea96\",\"parentId\":\"af78b0aa\",\"timestamp\":\"2026-08-19T15:56:19.146Z\",\"message\":{\"role\":\"user\",\"content\":[{\"type\":\"text\",\"text\":\"STEER-ACCEPTANCE-aa9a738d-a7e4-412e-b3a6-13c55b00c175\\n中文 😀\\nquotes: 'single' and \\\"double\\\"\"}],\"timestamp\":1787154977788}}",
+        "{\"type\":\"message\",\"id\":\"0b433d9d\",\"parentId\":\"4a64ea96\",\"timestamp\":\"2026-08-19T15:56:37.705Z\",\"message\":{\"role\":\"assistant\",\"content\":[{\"type\":\"thinking\",\"thinking\":\"**Planning inline skill and context loading**\",\"thinkingSignature\":\"{\\\"id\\\":\\\"rs_019a415bb696bee6016a85d240d8a887d28af323c3cc115f4a\\\",\\\"type\\\":\\\"reasoning\\\",\\\"content\\\":[],\\\"encrypted_content\\\":\\\"gAAAAABqhdJBUgjnn856BCIsg2MG8tzYIlqIW82x1hFsBTeUf5igfTJI-7L9thYciEIWUcYuXOUVXzTK2uCdC7k3oRPQfXvP99sidQtqhFgXVUMJPKVv6x5UypU-iPRRBcOXvxMAGacugKOCOwsva2OJ5Xt4YMn1zN_GpgNvWD0UPBFDQ8TFK-sL0mZ1WazjAjcHUPyNvzVGfG2r3HkgvTZsyAkH6_39AcDPewm6Zg-tiq0VRDdnRUy7zhCJGcNuzRPmM6zg9xkfTLgIWOl76PKRLpJ0N4i5r8AzR-Y5ifTocEk4rPPqf4Fo8bEcO1UYN-b6DIIithnCRXjbkwFdlKWlSw0Ucdzr3yih7WdNLiUs6ulmGlorLqmix0RdKlTHpun6_Iw3_eJ2K8uUNMSnyQN_uezgcYnYilLHiXhLzdYIhMu9COYEPOfOizqqtycvQJFqdKa8ViPzkhzR-HWM14p2ccTFpvCpKEu3isSVkWQfwQqJALtplilKsXXm1uQj3rmD8Kz7ITFPesTYF7UOYYNH0GlN5S8UNE6mPjb8Pk42exfbNvjikX97DyRUk-MeTK9f0Hqef8udPsMxcCep9QivrsqDHD6Xk8OMjjaEIY_qTQ7jueKh5ts4HnowDJPj2FNs6XyJ5azQB_NFe2Qmqf3pkrcNfsIqcbBOGyvukchPySeCUblVldwTHRLqGEmU0shJqNLDCmSWvVhC41sKjwtSSqTs_jTQm0MS0_Vfe-R3CEU0jhlwoxni0IABeUokbRlpNOuDXuOkMD6FqOLByxqbsC0CEGT0O2MFvjr4auwFebCR_nBJke5Kv78xZMaoNWXIJ7Kfoicg3IUXhu05W07Ogq8Ogmk79GGxxicV-4uPDAZ2GCKlCavvbgK_OxNESiCpjhozDWrfdsGhEz3uikhgTs0rCvXmzXdO661zaLv9vXgmHEPhB9KeMJwXHU18itY7OvvPwZJsBnNBZlmRROECNTB2qL7OJ6VKlOHrh7OqZ-r9gjBZbunfKuWJM4A54-ns-ujzNysLuMuDQhDjfoUFNvKfWHgGr9yI7mqgpt053-yyAi1-iDkB14mLJcF6YNaAd-ZE07mI-VD2ONm0bUAkLhCX3GDavhIyCGtlzVE_5p561gJK87xwq4qcO6JPXwDrrGLQFn5U9Z1z6tY5v7eliOt8q8LLBNurUDhxK_4ixwqFeaBDJsW1jxSxNgKWfIbh4iNYyYbbCVUpBk4RkMl2N73h12JM2qm_xa32bxI7tN3Y5vq0dPGHJftnxtihpgmv3k7aXSz8oLFCSK61d9ktUKGwWHxP1HhS0IkFmwBi4hGPfMPCbAdEyyMnLNEJhyJc2RFi75_f2d0VZ9-lw9zAegm6QXZwV96mNC_Ku-zG0T3rF5djHqS5cNJoBpWZogiAPlr-EA_vcRmbsdP_rkR8UJl_yepn5fsNpX6ZN6UICCr8XTsa1twpwYIP-72SSMFUqa5qY34jt3THRwHB6bEZ5OqH-qF3iAftL6b20AzZTo2hhKujNOOwy8CjN9RrwLqR5kfsWoXGg9fGyYfmXulcXM6brhfhKv5T59Dngk0x1poX2H0miVnIW5PG5Dq5cOaoAShD4wc4\\\",\\\"summary\\\":[{\\\"type\\\":\\\"summary_text\\\",\\\"text\\\":\\\"**Planning inline skill and context loading**\\\"}]}\"},{\"type\":\"toolCall\",\"id\":\"call_iOjIyTz5ivHKuiyQO6br90dt|fc_019a415bb696bee6016a85d241f8b487d2b3c3f33f32d42757\",\"name\":\"read\",\"arguments\":{\"endLine\":400,\"limit\":400,\"offset\":1,\"path\":\"E:\\\\Projects\\\\pi-packages\\\\packages\\\\pi-harness\\\\skills\\\\implement-change\\\\SKILL.md\",\"startLine\":1}}],\"api\":\"openai-responses\",\"provider\":\"api2api\",\"model\":\"gpt-5.6-sol\",\"usage\":{\"input\":20186,\"output\":97,\"cacheRead\":0,\"cacheWrite\":0,\"reasoning\":39,\"totalTokens\":20283,\"cost\":{\"input\":0,\"output\":0,\"cacheRead\":0,\"cacheWrite\":0,\"total\":0}},\"stopReason\":\"toolUse\",\"timestamp\":1787154981128,\"responseId\":\"resp_019a415bb696bee6016a85d23ff20087d29ba1495e9512a52d\",\"rawStopReason\":\"completed\"}}",
+        "{\"type\":\"message\",\"id\":\"20d12e0b\",\"parentId\":\"0b433d9d\",\"timestamp\":\"2026-08-19T15:56:37.762Z\",\"message\":{\"role\":\"toolResult\",\"toolCallId\":\"call_iOjIyTz5ivHKuiyQO6br90dt|fc_019a415bb696bee6016a85d241f8b487d2b3c3f33f32d42757\",\"toolName\":\"read\",\"content\":[{\"type\":\"text\",\"text\":\" 1: ---\\n 2: name: implement-change\\n 3: description: Perform one bounded code, configuration, or ordinary-documentation change and leave focused verification evidence. Use for a concrete implementation unit whose behavior and scope are already understood.\\n 4: ---\\n 5: \\n 6: # Implement Change\\n 7: \\n 8: ## Method\\n 9: \\n10: 1. Read the objective, constraints, relevant authority, target files, callers, and tests before editing. Establish the actual behavior and shared ownership boundary.\\n11: 2. Reuse existing project patterns, standard library, native platform features, and installed dependencies before adding new mechanisms.\\n12: 3. Make the smallest change at the causal or owning boundary. Do not add speculative abstractions, compatibility layers, configuration, or unrelated cleanup.\\n13: 4. Preserve unrelated worktree changes. Update adjacent contracts or documentation only when the requested behavior would otherwise make them false.\\n14: 5. Validate trust-boundary inputs, protect data integrity, preserve security controls, and retain required accessibility behavior.\\n15: 6. Add or update the smallest regression check proportional to the changed logic and risk.\\n16: 7. Run focused checks, then the narrowest broader gate needed to catch integration breakage. Inspect the final diff for accidental scope.\\n17: \\n18: ## Output\\n19: \\n20: Report changed behavior and files, verification commands and results, residual risks, and any incomplete requirement. Do not claim completion when required checks fail or were not run.\\n\"}],\"details\":{\"id\":\"8\",\"success\":true,\"content\":\" 1: ---\\n 2: name: implement-change\\n 3: description: Perform one bounded code, configuration, or ordinary-documentation change and leave focused verification evidence. Use for a concrete implementation unit whose behavior and scope are already understood.\\n 4: ---\\n 5: \\n 6: # Implement Change\\n 7: \\n 8: ## Method\\n 9: \\n10: 1. Read the objective, constraints, relevant authority, target files, callers, and tests before editing. Establish the actual behavior and shared ownership boundary.\\n11: 2. Reuse existing project patterns, standard library, native platform features, and installed dependencies before adding new mechanisms.\\n12: 3. Make the smallest change at the causal or owning boundary. Do not add speculative abstractions, compatibility layers, configuration, or unrelated cleanup.\\n13: 4. Preserve unrelated worktree changes. Update adjacent contracts or documentation only when the requested behavior would otherwise make them false.\\n14: 5. Validate trust-boundary inputs, protect data integrity, preserve security controls, and retain required accessibility behavior.\\n15: 6. Add or update the smallest regression check proportional to the changed logic and risk.\\n16: 7. Run focused checks, then the narrowest broader gate needed to catch integration breakage. Inspect the final diff for accidental scope.\\n17: \\n18: ## Output\\n19: \\n20: Report changed behavior and files, verification commands and results, residual risks, and any incomplete requirement. Do not claim completion when required checks fail or were not run.\\n\",\"complete\":true,\"lines_read\":20,\"start_line\":1,\"end_line\":20,\"truncated\":false,\"byte_size\":1446,\"total_lines\":20,\"text\":\" 1: ---\\n 2: name: implement-change\\n 3: description: Perform one bounded code, configuration, or ordinary-documentation change and leave focused verification evidence. Use for a concrete implementation unit whose behavior and scope are already understood.\\n 4: ---\\n 5: \\n 6: # Implement Change\\n 7: \\n 8: ## Method\\n 9: \\n10: 1. Read the objective, constraints, relevant authority, target files, callers, and tests before editing. Establish the actual behavior and shared ownership boundary.\\n11: 2. Reuse existing project patterns, standard library, native platform features, and installed dependencies before adding new mechanisms.\\n12: 3. Make the smallest change at the causal or owning boundary. Do not add speculative abstractions, compatibility layers, configuration, or unrelated cleanup.\\n13: 4. Preserve unrelated worktree changes. Update adjacent contracts or documentation only when the requested behavior would otherwise make them false.\\n14: 5. Validate trust-boundary inputs, protect data integrity, preserve security controls, and retain required accessibility behavior.\\n15: 6. Add or update the smallest regression check proportional to the changed logic and risk.\\n16: 7. Run focused checks, then the narrowest broader gate needed to catch integration breakage. Inspect the final diff for accidental scope.\\n17: \\n18: ## Output\\n19: \\n20: Report changed behavior and files, verification commands and results, residual risks, and any incomplete requirement. Do not claim completion when required checks fail or were not run.\\n\"},\"isError\":false,\"timestamp\":1787154997757}}",
+        "{\"type\":\"custom\",\"customType\":\"tps\",\"data\":{\"model\":{\"provider\":\"api2api\",\"modelId\":\"gpt-5.6-sol\"},\"tokens\":{\"input\":20186,\"output\":97,\"cacheRead\":0,\"cacheWrite\":0,\"total\":20283},\"timing\":{\"ttftMs\":17855.7791,\"totalMs\":18623.1555,\"generationMs\":1553.2647999999972,\"streamMs\":465.69080000000395,\"stallMs\":0,\"stallCount\":0,\"messageCount\":1},\"tps\":208.3,\"isPrimaryBranch\":true,\"cost\":null,\"rateUsdPerMTokens\":null,\"timestamp\":1787154997765},\"id\":\"a9a857c3\",\"parentId\":\"20d12e0b\",\"timestamp\":\"2026-08-19T15:56:37.765Z\"}"
+      ]
+    }
+  ],
+  "extractionCommand": "bun run packages/pi-herdr-subagents/docs/works/steer-input-submission/evidence/run-real-herdr-acceptance.ts",
+  "comparisonCommand": "bun run packages/pi-herdr-subagents/docs/works/steer-input-submission/evidence/run-real-herdr-acceptance.ts --verify packages/pi-herdr-subagents/docs/works/steer-input-submission/evidence/real-herdr-acceptance.json"
+}
