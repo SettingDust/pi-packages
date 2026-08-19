@@ -1,0 +1,60 @@
+{
+  "status": "passed",
+  "capturedAt": "2026-08-19T11:35:18Z",
+  "herdr": {
+    "version": "herdr 0.8.0-preview.2026-08-17-1147e60bc0a4",
+    "parentWorkspaceId": "wF",
+    "foregroundSwitch": "herdr workspace focus w8",
+    "foregroundWorkspaceId": "w8",
+    "foregroundWorkspaceFocused": true
+  },
+  "invocation": {
+    "mode": "direct Bun executable plus active Pi CLI entry script",
+    "execPath": "D:\\Applications\\Scoop\\apps\\bun\\1.3.14\\bun.exe",
+    "entryScript": "D:/Applications/Scoop/apps/pi-coding-agent-bun/current/node_modules/@earendil-works/pi-coding-agent/dist/cli.js"
+  },
+  "spawn": {
+    "subagentId": "workspace-pinning-final",
+    "generation": 1,
+    "tabId": "wF:t3T",
+    "paneId": "wF:p43",
+    "returnedWorkspaceId": "wF",
+    "handlerResultStatus": "completed",
+    "handlerResult": "status: completed\nsummary: acceptance handler\nreport: spawn or resume path reached."
+  },
+  "resume": {
+    "subagentId": "workspace-pinning-final",
+    "generation": 2,
+    "tabId": "wF:t3V",
+    "paneId": "wF:p44",
+    "returnedWorkspaceId": "wF",
+    "handlerResultStatus": "completed",
+    "handlerResult": "status: completed\nsummary: acceptance handler\nreport: spawn or resume path reached."
+  },
+  "foregroundEvidence": {
+    "before": "explicit focus command returned workspace_id w8 with focused=true",
+    "during": "workspace list reported w8 focused while both created tabs reported workspace_id wF",
+    "after": "workspace list reported w8 focused; wF returned to three tabs and the controlled tabs were absent"
+  },
+  "cleanup": {
+    "sequence": "generation 1 completed, generation 2 resumed and completed, then runtime.remove removed the current generation-2 task artifacts before the acceptance harness closed the two retained panes individually",
+    "generation1": {
+      "tabId": "wF:t3T",
+      "paneId": "wF:p43",
+      "action": "explicit acceptance-harness pane-close fallback; generation 1 was retained while generation 2 was current",
+      "tabVerification": "herdr tab get wF:t3T returned tab_not_found"
+    },
+    "generation2": {
+      "tabId": "wF:t3V",
+      "paneId": "wF:p44",
+      "action": "runtime.remove removed current task artifacts; explicit acceptance-harness pane-close fallback closed the retained pane",
+      "tabVerification": "herdr tab get wF:t3V returned tab_not_found"
+    }
+  },
+  "diagnosticAttempt": {
+    "surfaces": ["wF:t3M", "wF:t3N"],
+    "outcome": "both creates were pinned to wF, but child launch failed with ENOENT for the Scoop pi.cmd shim",
+    "disposition": "not used as passing child-launch evidence; the final run used the direct Bun plus Pi CLI entry invocation above"
+  },
+  "evidenceBoundary": "Observed Herdr version, parent environment, explicit foreground switch, returned tab/pane/workspace identities, child Result status, and cleanup outcomes. No workspace ownership was inferred from ID prefixes, and no incident chronology was treated as runtime evidence."
+}

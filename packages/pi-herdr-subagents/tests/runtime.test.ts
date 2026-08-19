@@ -37,9 +37,9 @@ describe("pi-herdr-subagents runtime", () => {
     const client = createHerdrClient(async () => ({
       code: 0,
       stderr: "",
-      stdout: JSON.stringify({ id: "cli:tab:create", result: { root_pane: { pane_id: "wF:p6", tab_id: "wF:t5" }, tab: { tab_id: "wF:t5" }, type: "tab_created" } }),
+      stdout: JSON.stringify({ id: "cli:tab:create", result: { root_pane: { pane_id: "wF:p6", tab_id: "wF:t5" }, tab: { tab_id: "wF:t5", workspace_id: "wF" }, type: "tab_created" } }),
     }));
-    const transport = createHerdrTransport(client);
+    const transport = createHerdrTransport(client, { workspaceId: "wF" });
     await expect(transport.createTab({ cwd: "/repo", label: "task" })).resolves.toEqual({ tabId: "wF:t5", paneId: "wF:p6" });
   });
 
@@ -730,4 +730,191 @@ describe("parent running-task widget", () => {
     expect(state.calls.unsubscribe).toBe(1);
     expect(state.calls.stop).toBe(2);
   });
+});
+
+
+test("captures the parent workspace once and preserves create arguments", async () => {
+  const previous = process.env.HERDR_WORKSPACE_ID;
+  const calls: string[][] = [];
+  try {
+    process.env.HERDR_WORKSPACE_ID = "wF";
+    const client = createHerdrClient(async (_command, args) => {
+      calls.push([...args]);
+      return {
+        code: 0,
+        stdout: JSON.stringify({ result: { tab: { tab_id: "wF:t1", workspace_id: "wF" }, root_pane: { pane_id: "wF:p1" } } }),
+        stderr: "",
+      };
+    });
+    const transport = createHerdrTransport(client);
+    process.env.HERDR_WORKSPACE_ID = "w8";
+
+    await expect(transport.createTab({ cwd: "/repo", label: "pinned", env: { A: "1" } }))
+      .resolves.toEqual({ tabId: "wF:t1", paneId: "wF:p1" });
+    expect(calls).toEqual([["tab", "create", "--workspace", "wF", "--cwd", "/repo", "--label", "pinned", "--no-focus", "--env", "A=1"]]);
+  } finally {
+    if (previous === undefined) delete process.env.HERDR_WORKSPACE_ID;
+    else process.env.HERDR_WORKSPACE_ID = previous;
+  }
+});
+
+test("defers missing and invalid workspace rejection until createTab", async () => {
+  for (const [options, token] of [[{ workspaceId: undefined }, "parent_workspace_missing"], [{ workspaceId: " \t" }, "parent_workspace_invalid"]] as const) {
+    let calls = 0;
+    const client = createHerdrClient(async () => {
+      calls++;
+      return { code: 0, stdout: "{}", stderr: "" };
+    });
+    const transport = createHerdrTransport(client, options);
+    await expect(transport.createTab({ cwd: "/repo", label: "blocked" })).rejects.toThrow(token);
+    expect(calls).toBe(0);
+  }
+});
+
+test("rejects a mismatched response and closes only its explicit root pane", async () => {
+  const calls: string[][] = [];
+  const client = createHerdrClient(async (_command, args) => {
+    calls.push([...args]);
+    return args[0] === "pane"
+      ? { code: 0, stdout: "{}", stderr: "" }
+      : { code: 0, stdout: JSON.stringify({ result: { tab: { tab_id: "w8:t1", workspace_id: "w8" }, root_pane: { pane_id: "w8:p1" } } }), stderr: "" };
+  });
+  const transport = createHerdrTransport(client, { workspaceId: "wF" });
+
+  await expect(transport.createTab({ cwd: "/repo", label: "mismatch" })).rejects.toThrow("parent_workspace_mismatch");
+  expect(calls).toEqual([
+    ["tab", "create", "--workspace", "wF", "--cwd", "/repo", "--label", "mismatch", "--no-focus"],
+    ["pane", "close", "w8:p1"],
+  ]);
+});
+
+test("classifies unsupported create contracts and keeps unrelated command failures unchanged", async () => {
+  const unsupportedCalls: string[][] = [];
+  const unsupported = createHerdrTransport(createHerdrClient(async (_command, args) => {
+    unsupportedCalls.push([...args]);
+    return { code: 2, stdout: "", stderr: "unknown option --workspace" };
+  }), { workspaceId: "wF" });
+  await expect(unsupported.createTab({ cwd: "/repo", label: "unsupported" })).rejects.toThrow("parent_workspace_contract_unsupported");
+  expect(unsupportedCalls).toHaveLength(1);
+
+  const missingFieldCalls: string[][] = [];
+  const missingField = createHerdrTransport(createHerdrClient(async (_command, args) => {
+    missingFieldCalls.push([...args]);
+    return args[0] === "pane"
+      ? { code: 0, stdout: "{}", stderr: "" }
+      : { code: 0, stdout: JSON.stringify({ result: { tab: { tab_id: "wF:t2" }, root_pane: { pane_id: "wF:p2" } } }), stderr: "" };
+  }), { workspaceId: "wF" });
+  await expect(missingField.createTab({ cwd: "/repo", label: "missing-field" })).rejects.toThrow("parent_workspace_contract_unsupported");
+  expect(missingFieldCalls).toEqual([
+    ["tab", "create", "--workspace", "wF", "--cwd", "/repo", "--label", "missing-field", "--no-focus"],
+    ["pane", "close", "wF:p2"],
+  ]);
+
+  const commandFailure = createHerdrTransport(createHerdrClient(async () => ({ code: 1, stdout: "", stderr: "backend unavailable" })), { workspaceId: "wF" });
+  await expect(commandFailure.createTab({ cwd: "/repo", label: "failure" })).rejects.toThrow("herdr tab create failed: backend unavailable");
+  await expect(commandFailure.createTab({ cwd: "/repo", label: "failure" })).rejects.not.toThrow("parent_workspace_contract_unsupported");
+});
+
+test("preserves the primary mismatch token when rejected-pane cleanup fails", async () => {
+  const calls: string[][] = [];
+  const transport = createHerdrTransport(createHerdrClient(async (_command, args) => {
+    calls.push([...args]);
+    return args[0] === "pane"
+      ? { code: 1, stdout: "", stderr: "close denied" }
+      : { code: 0, stdout: JSON.stringify({ result: { tab: { tab_id: "w8:t3", workspace_id: "w8" }, root_pane: { pane_id: "w8:p3" } } }), stderr: "" };
+  }), { workspaceId: "wF" });
+
+  await expect(transport.createTab({ cwd: "/repo", label: "cleanup" })).rejects.toThrow(/parent_workspace_mismatch.*cleanup failed/);
+  expect(calls).toEqual([
+    ["tab", "create", "--workspace", "wF", "--cwd", "/repo", "--label", "cleanup", "--no-focus"],
+    ["pane", "close", "w8:p3"],
+  ]);
+});
+
+test("propagates a missing parent workspace through spawn without a fallback launch", async () => {
+  let calls = 0;
+  const transport = createHerdrTransport(createHerdrClient(async () => {
+    calls++;
+    return { code: 0, stdout: "{}", stderr: "" };
+  }), { workspaceId: undefined });
+  const runtime = new SubagentRuntime(transport, handlerRegistry(), mkdtempSync(join(tmpdir(), "subagents-workspace-missing-")));
+
+  await expect(runtime.spawn({ agent: "handler", cwd: "/repo", prompt: "work", label: "missing", taskSlug: "workspace-missing" }))
+    .rejects.toThrow("parent_workspace_missing");
+  expect(calls).toBe(0);
+  expect(runtime.inspect("workspace-missing")).toMatchObject({ status: "failed", error: "Error: parent_workspace_missing" });
+  runtime.stop();
+});
+
+
+test("classifies a successful malformed tab-create response as an unsupported contract without cleanup", async () => {
+  const calls: string[][] = [];
+  const transport = createHerdrTransport(createHerdrClient(async (_command, args) => {
+    calls.push([...args]);
+    return { code: 0, stdout: "{", stderr: "" };
+  }), { workspaceId: "wF" });
+
+  await expect(transport.createTab({ cwd: "/repo", label: "malformed" }))
+    .rejects.toThrow(/parent_workspace_contract_unsupported.*invalid JSON/);
+  expect(calls).toEqual([["tab", "create", "--workspace", "wF", "--cwd", "/repo", "--label", "malformed", "--no-focus"]]);
+});
+
+test("retains every workspace create rejection without a pane run", async () => {
+  const cases: Array<{ name: string; workspaceId: string | undefined; token: string }> = [
+    { name: "missing", workspaceId: undefined, token: "parent_workspace_missing" },
+    { name: "invalid", workspaceId: " \t", token: "parent_workspace_invalid" },
+    { name: "unsupported", workspaceId: "wF", token: "parent_workspace_contract_unsupported" },
+    { name: "mismatch", workspaceId: "wF", token: "parent_workspace_mismatch" },
+  ];
+
+  for (const { name, workspaceId, token } of cases) {
+    const calls: string[][] = [];
+    const transport = createHerdrTransport(createHerdrClient(async (_command, args) => {
+      calls.push([...args]);
+      if (name === "unsupported") return { code: 2, stdout: "", stderr: "unknown option --workspace" };
+      if (name === "mismatch") return args[0] === "pane"
+        ? { code: 0, stdout: "", stderr: "" }
+        : { code: 0, stdout: JSON.stringify({ result: { tab: { tab_id: "w8:t1", workspace_id: "w8" }, root_pane: { pane_id: "w8:p1" } } }), stderr: "" };
+      return { code: 0, stdout: "{}", stderr: "" };
+    }), { workspaceId });
+    const root = mkdtempSync(join(tmpdir(), `subagents-workspace-${name}-`));
+    const runtime = new SubagentRuntime(transport, handlerRegistry(), root);
+    const taskSlug = `workspace-${name}`;
+
+    await expect(runtime.spawn({ agent: "handler", cwd: "/repo", prompt: "work", label: name, taskSlug })).rejects.toThrow(token);
+    expect(calls.some(args => args[0] === "pane" && args[1] === "run")).toBeFalse();
+    expect(runtime.inspect(taskSlug)).toMatchObject({ status: "failed", error: expect.stringContaining(token) });
+    expect(JSON.parse(readFileSync(join(root, "tasks", `${taskSlug}-artifacts`, "task.json"), "utf8")))
+      .toMatchObject({ status: "failed", error: expect.stringContaining(token) });
+    runtime.stop();
+  }
+});
+
+test("recovery retains an existing pane while resumed creation uses the new transport target", async () => {
+  const parentSessionFile = join(mkdtempSync(join(tmpdir(), "subagents-workspace-recovery-")), "parent.jsonl");
+  const original = new SubagentRuntime(fakeTransport().transport, handlerRegistry());
+  const first = await original.spawn({ agent: "handler", cwd: "/repo", prompt: "one", label: "recover", taskSlug: "workspace-recovery", parentSessionFile });
+  writeFileSync(first.sessionFile, "");
+  original.stop();
+
+  const calls: string[][] = [];
+  const transport = createHerdrTransport(createHerdrClient(async (_command, args) => {
+    calls.push([...args]);
+    if (args[0] === "pane" && args[1] === "get") return { code: 0, stdout: "{}", stderr: "" };
+    if (args[0] === "tab") return { code: 0, stdout: JSON.stringify({ result: { tab: { tab_id: "w8:t2", workspace_id: "w8" }, root_pane: { pane_id: "w8:p2" } } }), stderr: "" };
+    return { code: 0, stdout: "", stderr: "" };
+  }), { workspaceId: "w8" });
+  const rebuilt = new SubagentRuntime(transport, handlerRegistry());
+
+  await rebuilt.recover("/repo", parentSessionFile);
+  expect(rebuilt.inspect(first.subagentId)).toMatchObject({ status: "running", paneId: first.paneId });
+  expect(calls).toEqual([["pane", "get", first.paneId]]);
+
+  writeFileSync(first.resultPath, JSON.stringify({ subagentId: first.subagentId, generation: 1, status: "failed", error: "retry" }));
+  await expect(rebuilt.join(first.subagentId)).resolves.toMatchObject({ status: "failed", generation: 1 });
+  const second = await rebuilt.resume(first.subagentId, "two");
+
+  expect(second).toMatchObject({ generation: 2, sessionFile: first.sessionFile, tabId: "w8:t2", paneId: "w8:p2" });
+  expect(calls).toContainEqual(["tab", "create", "--workspace", "w8", "--cwd", "/repo", "--label", "recover", "--no-focus", "--env", `PI_HERDR_SUBAGENT_ID=${first.subagentId}`, "--env", "PI_HERDR_SUBAGENT_GENERATION=2", "--env", `PI_HERDR_SUBAGENT_RESULT_PATH=${second.resultPath}`]);
+  rebuilt.stop();
 });

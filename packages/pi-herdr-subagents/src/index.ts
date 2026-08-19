@@ -109,17 +109,42 @@ function bootstrapRuntime(): string {
 export function createHerdrTransport(client: HerdrClient<{ cwd?: string }> = createHerdrClient<{ cwd?: string }>(async (command, args, options) => {
   try { const result = await exec(command, args, { cwd: options.cwd, maxBuffer: 4 * 1024 * 1024 }); return { code: 0, stdout: result.stdout, stderr: result.stderr }; }
   catch (error) { const failure = error as { code?: number; stdout?: string; stderr?: string; message?: string }; return { code: typeof failure.code === "number" ? failure.code : 1, stdout: failure.stdout ?? "", stderr: failure.stderr ?? failure.message ?? String(error) }; }
-})): HerdrTransport {
+}), options?: { workspaceId?: string }): HerdrTransport {
+  const workspaceId = capturedWorkspaceTarget(options);
+  const rejectResponse = async (token: string, rootPane: Json | undefined, detail?: string): Promise<never> => {
+    const paneId = rootPane?.pane_id;
+    let cleanupDetail = "";
+    if (hasNonEmptyString(paneId)) {
+      try { await client.run(["pane", "close", paneId], {}); }
+      catch (error) { cleanupDetail = `; cleanup failed: ${error instanceof Error ? error.message : String(error)}`; }
+    }
+    throw workspaceCreateError(token, `${detail ?? "Herdr tab create response rejected"}${cleanupDetail}`);
+  };
   return {
     async createTab(input) {
-      const args = ["tab", "create", "--cwd", input.cwd, "--label", input.label, "--no-focus"];
+      if (workspaceId === undefined) throw workspaceCreateError("parent_workspace_missing");
+      if (typeof workspaceId !== "string" || workspaceId.trim().length === 0) throw workspaceCreateError("parent_workspace_invalid");
+      const args = ["tab", "create", "--workspace", workspaceId, "--cwd", input.cwd, "--label", input.label, "--no-focus"];
       for (const [name, value] of Object.entries(input.env ?? {})) args.push("--env", `${name}=${value}`);
-      const raw = unwrap(await client.json(args, {}));
+      const result = await client.exec(args, {});
+      if (result.code !== 0 || result.killed) {
+        if (workspaceOptionRejected(result)) throw workspaceCreateError("parent_workspace_contract_unsupported", commandFailure(args, result));
+        throw new Error(commandFailure(args, result));
+      }
+      let raw: Json;
+      try { raw = unwrap(parseHerdrJson(args, result.stdout)); }
+      catch (error) {
+        return rejectResponse("parent_workspace_contract_unsupported", undefined, error instanceof Error ? error.message : String(error));
+      }
       const tab = raw.tab as Json | undefined;
       const rootPane = raw.root_pane as Json | undefined;
-      const tabId = typeof tab?.tab_id === "string" ? tab.tab_id : "";
-      const paneId = typeof rootPane?.pane_id === "string" ? rootPane.pane_id : "";
-      if (!tabId || !paneId) throw new Error("Herdr tab create returned no tab or pane identity");
+      const tabId = tab?.tab_id;
+      const returnedWorkspaceId = tab?.workspace_id;
+      const paneId = rootPane?.pane_id;
+      if (!hasNonEmptyString(tabId) || !hasNonEmptyString(returnedWorkspaceId) || !hasNonEmptyString(paneId)) {
+        return rejectResponse("parent_workspace_contract_unsupported", rootPane);
+      }
+      if (returnedWorkspaceId !== workspaceId) return rejectResponse("parent_workspace_mismatch", rootPane);
       return { tabId, paneId };
     },
     async run(paneId, command, args) { await client.run(["pane", "run", paneId, powerShellInvocation(command, args)], {}); },
@@ -837,4 +862,27 @@ async function packageAgentFiles(packageRoot: string): Promise<Array<{ path: str
   } catch {
     return [];
   }
+}
+
+
+function hasNonEmptyString(value: unknown): value is string { return typeof value === "string" && value.length > 0; }
+function workspaceCreateError(token: string, detail?: string): Error {
+  return new Error(detail ? `${token}: ${detail}` : token);
+}
+function workspaceOptionRejected(result: { stdout: string; stderr: string }): boolean {
+  const output = `${result.stderr}\n${result.stdout}`;
+  return /--workspace\b/i.test(output)
+    && /(?:unknown|unrecognized|unsupported|invalid|unexpected)\s+(?:option|argument|flag)|(?:option|argument|flag).*?(?:not\s+supported|unsupported|not\s+recognized)/i.test(output);
+}
+function parseHerdrJson(args: readonly string[], output: string): Json {
+  try {
+    const value: unknown = JSON.parse(output);
+    if (!value || typeof value !== "object" || Array.isArray(value)) throw new Error();
+    return value as Json;
+  } catch {
+    throw new Error(`herdr ${args.slice(0, 2).join(" ")} returned invalid JSON`);
+  }
+}
+function capturedWorkspaceTarget(options?: { workspaceId?: string }): string | undefined {
+  return options && Object.prototype.hasOwnProperty.call(options, "workspaceId") ? options.workspaceId : process.env.HERDR_WORKSPACE_ID;
 }
