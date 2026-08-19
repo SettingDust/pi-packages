@@ -755,6 +755,45 @@ describe("parent running-task widget", () => {
 });
 
 
+test("aborting join leaves the running task unchanged until explicit cancellation", async () => {
+  const notifications: CompletionNotification[] = [];
+  const { calls, transport } = fakeTransport();
+  const root = mkdtempSync(join(tmpdir(), "subagents-join-abort-"));
+  const runtime = new SubagentRuntime(transport, handlerRegistry(), root, notification => { notifications.push(notification); });
+  const task = await runtime.spawn({ agent: "handler", cwd: "/repo", prompt: "work", label: "join", taskSlug: "task" });
+  const manifest = readFileSync(join(dirname(task.resultPath), "task.json"), "utf8");
+  const controller = new AbortController();
+  const joined = runtime.join(task.subagentId, task.generation, controller.signal);
+
+  controller.abort();
+  await expect(joined).rejects.toMatchObject({ name: "AbortError" });
+  expect(runtime.inspect(task.subagentId)).toMatchObject({ generation: task.generation, status: "running" });
+  expect(existsSync(task.resultPath)).toBeFalse();
+  expect(readFileSync(join(dirname(task.resultPath), "task.json"), "utf8")).toBe(manifest);
+  expect(notifications).toEqual([]);
+  expect(calls.filter(call => (call as { op?: string }).op === "close")).toHaveLength(0);
+
+  await expect(runtime.cancel(task.subagentId)).resolves.toMatchObject({ status: "cancelled" });
+  expect(calls.filter(call => (call as { op?: string }).op === "close")).toHaveLength(1);
+  expect(notifications).toEqual([{ subagentId: task.subagentId, generation: task.generation, status: "cancelled", label: "join" }]);
+});
+
+test("passes the join tool AbortSignal to the runtime wait", async () => {
+  const { transport } = fakeTransport();
+  const runtime = new SubagentRuntime(transport, handlerRegistry(), mkdtempSync(join(tmpdir(), "subagents-tool-join-abort-")));
+  const task = await runtime.spawn({ agent: "handler", cwd: "/repo", prompt: "work", label: "join", taskSlug: "task" });
+  const joinTool = createSubagentTools(runtime, "/repo").find(tool => tool.name === "subagent_join")!;
+  const controller = new AbortController();
+  const joined = (joinTool.execute as any)("call-1", { subagentId: task.subagentId, generation: task.generation }, controller.signal);
+
+  controller.abort();
+  await expect(joined).rejects.toMatchObject({ name: "AbortError" });
+  expect(runtime.inspect(task.subagentId)).toMatchObject({ generation: task.generation, status: "running" });
+  expect(existsSync(task.resultPath)).toBeFalse();
+  runtime.stop();
+});
+
+
 test("captures the parent workspace once and preserves create arguments", async () => {
   const previous = process.env.HERDR_WORKSPACE_ID;
   const calls: string[][] = [];

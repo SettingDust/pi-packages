@@ -446,12 +446,12 @@ export class SubagentRuntime {
 
   inspect(id: string): SubagentTask { return { ...this.get(id) }; }
 
-  async join(id: string, generation = this.get(id).generation): Promise<SubagentTask> {
+  async join(id: string, generation = this.get(id).generation, signal?: AbortSignal): Promise<SubagentTask> {
     const task = this.get(id);
     if (task.generation !== generation) throw new Error("Subagent generation is no longer current");
     while (task.status === "running") {
       if (existsSync(task.resultPath)) await this.settleFromResult(task);
-      else await delay(50);
+      else await delay(50, undefined, { signal });
     }
     return { ...task };
   }
@@ -731,10 +731,10 @@ function renderJoinResult(result: ToolResult, options: { expanded?: boolean; isP
 
 export function createSubagentTools(runtime: SubagentRuntime, cwd: string, parentSessionFile?: string) {
   const result = (details: unknown) => ({ content: [{ type: "text" as const, text: JSON.stringify(details) }], details });
-  const tool = (name: string, description: string, parameters: any, execute: (params: any, update?: ToolUpdate) => Promise<unknown>, renderer: Record<string, unknown> = {}) => defineTool({
+  const tool = (name: string, description: string, parameters: any, execute: (params: any, update?: ToolUpdate, signal?: AbortSignal) => Promise<unknown>, renderer: Record<string, unknown> = {}) => defineTool({
     name, label: name, description, parameters, ...renderer,
-    async execute(_id, params, _signal, onUpdate) {
-      const details = await execute(params, value => onUpdate?.(result(value)));
+    async execute(_id, params, signal, onUpdate) {
+      const details = await execute(params, value => onUpdate?.(result(value)), signal);
       return result(details);
     },
   });
@@ -743,7 +743,7 @@ export function createSubagentTools(runtime: SubagentRuntime, cwd: string, paren
     tool("subagent_spawn", "Start one background subagent. taskSlug is required and must be a Router-provided canonical task identity; the parent receives a terminal notification without the full Result.", Type.Object({ agent: StringEnum(runtime.agentNames()), prompt: Type.String({ minLength: 1 }), label: Type.String({ minLength: 1 }), taskSlug: Type.Optional(Type.String()), model: Type.Optional(Type.String()), thinking: Type.Optional(Type.String()) }), params => runtime.spawn({ ...params, cwd, parentSessionFile }), { renderCall: renderSpawnCall, renderResult: renderSpawnResult }),
     tool("subagent_resume", "Resume a completed or failed subagent.", Type.Object({ subagentId: Type.String(), prompt: Type.String({ minLength: 1 }) }), params => runtime.resume(params.subagentId, params.prompt)),
     tool("subagent_inspect", "Return a non-blocking subagent snapshot.", Type.Object({ subagentId: Type.String() }), params => Promise.resolve(runtime.inspect(params.subagentId))),
-    tool("subagent_join", "Wait for a subagent and read its full Result.", Type.Object({ subagentId: Type.String(), generation: Type.Optional(Type.Number()) }), async (params, update) => { update?.(runtime.inspect(params.subagentId)); return runtime.join(params.subagentId, params.generation); }, { renderCall: renderJoinCall, renderResult: renderJoinResult }),
+    tool("subagent_join", "Wait for a subagent and read its full Result.", Type.Object({ subagentId: Type.String(), generation: Type.Optional(Type.Number()) }), async (params, update, signal) => { update?.(runtime.inspect(params.subagentId)); return runtime.join(params.subagentId, params.generation, signal); }, { renderCall: renderJoinCall, renderResult: renderJoinResult }),
     tool("subagent_steer", "Send a message to a running subagent.", Type.Object({ subagentId: Type.String(), message: Type.String({ minLength: 1 }) }), params => runtime.steer(params.subagentId, params.message)),
     tool("subagent_cancel", "Best-effort cancel a running subagent.", Type.Object({ subagentId: Type.String() }), params => runtime.cancel(params.subagentId)),
     tool("subagent_remove", "Close and remove a subagent and its artifacts.", Type.Object({ subagentId: Type.String() }), async params => { await runtime.remove(params.subagentId); return { status: "removed" }; }),
