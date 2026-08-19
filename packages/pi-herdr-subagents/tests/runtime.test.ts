@@ -444,3 +444,287 @@ test("discovers package Agents from pi.agents directories", async () => {
   expect(registry.list().map(agent => agent.name)).toContain("handler");
   expect(registry.get("handler")).toMatchObject({ path: join(root, "handler.md"), body: "Use the validated Handler protocol." });
 });
+
+
+describe("runtime task observation", () => {
+  test("projects private task state into defensive snapshots and emits synchronous updates", async () => {
+    const root = mkdtempSync(join(tmpdir(), "subagents-observation-"));
+    const notifications: CompletionNotification[] = [];
+    const runtime = new SubagentRuntime(fakeTransport().transport, handlerRegistry(), root, notification => { notifications.push(notification); });
+    const events: string[] = [];
+    const unsubscribeThrowing = runtime.onTaskUpdate(() => { throw new Error("listener failed"); });
+    const unsubscribe = runtime.onTaskUpdate(() => {
+      events.push(runtime.listTasks()[0]?.status ?? "empty");
+    });
+
+    expect(events).toEqual([]);
+    const task = await runtime.spawn({ agent: "handler", cwd: "/repo", prompt: "work", label: "observe", model: "secret-model", thinking: "secret-thinking" });
+    expect(events).toEqual(["running"]);
+    const snapshot = runtime.listTasks();
+    expect(snapshot).toHaveLength(1);
+    expect(Object.keys(snapshot[0]!)).toEqual(["subagentId", "generation", "agent", "label", "status", "createdAt"]);
+    expect(snapshot[0]).not.toHaveProperty("result");
+    expect(snapshot[0]).not.toHaveProperty("error");
+    expect(snapshot[0]).not.toHaveProperty("model");
+    expect(snapshot[0]).not.toHaveProperty("thinking");
+    (snapshot[0] as { label: string }).label = "mutated";
+    (snapshot as unknown as unknown[]).pop();
+    expect(runtime.listTasks()[0]).toMatchObject({ label: "observe", status: "running" });
+
+    writeFileSync(task.resultPath, JSON.stringify({ subagentId: task.subagentId, generation: 1, status: "completed", result: "private" }));
+    await expect(runtime.join(task.subagentId)).resolves.toMatchObject({ status: "completed", result: "private" });
+    expect(events).toEqual(["running", "completed"]);
+    expect(notifications).toEqual([{ subagentId: task.subagentId, generation: 1, status: "completed", label: "observe" }]);
+
+    await runtime.remove(task.subagentId);
+    expect(events).toEqual(["running", "completed", "empty"]);
+    unsubscribe();
+    unsubscribe();
+    unsubscribeThrowing();
+    runtime.stop();
+  });
+
+  test("resume, cancellation, and launch failure all invalidate after their state changes", async () => {
+    const root = mkdtempSync(join(tmpdir(), "subagents-observation-mutations-"));
+    const { transport } = fakeTransport();
+    const runtime = new SubagentRuntime(transport, handlerRegistry(), root);
+    let updates = 0;
+    runtime.onTaskUpdate(() => { updates++; });
+
+    const first = await runtime.spawn({ agent: "handler", cwd: "/repo", prompt: "one", label: "resume" });
+    writeFileSync(first.resultPath, JSON.stringify({ subagentId: first.subagentId, generation: 1, status: "failed", error: "retry" }));
+    await runtime.join(first.subagentId);
+    const beforeResume = updates;
+    const second = await runtime.resume(first.subagentId, "two");
+    expect(updates).toBeGreaterThan(beforeResume);
+    const beforeCancel = updates;
+    await runtime.cancel(second.subagentId);
+    expect(updates).toBeGreaterThan(beforeCancel);
+
+    const failingTransport = fakeTransport().transport;
+    failingTransport.createTab = async () => { throw new Error("launch unavailable"); };
+    const failing = new SubagentRuntime(failingTransport, handlerRegistry(), mkdtempSync(join(tmpdir(), "subagents-observation-launch-")));
+    let failedUpdates = 0;
+    failing.onTaskUpdate(() => { failedUpdates++; });
+    await expect(failing.spawn({ agent: "handler", cwd: "/repo", prompt: "fail", label: "launch" })).rejects.toThrow("launch unavailable");
+    expect(failedUpdates).toBe(2);
+    runtime.stop();
+    failing.stop();
+  });
+
+  test("successful recovery emits exactly once after the final scope, including empty and repeated scopes", async () => {
+    const parentA = join(mkdtempSync(join(tmpdir(), "subagents-observation-a-")), "parent.jsonl");
+    const parentB = join(mkdtempSync(join(tmpdir(), "subagents-observation-b-")), "parent.jsonl");
+    const parentEmpty = join(mkdtempSync(join(tmpdir(), "subagents-observation-empty-")), "parent.jsonl");
+    const original = new SubagentRuntime(fakeTransport().transport, handlerRegistry());
+    const taskA = await original.spawn({ agent: "handler", cwd: "/repo", prompt: "a", label: "a", parentSessionFile: parentA });
+    const taskB = await original.spawn({ agent: "handler", cwd: "/repo", prompt: "b", label: "b", parentSessionFile: parentB });
+    original.stop();
+    writeFileSync(taskA.sessionFile, "");
+    writeFileSync(taskB.sessionFile, "");
+
+    const runtime = new SubagentRuntime(fakeTransport(true).transport, handlerRegistry());
+    const updates: string[][] = [];
+    runtime.onTaskUpdate(() => { updates.push(runtime.listTasks().map(task => task.label)); });
+    await runtime.recover("/repo", parentA);
+    expect(updates).toEqual([["a"]]);
+    await runtime.recover("/repo", parentB);
+    expect(updates).toEqual([["a"], ["b"]]);
+    await runtime.recover("/repo", parentB);
+    expect(updates).toEqual([["a"], ["b"], ["b"]]);
+    await runtime.recover("/repo", parentEmpty);
+    expect(updates).toEqual([["a"], ["b"], ["b"], []]);
+    expect(runtime.listTasks()).toEqual([]);
+    runtime.stop();
+  });
+});
+
+
+type WidgetObservation = {
+  subagentId: string;
+  generation: number;
+  agent: string;
+  label: string;
+  status: "running" | "completed" | "failed" | "cancelled";
+  createdAt: string;
+};
+
+function widgetRuntime(initialTasks: WidgetObservation[]) {
+  let tasks = initialTasks;
+  let listener: (() => void) | undefined;
+  let savedListener: (() => void) | undefined;
+  let notifier: ((notification: CompletionNotification) => void | Promise<void>) | undefined;
+  const calls = { list: 0, subscribe: 0, unsubscribe: 0, recover: 0, inspect: 0, join: 0, stop: 0 };
+  const runtime = {
+    setCompletionNotifier(value: typeof notifier) { notifier = value; },
+    listTasks() { calls.list++; return tasks.map(task => ({ ...task })); },
+    onTaskUpdate(value: () => void) {
+      calls.subscribe++;
+      listener = value;
+      savedListener = value;
+      let active = true;
+      return () => {
+        if (!active) return;
+        active = false;
+        calls.unsubscribe++;
+        if (listener === value) listener = undefined;
+      };
+    },
+    async recover() { calls.recover++; listener?.(); },
+    inspect() { calls.inspect++; throw new Error("widget called inspect"); },
+    async join() { calls.join++; return { status: "completed" }; },
+    agentNames() { return ["handler"]; },
+    stop() { calls.stop++; },
+  };
+  return {
+    runtime,
+    calls,
+    setTasks(value: WidgetObservation[]) { tasks = value; },
+    emit() { listener?.(); },
+    emitSaved() { savedListener?.(); },
+    async notify(notification: CompletionNotification) { await notifier?.(notification); },
+  };
+}
+
+function widgetExtensionHarness(runtime: any, setWidget: (...args: any[]) => void) {
+  const handlers: Record<string, (event: unknown, ctx: any) => unknown> = {};
+  const messages: Array<{ message: any; options: any }> = [];
+  const previousChildResultPath = process.env.PI_HERDR_SUBAGENT_RESULT_PATH;
+  delete process.env.PI_HERDR_SUBAGENT_RESULT_PATH;
+  try {
+    activateSubagents({
+      on(event: string, handler: (event: unknown, ctx: any) => unknown) { handlers[event] = handler; },
+      sendMessage(message: unknown, options: unknown) { messages.push({ message, options }); },
+      registerTool() {},
+      getActiveTools() { return []; },
+      setActiveTools() {},
+    } as any, { runtime, registry: { async discover() {} } as any });
+  } finally {
+    if (previousChildResultPath === undefined) delete process.env.PI_HERDR_SUBAGENT_RESULT_PATH;
+    else process.env.PI_HERDR_SUBAGENT_RESULT_PATH = previousChildResultPath;
+  }
+  const ctx = {
+    cwd: "/repo",
+    sessionManager: { getSessionFile: () => "/repo/parent.jsonl", getEntries: () => [] },
+    ui: { setWidget },
+  };
+  return { handlers, messages, ctx };
+}
+
+const runningTask = (subagentId: string, createdAt: string, label = subagentId): WidgetObservation => ({
+  subagentId, generation: 1, agent: "handler", label, status: "running", createdAt,
+});
+
+describe("parent running-task widget", () => {
+  test("renders only running tasks above the editor in deterministic order without polling or Result APIs", async () => {
+    const timerCalls = { interval: 0, timeout: 0 };
+    const originalSetInterval = globalThis.setInterval;
+    const originalSetTimeout = globalThis.setTimeout;
+    globalThis.setInterval = ((..._args: any[]) => { timerCalls.interval++; return 0 as any; }) as typeof setInterval;
+    globalThis.setTimeout = ((..._args: any[]) => { timerCalls.timeout++; return 0 as any; }) as typeof setTimeout;
+    try {
+      const completed = { ...runningTask("subagent-9", "2026-01-01T00:00:00.000Z"), status: "completed" as const };
+      const state = widgetRuntime([
+        runningTask("subagent-2", "2026-01-02T00:00:00.000Z", "two"),
+        runningTask("subagent-3", "2026-01-01T00:00:00.000Z", "three"),
+        runningTask("subagent-10", "2026-01-02T00:00:00.000Z", "ten"),
+        completed,
+      ]);
+      const widgetCalls: any[][] = [];
+      const harness = widgetExtensionHarness(state.runtime, (...args) => { widgetCalls.push(args); });
+
+      await harness.handlers.session_start!({}, harness.ctx);
+      expect(widgetCalls.at(-1)).toEqual([
+        "pi-herdr-subagent-running",
+        [
+          "subagent-3 · three · handler · generation 1 · running",
+          "subagent-10 · ten · handler · generation 1 · running",
+          "subagent-2 · two · handler · generation 1 · running",
+        ],
+        { placement: "aboveEditor" },
+      ]);
+
+      state.setTasks([completed]);
+      state.emit();
+      expect(widgetCalls.at(-1)).toEqual(["pi-herdr-subagent-running", undefined]);
+      await harness.handlers.session_start!({}, harness.ctx);
+      await harness.handlers.before_agent_start!({}, harness.ctx);
+
+      expect(state.calls.subscribe).toBe(1);
+      expect(state.calls.inspect).toBe(0);
+      expect(state.calls.join).toBe(0);
+      expect(timerCalls.interval).toBe(0);
+      expect(timerCalls.timeout).toBe(0);
+    } finally {
+      globalThis.setInterval = originalSetInterval;
+      globalThis.setTimeout = originalSetTimeout;
+    }
+  });
+
+  test("isolates an initial render failure from later refresh, completion delivery, and join", async () => {
+    const state = widgetRuntime([runningTask("subagent-1", "2026-01-01T00:00:00.000Z")]);
+    let attempts = 0;
+    const harness = widgetExtensionHarness(state.runtime, () => {
+      attempts++;
+      if (attempts === 1) throw new Error("initial render failed");
+    });
+
+    await expect(harness.handlers.session_start!({}, harness.ctx)).resolves.toBeUndefined();
+    expect(() => state.emit()).not.toThrow();
+    expect(attempts).toBe(2);
+    await state.notify({ subagentId: "subagent-1", generation: 1, status: "completed", label: "task" });
+    expect(harness.messages).toHaveLength(1);
+    await expect(state.runtime.join()).resolves.toEqual({ status: "completed" });
+  });
+
+  test("isolates an update refresh failure and permits the next update", async () => {
+    const state = widgetRuntime([runningTask("subagent-1", "2026-01-01T00:00:00.000Z")]);
+    let attempts = 0;
+    const harness = widgetExtensionHarness(state.runtime, () => {
+      attempts++;
+      if (attempts === 2) throw new Error("update failed");
+    });
+
+    await harness.handlers.session_start!({}, harness.ctx);
+    expect(() => state.emit()).not.toThrow();
+    expect(() => state.emit()).not.toThrow();
+    expect(attempts).toBe(3);
+  });
+
+  test("isolates an empty-state clear failure and permits a later render", async () => {
+    const running = runningTask("subagent-1", "2026-01-01T00:00:00.000Z");
+    const state = widgetRuntime([running]);
+    let attempts = 0;
+    const harness = widgetExtensionHarness(state.runtime, (_key, content) => {
+      attempts++;
+      if (content === undefined) throw new Error("clear failed");
+    });
+
+    await harness.handlers.session_start!({}, harness.ctx);
+    state.setTasks([{ ...running, status: "failed" }]);
+    expect(() => state.emit()).not.toThrow();
+    state.setTasks([running]);
+    expect(() => state.emit()).not.toThrow();
+    expect(attempts).toBe(3);
+  });
+
+  test("shutdown clears, unsubscribes, releases the Context, and stops after a clear failure", async () => {
+    const state = widgetRuntime([runningTask("subagent-1", "2026-01-01T00:00:00.000Z")]);
+    let attempts = 0;
+    const harness = widgetExtensionHarness(state.runtime, (_key, content) => {
+      attempts++;
+      if (content === undefined) throw new Error("shutdown clear failed");
+    });
+
+    await harness.handlers.session_start!({}, harness.ctx);
+    expect(() => harness.handlers.session_shutdown!({}, harness.ctx)).not.toThrow();
+    expect(state.calls.unsubscribe).toBe(1);
+    expect(state.calls.stop).toBe(1);
+    expect(attempts).toBe(2);
+    state.emitSaved();
+    expect(attempts).toBe(2);
+    expect(() => harness.handlers.session_shutdown!({}, harness.ctx)).not.toThrow();
+    expect(state.calls.unsubscribe).toBe(1);
+    expect(state.calls.stop).toBe(2);
+  });
+});

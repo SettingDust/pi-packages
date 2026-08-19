@@ -21,6 +21,14 @@ export type SubagentTask = {
   sessionFile: string; resultPath: string; tabId: string; paneId: string; status: TaskStatus;
   createdAt: string; updatedAt: string; result?: string; error?: string;
 };
+export type SubagentTaskObservation = Readonly<{
+  subagentId: string;
+  generation: number;
+  agent: string;
+  label: string;
+  status: TaskStatus;
+  createdAt: string;
+}>;
 export type CompletionNotification = {
   subagentId: string; generation: number; status: Exclude<TaskStatus, "running">; label: string; reason?: string;
 };
@@ -156,6 +164,7 @@ export class SubagentRuntime {
   private activeTasksDir?: string;
   private monitors = new Map<string, AbortController>();
   private notified = new Set<string>();
+  private taskUpdateListeners = new Set<() => void>();
   private completionNotifier?: CompletionNotifier;
 
   constructor(
@@ -164,8 +173,23 @@ export class SubagentRuntime {
     private readonly root?: string,
     completionNotifier?: CompletionNotifier,
   ) { this.completionNotifier = completionNotifier; }
-
   setCompletionNotifier(notifier: CompletionNotifier): void { this.completionNotifier = notifier; }
+
+  listTasks(): readonly SubagentTaskObservation[] {
+    return [...this.tasks.values()].map(task => ({
+      subagentId: task.subagentId,
+      generation: task.generation,
+      agent: task.agent,
+      label: task.label,
+      status: task.status,
+      createdAt: task.createdAt,
+    }));
+  }
+
+  onTaskUpdate(listener: () => void): () => void {
+    this.taskUpdateListeners.add(listener);
+    return () => { this.taskUpdateListeners.delete(listener); };
+  }
 
   async spawn(input: {
     agent: string;
@@ -189,7 +213,10 @@ export class SubagentRuntime {
     this.stop();
     this.tasks.clear();
     for (const key of notifiedKeys) this.notified.add(key);
-    if (!existsSync(tasksDir)) return;
+    if (!existsSync(tasksDir)) {
+      this.notifyTaskUpdate();
+      return;
+    }
     for (const entry of readdirSync(tasksDir, { withFileTypes: true })) {
       const match = entry.name.match(/^(subagent-\d+)-artifacts$/);
       if (!entry.isDirectory() || !match) continue;
@@ -226,6 +253,7 @@ export class SubagentRuntime {
       if (task.status === "running") this.startMonitor(task);
       else await this.notifyTerminal(task);
     }
+    this.notifyTaskUpdate();
   }
 
   async resume(subagentId: string, prompt: string): Promise<SubagentTask> {
@@ -314,6 +342,7 @@ export class SubagentRuntime {
       model: input.model, thinking: input.thinking, sessionFile, resultPath, tabId: "", paneId: "", status: "running", createdAt, updatedAt: now,
     };
     this.tasks.set(task.subagentId, task);
+    this.notifyTaskUpdate();
     try {
       const surface = await this.transport.createTab({
         cwd: input.cwd,
@@ -362,6 +391,13 @@ export class SubagentRuntime {
     return task;
   }
 
+  private notifyTaskUpdate(): void {
+    for (const listener of this.taskUpdateListeners) {
+      try { listener(); }
+      catch { /* Observation must not affect runtime operations. */ }
+    }
+  }
+
   inspect(id: string): SubagentTask { return { ...this.get(id) }; }
 
   async join(id: string, generation = this.get(id).generation): Promise<SubagentTask> {
@@ -398,6 +434,7 @@ export class SubagentRuntime {
     this.stopMonitor(task);
     if (task.status === "running") await this.transport.closePane(task.paneId);
     this.tasks.delete(id);
+    this.notifyTaskUpdate();
     rmSync(task.sessionFile, { force: true });
     rmSync(dirname(task.resultPath), { recursive: true, force: true });
   }
@@ -459,6 +496,7 @@ export class SubagentRuntime {
     task.status = status;
     task.result = result;
     task.error = error;
+    this.notifyTaskUpdate();
     await this.persist(task);
     await this.notifyTerminal(task);
   }
@@ -652,6 +690,25 @@ export default function subagentsExtension(pi: ExtensionAPI, dependencies: { run
   if (process.env.PI_HERDR_SUBAGENT_RESULT_PATH) return;
   const registry = dependencies.registry ?? new AgentRegistry();
   const runtime = dependencies.runtime ?? new SubagentRuntime(createHerdrTransport(), registry);
+  let widgetContext: ExtensionContext | undefined;
+  let unsubscribeTaskUpdates: (() => void) | undefined;
+  const widgetKey = "pi-herdr-subagent-running";
+  const refreshWidget = () => {
+    if (!widgetContext) return;
+    const lines = runtime.listTasks()
+      .filter(task => task.status === "running")
+      .sort((left, right) => left.createdAt.localeCompare(right.createdAt) || left.subagentId.localeCompare(right.subagentId))
+      .map(task => `${task.subagentId} · ${task.label} · ${task.agent} · generation ${task.generation} · running`);
+    try {
+      if (lines.length) widgetContext.ui.setWidget(widgetKey, lines, { placement: "aboveEditor" });
+      else widgetContext.ui.setWidget(widgetKey, undefined);
+    } catch { /* Widget failures must not affect runtime behavior. */ }
+  };
+  const bindWidget = (ctx: ExtensionContext) => {
+    widgetContext = ctx;
+    unsubscribeTaskUpdates ??= runtime.onTaskUpdate(refreshWidget);
+    refreshWidget();
+  };
   runtime.setCompletionNotifier(notification => {
     pi.sendMessage({
       customType: completionMessageType,
@@ -663,6 +720,7 @@ export default function subagentsExtension(pi: ExtensionAPI, dependencies: { run
   const recoverCurrent = async (ctx: ExtensionContext) => {
     const parentSessionFile = ctx.sessionManager?.getSessionFile?.();
     await runtime.recover(ctx.cwd, parentSessionFile, completionNotificationKeys(ctx.sessionManager.getEntries()));
+    bindWidget(ctx);
   };
   pi.on("session_start", async (_event, ctx) => recoverCurrent(ctx));
   pi.on("before_agent_start", async (_event, ctx) => {
@@ -673,7 +731,20 @@ export default function subagentsExtension(pi: ExtensionAPI, dependencies: { run
     for (const tool of tools) pi.registerTool(tool);
     pi.setActiveTools([...pi.getActiveTools().filter(name => !name.startsWith("subagent_")), ...tools.map(tool => tool.name)]);
   });
-  pi.on("session_shutdown", () => runtime.stop());
+  pi.on("session_shutdown", () => {
+    const context = widgetContext;
+    try {
+      try { context?.ui.setWidget(widgetKey, undefined); }
+      catch { /* Continue shutdown after a widget failure. */ }
+    } finally {
+      try { unsubscribeTaskUpdates?.(); }
+      finally {
+        unsubscribeTaskUpdates = undefined;
+        widgetContext = undefined;
+        runtime.stop();
+      }
+    }
+  });
 }
 
 async function configuredPackageRoots(cwd: string): Promise<string[]> {
