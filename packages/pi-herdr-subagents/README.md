@@ -8,7 +8,7 @@ Each reserved `<subagentId>-artifacts/` directory contains an atomically updated
 
 Within a child Pi process, an unfinished Handler turn receives one delayed follow-up in its existing session. Each later unfinished turn repeats that continuation until `subagent_done` writes the Result; there is no attempt limit or deadline. Pending follow-ups are cancelled while input or agent/session lifecycle activity is in progress.
 
-The runtime watches every running generation for a terminal Result or a missing pane. On `completed`, `failed`, `cancelled`, `pane_closed`, or launch failure, it advances the task state and sends the parent a summary-only `pi-herdr-subagent-completion` message that triggers a Router turn. The message contains only `subagentId`, `generation`, `status`, `label`, and an optional short reason; `subagent_join` remains the only operation that returns the full Result. Notification markers are persisted by generation and recovered parent-session messages are also honored, so restart recovery backfills missed notifications without replaying consumed ones.
+Within the parent session, model-facing guidance is notification-first: after `subagent_spawn`, end the Router turn and wait for the terminal completion notification instead of polling `subagent_inspect` or routinely waiting with `subagent_join`. Use `subagent_inspect` only for an explicit non-blocking snapshot. Use `subagent_join` after a terminal notification, or when an immediate full Result is explicitly necessary; cancelling its caller wait, including ESC, affects only that wait, while `subagent_cancel` remains the explicit task-cancellation operation.
 
 It does not own Harness Handoff/Result semantics, Router scheduling, retries, queues, worktrees, or conflict detection.
 

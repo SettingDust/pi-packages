@@ -132,6 +132,9 @@ describe("pi-herdr-subagents runtime", () => {
     expect(parameters.properties.agent?.enum).toEqual(["handler", "reviewer"]);
     expect(parameters.properties).toHaveProperty("taskSlug");
     expect(tools[0]!.description).toContain("taskSlug is required");
+    expect(tools[0]!.description).toContain("After spawning, end the Router turn");
+    expect(tools.find(tool => tool.name === "subagent_inspect")!.description).toContain("do not poll this tool while waiting");
+    expect(tools.find(tool => tool.name === "subagent_join")!.description).toContain("Caller cancellation, including ESC, stops only this wait");
 
     const spawned = await (tools[0]!.execute as any)("call-1", {
       agent: "handler",
