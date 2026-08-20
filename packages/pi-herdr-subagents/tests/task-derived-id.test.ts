@@ -96,7 +96,7 @@ describe("task-derived subagent IDs", () => {
     const canonical = await spawn(original.runtime, original.root);
     expect(canonical).toMatchObject({ subagentId: "fix-steer-submit", taskSlug: "fix-steer-submit" });
     const manifest = JSON.parse(await Bun.file(join(original.root, "tasks", "fix-steer-submit-artifacts", "task.json")).text());
-    expect(manifest).toMatchObject({ version: 1, subagentId: "fix-steer-submit", taskSlug: "fix-steer-submit", sessionFile: canonical.sessionFile });
+    expect(manifest).toMatchObject({ version: 2, subagentId: "fix-steer-submit", taskSlug: "fix-steer-submit", sessionFile: canonical.sessionFile });
     writeFileSync(canonical.resultPath, JSON.stringify({ subagentId: canonical.subagentId, generation: 1, status: "completed", result: "done" }));
     const rebuilt = runtime(original.root);
     await rebuilt.runtime.recover("/repo", join(original.root, "parent.jsonl"));

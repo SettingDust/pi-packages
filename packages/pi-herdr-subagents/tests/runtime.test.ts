@@ -60,7 +60,10 @@ describe("pi-herdr-subagents runtime", () => {
     const task = await runtime.spawn({ agent: "handler", cwd: "/repo", prompt: "Do\nthe work", label: "task", taskSlug: "task", model: "test/model", thinking: "high" });
     expect(task).toMatchObject({ subagentId: "task", generation: 1, sessionFile: join(root, "tasks", "task-g1.jsonl"), status: "running" });
     const manifest = JSON.parse(readFileSync(join(dirname(task.resultPath), "task.json"), "utf8"));
-    expect(manifest).toMatchObject({ version: 1, subagentId: task.subagentId, generation: 1, status: "running", paneId: "pane-1" });
+    expect(manifest).toMatchObject({
+      version: 2, subagentId: task.subagentId, generation: 1, status: "running", paneId: "pane-1",
+      queuedAt: expect.any(String), startedAt: expect.any(String), updatedAt: expect.any(String),
+    });
     expect(calls[0]).toMatchObject({ op: "create", input: { cwd: "/repo", env: { PI_HERDR_SUBAGENT_ID: "task", PI_HERDR_SUBAGENT_GENERATION: "1" } } });
     const launch = calls[1] as { op: string; command: string; args: string[] };
     expect(launch).toMatchObject({ op: "run", command: "powershell.exe" });
@@ -241,7 +244,7 @@ describe("pi-herdr-subagents runtime", () => {
     await rebuilt.recover("/repo", parentSessionFile);
     await expect(rebuilt.join(first.subagentId)).resolves.toMatchObject({ status: "failed", error: "pane_closed" });
     const manifest = JSON.parse(readFileSync(join(dirname(first.resultPath), "task.json"), "utf8"));
-    expect(manifest).toMatchObject({ version: 1, subagentId: first.subagentId, status: "failed", error: "pane_closed" });
+    expect(manifest).toMatchObject({ version: 2, subagentId: first.subagentId, status: "failed", error: "pane_closed" });
     await rebuilt.remove(first.subagentId);
     expect(existsSync(dirname(first.resultPath))).toBeFalse();
   });
@@ -484,10 +487,10 @@ describe("runtime task observation", () => {
 
     expect(events).toEqual([]);
     const task = await runtime.spawn({ agent: "handler", cwd: "/repo", prompt: "work", label: "observe", taskSlug: "task", model: "secret-model", thinking: "secret-thinking" });
-    expect(events).toEqual(["running"]);
+    expect(events).toEqual(["queued", "running"]);
     const snapshot = runtime.listTasks();
     expect(snapshot).toHaveLength(1);
-    expect(Object.keys(snapshot[0]!)).toEqual(["subagentId", "generation", "agent", "label", "status", "createdAt"]);
+    expect(Object.keys(snapshot[0]!)).toEqual(["subagentId", "generation", "agent", "label", "status", "queuedAt", "startedAt", "updatedAt"]);
     expect(snapshot[0]).not.toHaveProperty("result");
     expect(snapshot[0]).not.toHaveProperty("error");
     expect(snapshot[0]).not.toHaveProperty("model");
@@ -498,11 +501,11 @@ describe("runtime task observation", () => {
 
     writeFileSync(task.resultPath, JSON.stringify({ subagentId: task.subagentId, generation: 1, status: "completed", result: "private" }));
     await expect(runtime.join(task.subagentId)).resolves.toMatchObject({ status: "completed", result: "private" });
-    expect(events).toEqual(["running", "completed"]);
+    expect(events).toEqual(["queued", "running", "completed"]);
     expect(notifications).toEqual([{ subagentId: task.subagentId, generation: 1, status: "completed", label: "observe" }]);
 
     await runtime.remove(task.subagentId);
-    expect(events).toEqual(["running", "completed", "empty"]);
+    expect(events).toEqual(["queued", "running", "completed", "empty"]);
     unsubscribe();
     unsubscribe();
     unsubscribeThrowing();
@@ -570,8 +573,10 @@ type WidgetObservation = {
   generation: number;
   agent: string;
   label: string;
-  status: "running" | "completed" | "failed" | "cancelled";
-  createdAt: string;
+  status: "queued" | "running" | "completed" | "failed" | "cancelled";
+  queuedAt?: string;
+  startedAt?: string;
+  updatedAt: string;
 };
 
 function widgetRuntime(initialTasks: WidgetObservation[]) {
@@ -611,7 +616,12 @@ function widgetRuntime(initialTasks: WidgetObservation[]) {
   };
 }
 
-function widgetExtensionHarness(runtime: any, setWidget: (...args: any[]) => void) {
+function widgetExtensionHarness(
+  runtime: any,
+  setWidget: (...args: any[]) => void,
+  settings = { widgetPlacement: "aboveEditor", widgetMode: "progress", useNerdFont: false },
+  settingsStoreFactory?: (warn: (message: string) => void) => any,
+) {
   const handlers: Record<string, (event: unknown, ctx: any) => unknown> = {};
   const messages: Array<{ message: any; options: any }> = [];
   const previousChildResultPath = process.env.PI_HERDR_SUBAGENT_RESULT_PATH;
@@ -623,7 +633,13 @@ function widgetExtensionHarness(runtime: any, setWidget: (...args: any[]) => voi
       registerTool() {},
       getActiveTools() { return []; },
       setActiveTools() {},
-    } as any, { runtime, registry: { async discover() {} } as any });
+    } as any, {
+      runtime,
+      registry: { async discover() {} } as any,
+      settingsStore: settingsStoreFactory ? undefined : { load: () => settings } as any,
+      settingsStoreFactory,
+      clock: () => Date.parse("2026-01-03T00:00:00.000Z"),
+    });
   } finally {
     if (previousChildResultPath === undefined) delete process.env.PI_HERDR_SUBAGENT_RESULT_PATH;
     else process.env.PI_HERDR_SUBAGENT_RESULT_PATH = previousChildResultPath;
@@ -636,17 +652,18 @@ function widgetExtensionHarness(runtime: any, setWidget: (...args: any[]) => voi
   return { handlers, messages, ctx };
 }
 
-const runningTask = (subagentId: string, createdAt: string, label = subagentId): WidgetObservation => ({
-  subagentId, generation: 1, agent: "handler", label, status: "running", createdAt,
+const runningTask = (subagentId: string, startedAt: string, label = subagentId): WidgetObservation => ({
+  subagentId, generation: 1, agent: "handler", label, status: "running", queuedAt: startedAt, startedAt, updatedAt: startedAt,
 });
 
 describe("parent running-task widget", () => {
-  test("renders only running tasks above the editor in deterministic order without polling or Result APIs", async () => {
-    const timerCalls = { interval: 0, timeout: 0 };
+  test("renders a progress Component above the editor without polling or Result APIs", async () => {
+    let intervals = 0;
     const originalSetInterval = globalThis.setInterval;
-    const originalSetTimeout = globalThis.setTimeout;
-    globalThis.setInterval = ((..._args: any[]) => { timerCalls.interval++; return 0 as any; }) as typeof setInterval;
-    globalThis.setTimeout = ((..._args: any[]) => { timerCalls.timeout++; return 0 as any; }) as typeof setTimeout;
+    globalThis.setInterval = ((..._args: any[]) => {
+      intervals++;
+      return { unref() {} } as any;
+    }) as typeof setInterval;
     try {
       const completed = { ...runningTask("task-9", "2026-01-01T00:00:00.000Z"), status: "completed" as const };
       const state = widgetRuntime([
@@ -659,30 +676,30 @@ describe("parent running-task widget", () => {
       const harness = widgetExtensionHarness(state.runtime, (...args) => { widgetCalls.push(args); });
 
       await harness.handlers.session_start!({}, harness.ctx);
-      expect(widgetCalls.at(-1)).toEqual([
-        "pi-herdr-subagent-running",
-        [
-          "task-3 · three · handler · generation 1 · running",
-          "task-10 · ten · handler · generation 1 · running",
-          "task-2 · two · handler · generation 1 · running",
-        ],
-        { placement: "aboveEditor" },
+      const [key, factory, options] = widgetCalls.at(-1)!;
+      expect(key).toBe("pi-herdr-subagent-progress");
+      expect(typeof factory).toBe("function");
+      expect(options).toEqual({ placement: "aboveEditor" });
+      const component = factory({ requestRender() {} }, { fg(_color: string, text: string) { return text; } });
+      expect(component.render(120)).toEqual([
+        "> three · handler  48:00:00  running",
+        "> ten · handler  24:00:00  running",
+        "> two · handler  24:00:00  running",
       ]);
+      expect(intervals).toBe(1);
+      component.dispose();
 
       state.setTasks([completed]);
       state.emit();
-      expect(widgetCalls.at(-1)).toEqual(["pi-herdr-subagent-running", undefined]);
+      expect(widgetCalls.at(-1)).toEqual(["pi-herdr-subagent-progress", undefined]);
       await harness.handlers.session_start!({}, harness.ctx);
       await harness.handlers.before_agent_start!({}, harness.ctx);
 
-      expect(state.calls.subscribe).toBe(1);
+      expect(state.calls.subscribe - state.calls.unsubscribe).toBe(1);
       expect(state.calls.inspect).toBe(0);
       expect(state.calls.join).toBe(0);
-      expect(timerCalls.interval).toBe(0);
-      expect(timerCalls.timeout).toBe(0);
     } finally {
       globalThis.setInterval = originalSetInterval;
-      globalThis.setTimeout = originalSetTimeout;
     }
   });
 
@@ -731,6 +748,77 @@ describe("parent running-task widget", () => {
     state.setTasks([running]);
     expect(() => state.emit()).not.toThrow();
     expect(attempts).toBe(3);
+  });
+
+  test("honors summary placement, Nerd Font capability, and off", async () => {
+    const originalSetInterval = globalThis.setInterval;
+    let intervals = 0;
+    globalThis.setInterval = ((..._args: any[]) => { intervals++; return { unref() {} } as any; }) as typeof setInterval;
+    try {
+      const running = runningTask("run", "2026-01-01T00:00:00.000Z");
+      const state = widgetRuntime([
+        running,
+        { ...running, subagentId: "queue", label: "queue", status: "queued", startedAt: undefined },
+        { ...running, subagentId: "done", label: "done", status: "completed" },
+        { ...running, subagentId: "failed", label: "failed", status: "failed" },
+        { ...running, subagentId: "cancelled", label: "cancelled", status: "cancelled" },
+      ]);
+      const calls: any[][] = [];
+      const summary = widgetExtensionHarness(state.runtime, (...args) => calls.push(args), {
+        widgetPlacement: "belowEditor",
+        widgetMode: "summary",
+        useNerdFont: true,
+      });
+      await summary.handlers.session_start!({}, summary.ctx);
+      const [key, factory, options] = calls.at(-1)!;
+      expect(key).toBe("pi-herdr-subagent-progress");
+      expect(options).toEqual({ placement: "belowEditor" });
+      expect(factory({ requestRender() {} }, { fg(_color: string, text: string) { return text; } }).render(120)).toEqual([
+        " 1 running   1 queued   1 completed   2 failed",
+      ]);
+      expect(intervals).toBe(0);
+      summary.handlers.session_shutdown!({}, summary.ctx);
+
+      const offCalls: any[][] = [];
+      const off = widgetExtensionHarness(widgetRuntime([running]).runtime, (...args) => offCalls.push(args), {
+        widgetPlacement: "off",
+        widgetMode: "progress",
+        useNerdFont: false,
+      });
+      await off.handlers.session_start!({}, off.ctx);
+      expect(offCalls.at(-1)).toEqual(["pi-herdr-subagent-progress", undefined]);
+      expect(intervals).toBe(0);
+      off.handlers.session_shutdown!({}, off.ctx);
+    } finally {
+      globalThis.setInterval = originalSetInterval;
+    }
+  });
+  test("routes default settings warnings to the current Context and releases it after recovery failure", async () => {
+    const state = widgetRuntime([]);
+    let warning!: (message: string) => void;
+    const settings = { widgetPlacement: "aboveEditor", widgetMode: "progress", useNerdFont: false } as const;
+    const harness = widgetExtensionHarness(state.runtime, () => {}, settings, warn => {
+      warning = warn;
+      return { load() { warning("Invalid subagent settings."); return settings; } };
+    });
+    const firstWarnings: string[] = [];
+    const secondWarnings: string[] = [];
+    const failedWarnings: string[] = [];
+    const context = (warnings: string[]) => ({
+      ...harness.ctx,
+      ui: { ...harness.ctx.ui, notify(message: string) { warnings.push(message); } },
+    });
+
+    await harness.handlers.session_start!({}, context(firstWarnings));
+    await harness.handlers.session_start!({}, context(secondWarnings));
+    expect(firstWarnings).toEqual(["Invalid subagent settings."]);
+    expect(secondWarnings).toEqual(["Invalid subagent settings."]);
+
+    state.runtime.recover = async () => { throw new Error("recovery failed"); };
+    await expect(harness.handlers.session_start!({}, context(failedWarnings))).rejects.toThrow("recovery failed");
+    expect(failedWarnings).toEqual(["Invalid subagent settings."]);
+    warning("after recovery");
+    expect(failedWarnings).toEqual(["Invalid subagent settings."]);
   });
 
   test("shutdown clears, unsubscribes, releases the Context, and stops after a clear failure", async () => {

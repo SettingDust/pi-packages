@@ -9,17 +9,18 @@ import { setTimeout as delay } from "node:timers/promises";
 import { promisify } from "node:util";
 import { StringEnum, Type } from "@earendil-works/pi-ai";
 import { defineTool, getAgentDir, type ExtensionAPI, type ExtensionContext, type Theme } from "@earendil-works/pi-coding-agent";
-import { Text } from "@earendil-works/pi-tui";
+import { Text, stripTerminalSequences, truncateToWidth, type Component, type TUI } from "@earendil-works/pi-tui";
 import { commandFailure, createHerdrClient, hasHerdrErrorCode, type HerdrClient } from "pi-herdr";
 
 const exec = promisify(execFile);
 export const paneChildExtensionPath = resolve(dirname(fileURLToPath(import.meta.url)), "../extensions/pane-child.ts");
 export type AgentDefinition = { name: string; path: string; body: string; description: string };
-export type TaskStatus = "running" | "completed" | "failed" | "cancelled";
+export type TaskStatus = "queued" | "running" | "completed" | "failed" | "cancelled";
+export type ActiveTaskStatus = Extract<TaskStatus, "queued" | "running">;
 export type SubagentTask = {
   subagentId: string; taskSlug?: string; generation: number; agent: string; cwd: string; label: string; model?: string; thinking?: string;
   sessionFile: string; resultPath: string; tabId: string; paneId: string; status: TaskStatus;
-  createdAt: string; updatedAt: string; result?: string; error?: string;
+  createdAt: string; queuedAt: string; startedAt?: string; updatedAt: string; result?: string; error?: string;
 };
 
 export type TaskIdAllocationErrorCode = "invalid_task_slug" | "task_id_exhausted" | "filesystem_reservation_failed";
@@ -44,17 +45,25 @@ export type SubagentTaskObservation = Readonly<{
   agent: string;
   label: string;
   status: TaskStatus;
-  createdAt: string;
+  queuedAt: string;
+  startedAt?: string;
+  updatedAt: string;
 }>;
 export type CompletionNotification = {
-  subagentId: string; generation: number; status: Exclude<TaskStatus, "running">; label: string; reason?: string;
+  subagentId: string; generation: number; status: Exclude<TaskStatus, ActiveTaskStatus>; label: string; reason?: string;
 };
 export type CompletionNotifier = (notification: CompletionNotification) => void | Promise<void>;
 export type TaskRecordV1 = {
   version: 1; subagentId: string; taskSlug?: string; generation: number; agent: string; cwd: string; label: string; model?: string; thinking?: string;
-  sessionFile: string; tabId?: string; paneId?: string; status: "starting" | TaskStatus;
+  sessionFile: string; tabId?: string; paneId?: string; status: "starting" | Exclude<TaskStatus, "queued">;
   createdAt: string; updatedAt: string; error?: string; notifiedGeneration?: number;
 };
+export type TaskRecordV2 = {
+  version: 2; subagentId: string; taskSlug?: string; generation: number; agent: string; cwd: string; label: string; model?: string; thinking?: string;
+  sessionFile: string; tabId?: string; paneId?: string; status: TaskStatus;
+  queuedAt: string; startedAt?: string; updatedAt: string; error?: string; notifiedGeneration?: number;
+};
+type TaskRecord = TaskRecordV1 | TaskRecordV2;
 export type HerdrTransport = {
   createTab(input: { cwd: string; label: string; env?: Record<string, string> }): Promise<{ tabId: string; paneId: string }>;
   run(paneId: string, command: string, args: string[]): Promise<void>;
@@ -196,8 +205,90 @@ export class AgentRegistry {
 async function writeAtomic(path: string, value: unknown): Promise<void> {
   mkdirSync(dirname(path), { recursive: true, mode: 0o700 });
   const temporary = `${path}.${process.pid}-${randomUUID()}.tmp`;
-  await writeFile(temporary, JSON.stringify(value));
-  renameSync(temporary, path);
+  try {
+    await writeFile(temporary, JSON.stringify(value));
+    renameSync(temporary, path);
+  } finally {
+    try { rmSync(temporary, { force: true }); }
+    catch { /* Temporary-file cleanup is best effort. */ }
+  }
+}
+
+export type WidgetPlacement = "aboveEditor" | "belowEditor" | "off";
+export type WidgetMode = "progress" | "summary";
+export interface SubagentUiSettings {
+  widgetPlacement: WidgetPlacement;
+  widgetMode: WidgetMode;
+  useNerdFont: boolean;
+}
+
+export const defaultSubagentUiSettings: Readonly<SubagentUiSettings> = {
+  widgetPlacement: "aboveEditor",
+  widgetMode: "progress",
+  useNerdFont: true,
+};
+
+type SettingsWarning = (message: string) => void;
+
+function warnSafely(warn: SettingsWarning, message: string): void {
+  try { warn(message); }
+  catch { /* Settings warnings must not affect runtime behavior. */ }
+}
+
+function normalizeSubagentUiSettings(value: Json, warn: SettingsWarning): SubagentUiSettings {
+  const settings = { ...defaultSubagentUiSettings };
+  if (value.widgetPlacement === "aboveEditor" || value.widgetPlacement === "belowEditor" || value.widgetPlacement === "off") {
+    settings.widgetPlacement = value.widgetPlacement;
+  } else if (value.widgetPlacement !== undefined) {
+    warnSafely(warn, "Invalid subagent widgetPlacement; using aboveEditor.");
+  }
+  const validLegacyLayout = value.widgetLayout === "columns" || value.widgetLayout === "stacked";
+  if (value.widgetMode === "progress" || value.widgetMode === "summary") {
+    settings.widgetMode = value.widgetMode;
+  } else if (value.widgetMode === undefined && validLegacyLayout) {
+    settings.widgetMode = "progress";
+  } else if (value.widgetMode !== undefined) {
+    warnSafely(warn, "Invalid subagent widgetMode; using progress.");
+  }
+  if (value.widgetLayout !== undefined && !validLegacyLayout) {
+    warnSafely(warn, "Invalid legacy subagent widgetLayout; ignoring it.");
+  }
+  if (typeof value.useNerdFont === "boolean") settings.useNerdFont = value.useNerdFont;
+  else if (value.useNerdFont !== undefined) warnSafely(warn, "Invalid subagent useNerdFont; using true.");
+  return settings;
+}
+
+export class SubagentSettingsStore {
+  private parsed: Json = {};
+
+  constructor(
+    readonly path = join(getAgentDir(), "subagent", "settings.json"),
+    private readonly warn: SettingsWarning = message => console.warn(message),
+  ) {}
+
+  load(): SubagentUiSettings {
+    try {
+      const value: unknown = JSON.parse(readFileSync(this.path, "utf8"));
+      if (!value || typeof value !== "object" || Array.isArray(value)) {
+        this.parsed = {};
+        warnSafely(this.warn, "Invalid subagent settings root; using defaults.");
+        return { ...defaultSubagentUiSettings };
+      }
+      this.parsed = value as Json;
+      return normalizeSubagentUiSettings(this.parsed, this.warn);
+    } catch (error) {
+      this.parsed = {};
+      if ((error as { code?: unknown }).code !== "ENOENT") warnSafely(this.warn, "Unable to load subagent settings; using defaults.");
+      return { ...defaultSubagentUiSettings };
+    }
+  }
+
+  async save(settings: SubagentUiSettings): Promise<void> {
+    const normalized = normalizeSubagentUiSettings(settings as unknown as Json, this.warn);
+    const merged: Json = { ...this.parsed, ...normalized };
+    await writeAtomic(this.path, merged);
+    this.parsed = merged;
+  }
 }
 
 export class SubagentRuntime {
@@ -223,7 +314,9 @@ export class SubagentRuntime {
       agent: task.agent,
       label: task.label,
       status: task.status,
-      createdAt: task.createdAt,
+      queuedAt: task.queuedAt,
+      ...(task.startedAt ? { startedAt: task.startedAt } : {}),
+      updatedAt: task.updatedAt,
     }));
   }
 
@@ -274,34 +367,60 @@ export class SubagentRuntime {
         task.status = result.status;
         task.result = result.result;
         task.error = result.error;
+        task.updatedAt = new Date().toISOString();
       } else if (result && !result.valid) {
         task.status = "failed";
         task.error = result.error;
-      } else if (record.status !== "running" && record.status !== "starting") {
-        task.status = record.status;
-      } else if (task.paneId) {
-        try {
-          if (await this.transport.paneExists(task.paneId)) task.status = "running";
-          else { task.status = "failed"; task.error = "pane_closed"; }
-        } catch (error) {
+        task.updatedAt = new Date().toISOString();
+      } else if (record.version === 1 && record.status === "starting") {
+        if (task.paneId) {
+          try {
+            if (await this.transport.paneExists(task.paneId)) {
+              task.status = "running";
+              task.startedAt = record.createdAt;
+            } else {
+              task.status = "failed";
+              task.error = "pane_closed";
+            }
+          } catch (error) {
+            task.status = "failed";
+            task.error = `pane_verification_failed: ${error instanceof Error ? error.message : String(error)}`;
+          }
+        } else {
           task.status = "failed";
-          task.error = `pane_verification_failed: ${error instanceof Error ? error.message : String(error)}`;
+          task.error = "pane_closed";
         }
-      } else {
-        task.status = "failed";
-        task.error = "pane_closed";
+        task.updatedAt = new Date().toISOString();
+      } else if (task.status === "running") {
+        if (task.paneId) {
+          try {
+            if (!await this.transport.paneExists(task.paneId)) {
+              task.status = "failed";
+              task.error = "pane_closed";
+              task.updatedAt = new Date().toISOString();
+            }
+          } catch (error) {
+            task.status = "failed";
+            task.error = `pane_verification_failed: ${error instanceof Error ? error.message : String(error)}`;
+            task.updatedAt = new Date().toISOString();
+          }
+        } else {
+          task.status = "failed";
+          task.error = "pane_closed";
+          task.updatedAt = new Date().toISOString();
+        }
       }
       this.tasks.set(task.subagentId, task);
       await this.persist(task);
       if (task.status === "running") this.startMonitor(task);
-      else await this.notifyTerminal(task);
+      else if (isTerminalStatus(task.status)) await this.notifyTerminal(task);
     }
     this.notifyTaskUpdate();
   }
 
   async resume(subagentId: string, prompt: string): Promise<SubagentTask> {
     const old = this.get(subagentId);
-    if (old.status === "running") throw new Error("Cannot resume a running subagent");
+    if (isActiveStatus(old.status)) throw new Error("Cannot resume an active subagent");
     return this.start({
       subagentId: old.subagentId,
       taskSlug: old.taskSlug,
@@ -314,7 +433,6 @@ export class SubagentRuntime {
       thinking: old.thinking,
       sessionFile: old.sessionFile,
       artifactDir: dirname(old.resultPath),
-      createdAt: old.createdAt,
     });
   }
 
@@ -365,7 +483,6 @@ export class SubagentRuntime {
     parentSessionFile?: string;
     sessionFile?: string;
     artifactDir?: string;
-    createdAt?: string;
   }): Promise<SubagentTask> {
     const agent = this.resolveAgent(input.agent);
     const tasksDir = input.artifactDir ? dirname(input.artifactDir) : this.tasksDir(input.cwd, input.parentSessionFile);
@@ -374,19 +491,13 @@ export class SubagentRuntime {
     mkdirSync(artifactDir, { recursive: true, mode: 0o700 });
     const sessionFile = input.sessionFile ?? join(tasksDir, `${input.subagentId}-g1.jsonl`);
     const resultPath = join(artifactDir, `result-${input.generation}.json`);
-    const now = new Date().toISOString();
-    const createdAt = input.createdAt ?? now;
-    const starting: TaskRecordV1 = {
-      version: 1, subagentId: input.subagentId, ...(input.taskSlug ? { taskSlug: input.taskSlug } : {}), generation: input.generation, agent: input.agent, cwd: input.cwd, label: input.label,
-      ...(input.model ? { model: input.model } : {}), ...(input.thinking ? { thinking: input.thinking } : {}), sessionFile,
-      status: "starting", createdAt, updatedAt: now,
-    };
-    await writeAtomic(join(artifactDir, "task.json"), starting);
-
+    const queuedAt = new Date().toISOString();
     const task: SubagentTask = {
       subagentId: input.subagentId, taskSlug: input.taskSlug, generation: input.generation, agent: input.agent, cwd: input.cwd, label: input.label,
-      model: input.model, thinking: input.thinking, sessionFile, resultPath, tabId: "", paneId: "", status: "running", createdAt, updatedAt: now,
+      model: input.model, thinking: input.thinking, sessionFile, resultPath, tabId: "", paneId: "", status: "queued",
+      createdAt: queuedAt, queuedAt, updatedAt: queuedAt,
     };
+    await this.persist(task);
     this.tasks.set(task.subagentId, task);
     this.notifyTaskUpdate();
     try {
@@ -405,7 +516,19 @@ export class SubagentRuntime {
       await this.settle(task, "failed", undefined, String(error));
       throw error;
     }
+    if (this.tasks.get(task.subagentId) !== task) {
+      try { await this.transport.closePane(task.paneId); } catch { /* Removal already owns the visible state. */ }
+      throw new Error("Subagent was removed during launch");
+    }
+    if (task.status !== "queued") {
+      try { await this.transport.closePane(task.paneId); } catch { /* Cancellation remains terminal even if pane cleanup fails. */ }
+      return { ...task };
+    }
+    task.status = "running";
+    task.startedAt = new Date().toISOString();
+    task.updatedAt = task.startedAt;
     await this.persist(task);
+    this.notifyTaskUpdate();
     const args = ["--session", sessionFile, "-e", paneChildExtensionPath, "--system-prompt", agent.body, "--tools", "read,bash,edit,write,subagent_done"];
     if (input.model) args.push("--model", input.thinking ? `${input.model}:${input.thinking}` : input.model);
     args.push(`${input.prompt}\n\nReturn the Handler Result as YAML, then call subagent_done with that exact YAML string.`);
@@ -449,7 +572,7 @@ export class SubagentRuntime {
   async join(id: string, generation = this.get(id).generation, signal?: AbortSignal): Promise<SubagentTask> {
     const task = this.get(id);
     if (task.generation !== generation) throw new Error("Subagent generation is no longer current");
-    while (task.status === "running") {
+    while (isActiveStatus(task.status)) {
       if (existsSync(task.resultPath)) await this.settleFromResult(task);
       else await delay(50, undefined, { signal });
     }
@@ -465,10 +588,12 @@ export class SubagentRuntime {
 
   async cancel(id: string): Promise<SubagentTask> {
     const task = this.get(id);
-    if (task.status === "running") {
+    if (isActiveStatus(task.status)) {
       this.stopMonitor(task);
-      try { await this.transport.closePane(task.paneId); }
-      catch (error) { this.startMonitor(task); throw error; }
+      if (task.paneId) {
+        try { await this.transport.closePane(task.paneId); }
+        catch (error) { this.startMonitor(task); throw error; }
+      }
       await writeAtomic(task.resultPath, { subagentId: id, generation: task.generation, status: "cancelled" });
       await this.settle(task, "cancelled");
     }
@@ -478,7 +603,7 @@ export class SubagentRuntime {
   async remove(id: string): Promise<void> {
     const task = this.get(id);
     this.stopMonitor(task);
-    if (task.status === "running") await this.transport.closePane(task.paneId);
+    if (isActiveStatus(task.status) && task.paneId) await this.transport.closePane(task.paneId);
     this.tasks.delete(id);
     this.notifyTaskUpdate();
     rmSync(task.sessionFile, { force: true });
@@ -536,19 +661,20 @@ export class SubagentRuntime {
     else await this.settle(task, "failed", undefined, result.error);
   }
 
-  private async settle(task: SubagentTask, status: Exclude<TaskStatus, "running">, result?: string, error?: string): Promise<void> {
-    if (task.status !== "running") return;
+  private async settle(task: SubagentTask, status: Exclude<TaskStatus, ActiveTaskStatus>, result?: string, error?: string): Promise<void> {
+    if (!isActiveStatus(task.status)) return;
     this.stopMonitor(task);
     task.status = status;
     task.result = result;
     task.error = error;
-    this.notifyTaskUpdate();
+    task.updatedAt = new Date().toISOString();
     await this.persist(task);
+    this.notifyTaskUpdate();
     await this.notifyTerminal(task);
   }
 
   private async notifyTerminal(task: SubagentTask): Promise<void> {
-    if (task.status === "running" || !this.completionNotifier || this.notified.has(this.taskKey(task))) return;
+    if (isActiveStatus(task.status) || !this.completionNotifier || this.notified.has(this.taskKey(task))) return;
     const notification: CompletionNotification = {
       subagentId: task.subagentId,
       generation: task.generation,
@@ -566,50 +692,65 @@ export class SubagentRuntime {
   private recordPath(task: SubagentTask): string { return join(dirname(task.resultPath), "task.json"); }
 
   private async persist(task: SubagentTask): Promise<void> {
-    task.updatedAt = new Date().toISOString();
-    const record: TaskRecordV1 = {
-      version: 1, subagentId: task.subagentId, ...(task.taskSlug ? { taskSlug: task.taskSlug } : {}), generation: task.generation, agent: task.agent, cwd: task.cwd, label: task.label,
+    const record: TaskRecordV2 = {
+      version: 2, subagentId: task.subagentId, ...(task.taskSlug ? { taskSlug: task.taskSlug } : {}), generation: task.generation, agent: task.agent, cwd: task.cwd, label: task.label,
       ...(task.model ? { model: task.model } : {}), ...(task.thinking ? { thinking: task.thinking } : {}), sessionFile: task.sessionFile,
-      tabId: task.tabId || undefined, paneId: task.paneId || undefined, status: task.status, createdAt: task.createdAt, updatedAt: task.updatedAt,
+      tabId: task.tabId || undefined, paneId: task.paneId || undefined, status: task.status, queuedAt: task.queuedAt,
+      ...(task.startedAt ? { startedAt: task.startedAt } : {}), updatedAt: task.updatedAt,
       ...(task.error ? { error: task.error } : {}),
       ...(this.notified.has(this.taskKey(task)) ? { notifiedGeneration: task.generation } : {}),
     };
     await writeAtomic(this.recordPath(task), record);
   }
 
-  private taskFromRecord(record: TaskRecordV1, artifactDir: string): SubagentTask {
+  private taskFromRecord(record: TaskRecord, artifactDir: string): SubagentTask {
+    const queuedAt = record.version === 1 ? record.createdAt : record.queuedAt;
+    const startedAt = record.version === 1
+      ? record.status === "running" ? record.createdAt : undefined
+      : record.startedAt;
+    const status: TaskStatus = record.version === 1
+      ? record.status === "starting" ? "queued" : record.status
+      : record.status;
     return {
       subagentId: record.subagentId, taskSlug: record.taskSlug, generation: record.generation, agent: record.agent, cwd: record.cwd, label: record.label,
       model: record.model, thinking: record.thinking, sessionFile: record.sessionFile,
       resultPath: join(artifactDir, `result-${record.generation}.json`), tabId: record.tabId ?? "", paneId: record.paneId ?? "",
-      status: record.status === "starting" ? "running" : record.status, createdAt: record.createdAt, updatedAt: record.updatedAt, error: record.error,
+      status, createdAt: queuedAt, queuedAt, ...(startedAt ? { startedAt } : {}), updatedAt: record.updatedAt, error: record.error,
     };
   }
 
-  private readTaskRecord(path: string, tasksDir: string, artifactDir: string, subagentId: string): TaskRecordV1 | undefined {
+  private readTaskRecord(path: string, tasksDir: string, artifactDir: string, subagentId: string): TaskRecord | undefined {
     try {
-      const value = JSON.parse(readFileSync(path, "utf8")) as Partial<TaskRecordV1>;
+      const value = JSON.parse(readFileSync(path, "utf8")) as Json;
       const legacy = isLegacySubagentId(subagentId);
       const canonical = typeof value.taskSlug === "string" && isCanonicalFinalId(subagentId, value.taskSlug);
-      if (value.version !== 1 || value.subagentId !== subagentId || (!legacy && !canonical) || !Number.isInteger(value.generation) || value.generation! < 1) return;
+      if ((value.version !== 1 && value.version !== 2) || value.subagentId !== subagentId || (!legacy && !canonical)
+        || typeof value.generation !== "number" || !Number.isInteger(value.generation) || value.generation < 1) return;
       if (legacy ? value.taskSlug !== undefined : !canonical) return;
       if (typeof value.agent !== "string" || typeof value.cwd !== "string" || typeof value.label !== "string" || typeof value.sessionFile !== "string") return;
       if (value.model !== undefined && typeof value.model !== "string") return;
       if (value.thinking !== undefined && typeof value.thinking !== "string") return;
       const expectedSession = join(tasksDir, `${subagentId}-g1.jsonl`);
       if (resolve(value.sessionFile) !== resolve(expectedSession)) return;
-      if (typeof value.createdAt !== "string" || typeof value.updatedAt !== "string" || !isTaskRecordStatus(value.status)) return;
+      if (value.version === 1) {
+        if (typeof value.createdAt !== "string" || typeof value.updatedAt !== "string" || !isTaskRecordV1Status(value.status)) return;
+        if (!isIsoTimestamp(value.createdAt) || !isIsoTimestamp(value.updatedAt)) return;
+      } else {
+        if (!isIsoTimestamp(value.queuedAt) || !isIsoTimestamp(value.updatedAt) || !isTaskStatus(value.status)) return;
+        if (value.startedAt !== undefined && !isIsoTimestamp(value.startedAt)) return;
+        if (value.status === "running" && value.startedAt === undefined) return;
+      }
       if (value.tabId !== undefined && typeof value.tabId !== "string") return;
       if (value.paneId !== undefined && typeof value.paneId !== "string") return;
       if (value.error !== undefined && typeof value.error !== "string") return;
       if (value.notifiedGeneration !== undefined && value.notifiedGeneration !== value.generation) return;
       if (resolve(artifactDir) !== resolve(join(tasksDir, `${subagentId}-artifacts`))) return;
-      return value as TaskRecordV1;
+      return value as TaskRecord;
     } catch { return; }
   }
 
   private readResult(task: SubagentTask):
-    | { valid: true; status: Exclude<TaskStatus, "running">; result?: string; error?: string }
+    | { valid: true; status: Exclude<TaskStatus, ActiveTaskStatus>; result?: string; error?: string }
     | { valid: false; error: string } {
     try {
       const value = JSON.parse(readFileSync(task.resultPath, "utf8")) as Json;
@@ -661,13 +802,22 @@ function briefReason(reason: string): string {
 }
 
 function isTaskStatus(value: unknown): value is TaskStatus {
-  return value === "running" || value === "completed" || value === "failed" || value === "cancelled";
+  return value === "queued" || value === "running" || value === "completed" || value === "failed" || value === "cancelled";
 }
-function isTaskRecordStatus(value: unknown): value is TaskRecordV1["status"] {
-  return value === "starting" || isTaskStatus(value);
+function isTaskRecordV1Status(value: unknown): value is TaskRecordV1["status"] {
+  return value === "starting" || value === "running" || isTerminalStatus(value);
 }
-function isTerminalStatus(value: unknown): value is Exclude<TaskStatus, "running"> {
+function isActiveStatus(value: TaskStatus): value is ActiveTaskStatus {
+  return value === "queued" || value === "running";
+}
+function isTerminalStatus(value: unknown): value is Exclude<TaskStatus, ActiveTaskStatus> {
   return value === "completed" || value === "failed" || value === "cancelled";
+}
+function isIsoTimestamp(value: unknown): value is string {
+  return typeof value === "string"
+    && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/.test(value)
+    && Number.isFinite(Date.parse(value))
+    && new Date(value).toISOString() === value;
 }
 
 
@@ -750,6 +900,110 @@ export function createSubagentTools(runtime: SubagentRuntime, cwd: string, paren
   ];
 }
 
+export type WidgetClock = () => number;
+
+type StatusWidgetOptions = {
+  mode: WidgetMode;
+  useNerdFont: boolean;
+  clock: WidgetClock;
+  tui: Pick<TUI, "requestRender">;
+  theme?: ThemeLike;
+};
+
+function cleanIdentity(value: string): string {
+  const clean = stripTerminalSequences(value).replace(/[\u0000-\u001f\u007f-\u009f]/g, " ").replace(/\s+/g, " ").trim();
+  return truncateToWidth(clean, 160, "");
+}
+
+function elapsedTime(now: number, timestamp: string | undefined): string {
+  const started = timestamp === undefined ? Number.NaN : Date.parse(timestamp);
+  const totalSeconds = Number.isFinite(started) && now >= started ? Math.floor((now - started) / 1000) : 0;
+  const seconds = totalSeconds % 60;
+  const minutes = Math.floor(totalSeconds / 60) % 60;
+  const hours = Math.floor(totalSeconds / 3600);
+  return hours > 0
+    ? `${hours}:${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`
+    : `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
+}
+
+function activeTimestamp(task: SubagentTaskObservation): string | undefined {
+  return task.status === "running" ? task.startedAt : task.queuedAt;
+}
+
+function sortActiveTasks(tasks: readonly SubagentTaskObservation[]): SubagentTaskObservation[] {
+  return tasks.filter(task => isActiveStatus(task.status)).sort((left, right) => {
+    if (left.status !== right.status) return left.status === "running" ? -1 : 1;
+    const leftTime = Date.parse(activeTimestamp(left) ?? "");
+    const rightTime = Date.parse(activeTimestamp(right) ?? "");
+    const normalizedLeft = Number.isFinite(leftTime) ? leftTime : Number.POSITIVE_INFINITY;
+    const normalizedRight = Number.isFinite(rightTime) ? rightTime : Number.POSITIVE_INFINITY;
+    return normalizedLeft - normalizedRight || left.subagentId.localeCompare(right.subagentId);
+  });
+}
+
+export function createSubagentStatusWidget(
+  tasks: readonly SubagentTaskObservation[],
+  options: StatusWidgetOptions,
+): Component & { dispose(): void } {
+  const snapshot = tasks.map(task => ({ ...task }));
+  const active = sortActiveTasks(snapshot);
+  let timer: ReturnType<typeof setInterval> | undefined;
+  if (options.mode === "progress" && active.length > 0) {
+    try {
+      timer = setInterval(() => {
+        try { options.tui.requestRender(); }
+        catch { /* Timer rendering must not affect runtime behavior. */ }
+      }, 1000);
+      timer.unref?.();
+    } catch { /* A timer failure leaves lifecycle behavior available. */ }
+  }
+
+  return {
+    invalidate() {},
+    render(width: number): string[] {
+      try {
+        const maxWidth = Math.max(1, Math.floor(width));
+        const ellipsis = options.useNerdFont ? "…" : "...";
+        const now = options.mode === "progress" ? options.clock() : 0;
+        if (options.mode === "summary") {
+          const counts = {
+            running: snapshot.filter(task => task.status === "running").length,
+            queued: snapshot.filter(task => task.status === "queued").length,
+            completed: snapshot.filter(task => task.status === "completed").length,
+            failed: snapshot.filter(task => task.status === "failed" || task.status === "cancelled").length,
+          };
+          const parts = [
+            counts.running ? `${options.useNerdFont ? "" : ">"} ${counts.running} running` : "",
+            counts.queued ? `${options.useNerdFont ? "" : "~"} ${counts.queued} queued` : "",
+            counts.completed ? `${options.useNerdFont ? "" : "+"} ${counts.completed} completed` : "",
+            counts.failed ? `${options.useNerdFont ? "" : "!"} ${counts.failed} failed` : "",
+          ].filter(Boolean);
+          return parts.length ? [truncateToWidth(parts.join("  "), maxWidth, ellipsis)] : [];
+        }
+        const rows = active.slice(0, 6).map(task => {
+          const icon = task.status === "running" ? options.useNerdFont ? "" : ">" : options.useNerdFont ? "" : "~";
+          const label = cleanIdentity(task.label) || cleanIdentity(task.subagentId);
+          const agent = cleanIdentity(task.agent);
+          const identity = agent && agent !== label ? `${label} · ${agent}` : label;
+          const elapsed = elapsedTime(now, activeTimestamp(task));
+          const normal = `${icon} ${identity}  ${elapsed}  ${task.status}`;
+          const narrow = `${icon} ${task.status} ${identity}`;
+          const color = task.status === "running" ? "warning" : "muted";
+          return truncateToWidth(paint(options.theme, color, maxWidth < 32 ? narrow : normal), maxWidth, ellipsis);
+        });
+        if (active.length > 6) rows.push(truncateToWidth(`+${active.length - 6} more`, maxWidth, ellipsis));
+        return rows;
+      } catch {
+        return [];
+      }
+    },
+    dispose() {
+      if (timer !== undefined) clearInterval(timer);
+      timer = undefined;
+    },
+  };
+}
+
 const completionMessageType = "pi-herdr-subagent-completion";
 
 function notificationKey(value: Pick<CompletionNotification, "subagentId" | "generation">): string {
@@ -768,27 +1022,59 @@ function completionNotificationKeys(entries: readonly { type: string; customType
   return keys;
 }
 
-export default function subagentsExtension(pi: ExtensionAPI, dependencies: { runtime?: SubagentRuntime; registry?: AgentRegistry } = {}): void {
+export default function subagentsExtension(pi: ExtensionAPI, dependencies: {
+  runtime?: SubagentRuntime;
+  registry?: AgentRegistry;
+  settingsStore?: SubagentSettingsStore;
+  settingsStoreFactory?: (warn: SettingsWarning) => SubagentSettingsStore;
+  clock?: WidgetClock;
+} = {}): void {
   if (process.env.PI_HERDR_SUBAGENT_RESULT_PATH) return;
   const registry = dependencies.registry ?? new AgentRegistry();
   const runtime = dependencies.runtime ?? new SubagentRuntime(createHerdrTransport(), registry);
+  const clock = dependencies.clock ?? Date.now;
+  const createSettingsStore = dependencies.settingsStoreFactory ?? ((warn: SettingsWarning) => new SubagentSettingsStore(undefined, warn));
+  let settingsStore = dependencies.settingsStore;
+  let settings = { ...defaultSubagentUiSettings };
   let widgetContext: ExtensionContext | undefined;
+  let warningContext: ExtensionContext | undefined;
   let unsubscribeTaskUpdates: (() => void) | undefined;
-  const widgetKey = "pi-herdr-subagent-running";
+  const widgetKey = "pi-herdr-subagent-progress";
   const refreshWidget = () => {
     if (!widgetContext) return;
-    const lines = runtime.listTasks()
-      .filter(task => task.status === "running")
-      .sort((left, right) => left.createdAt.localeCompare(right.createdAt) || left.subagentId.localeCompare(right.subagentId))
-      .map(task => `${task.subagentId} · ${task.label} · ${task.agent} · generation ${task.generation} · running`);
     try {
-      if (lines.length) widgetContext.ui.setWidget(widgetKey, lines, { placement: "aboveEditor" });
-      else widgetContext.ui.setWidget(widgetKey, undefined);
+      const tasks = runtime.listTasks();
+      const hasContent = settings.widgetMode === "progress"
+        ? tasks.some(task => isActiveStatus(task.status))
+        : tasks.length > 0;
+      if (settings.widgetPlacement === "off" || !hasContent) {
+        widgetContext.ui.setWidget(widgetKey, undefined);
+        return;
+      }
+      const placement = settings.widgetPlacement;
+      widgetContext.ui.setWidget(widgetKey, (tui, theme) => createSubagentStatusWidget(tasks, {
+        mode: settings.widgetMode,
+        useNerdFont: settings.useNerdFont,
+        clock,
+        tui,
+        theme,
+      }), { placement });
     } catch { /* Widget failures must not affect runtime behavior. */ }
   };
+  const unbindWidget = () => {
+    const context = widgetContext;
+    widgetContext = undefined;
+    warningContext = undefined;
+    try { unsubscribeTaskUpdates?.(); }
+    catch { /* Continue cleanup after an unsubscribe failure. */ }
+    unsubscribeTaskUpdates = undefined;
+    try { context?.ui.setWidget(widgetKey, undefined); }
+    catch { /* Continue cleanup after a widget failure. */ }
+  };
   const bindWidget = (ctx: ExtensionContext) => {
+    warningContext = ctx;
     widgetContext = ctx;
-    unsubscribeTaskUpdates ??= runtime.onTaskUpdate(refreshWidget);
+    unsubscribeTaskUpdates = runtime.onTaskUpdate(refreshWidget);
     refreshWidget();
   };
   runtime.setCompletionNotifier(notification => {
@@ -800,9 +1086,19 @@ export default function subagentsExtension(pi: ExtensionAPI, dependencies: { run
     }, { triggerTurn: true, deliverAs: "followUp" });
   });
   const recoverCurrent = async (ctx: ExtensionContext) => {
-    const parentSessionFile = ctx.sessionManager?.getSessionFile?.();
-    await runtime.recover(ctx.cwd, parentSessionFile, completionNotificationKeys(ctx.sessionManager.getEntries()));
-    bindWidget(ctx);
+    unbindWidget();
+    warningContext = ctx;
+    settingsStore ??= createSettingsStore(message => warningContext?.ui.notify(message, "warning"));
+    try {
+      try { settings = settingsStore.load(); }
+      catch { settings = { ...defaultSubagentUiSettings }; }
+      const parentSessionFile = ctx.sessionManager?.getSessionFile?.();
+      await runtime.recover(ctx.cwd, parentSessionFile, completionNotificationKeys(ctx.sessionManager.getEntries()));
+      bindWidget(ctx);
+    } catch (error) {
+      warningContext = undefined;
+      throw error;
+    }
   };
   pi.on("session_start", async (_event, ctx) => recoverCurrent(ctx));
   pi.on("before_agent_start", async (_event, ctx) => {
@@ -814,18 +1110,8 @@ export default function subagentsExtension(pi: ExtensionAPI, dependencies: { run
     pi.setActiveTools([...pi.getActiveTools().filter(name => !name.startsWith("subagent_")), ...tools.map(tool => tool.name)]);
   });
   pi.on("session_shutdown", () => {
-    const context = widgetContext;
-    try {
-      try { context?.ui.setWidget(widgetKey, undefined); }
-      catch { /* Continue shutdown after a widget failure. */ }
-    } finally {
-      try { unsubscribeTaskUpdates?.(); }
-      finally {
-        unsubscribeTaskUpdates = undefined;
-        widgetContext = undefined;
-        runtime.stop();
-      }
-    }
+    try { unbindWidget(); }
+    finally { runtime.stop(); }
   });
 }
 
