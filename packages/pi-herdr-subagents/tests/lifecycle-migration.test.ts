@@ -6,16 +6,25 @@ import { AgentRegistry, SubagentRuntime, type HerdrTransport, type TaskRecordV1 
 
 const createdAt = "2026-01-01T00:00:00.000Z";
 
-function writeV1(root: string, status: TaskRecordV1["status"], options: { paneId?: string; result?: unknown } = {}): string {
+function writeV1(root: string, status: TaskRecordV1["status"], options: {
+  subagentId?: string;
+  taskSlug?: string;
+  paneId?: string;
+  result?: unknown;
+  unknown?: Record<string, unknown>;
+} = {}): string {
+  const subagentId = options.subagentId ?? "legacy-task";
+  const taskSlug = options.taskSlug ?? "legacy-task";
   const tasksDir = join(root, "tasks");
-  const artifactDir = join(tasksDir, "legacy-task-artifacts");
+  const artifactDir = join(tasksDir, `${subagentId}-artifacts`);
   mkdirSync(artifactDir, { recursive: true });
-  const sessionFile = join(tasksDir, "legacy-task-g1.jsonl");
+  const sessionFile = join(tasksDir, `${subagentId}-g1.jsonl`);
   writeFileSync(sessionFile, "");
   const record: TaskRecordV1 = {
+    ...options.unknown,
     version: 1,
-    subagentId: "legacy-task",
-    taskSlug: "legacy-task",
+    subagentId,
+    taskSlug,
     generation: 1,
     agent: "handler",
     cwd: "/repo",
@@ -28,7 +37,7 @@ function writeV1(root: string, status: TaskRecordV1["status"], options: { paneId
     updatedAt: createdAt,
   };
   writeFileSync(join(artifactDir, "task.json"), JSON.stringify(record));
-  if (options.result) writeFileSync(join(artifactDir, "result-1.json"), JSON.stringify(options.result));
+  if (options.result !== undefined) writeFileSync(join(artifactDir, "result-1.json"), JSON.stringify(options.result));
   return artifactDir;
 }
 
@@ -116,6 +125,71 @@ describe("V1 lifecycle migration", () => {
     expect(runtime.listTasks()[0]).not.toHaveProperty("result");
     expect(calls).toEqual([]);
     expect(JSON.parse(readFileSync(join(artifactDir, "task.json"), "utf8"))).toMatchObject({ version: 2, status: "completed" });
+  });
+
+  test("rejects a malformed Result from a V1 running record and preserves identity through the recovery rewrite", async () => {
+    const root = mkdtempSync(join(tmpdir(), "subagent-v1-malformed-result-"));
+    const subagentId = "phase-a-2";
+    const taskSlug = "phase-a";
+    const unknown = {
+      unknownScalar: "preserve me",
+      unknownObject: { nested: ["value", 3] },
+      unknownArray: ["value", { nested: true }],
+      unknownNull: null,
+      surfaceCleanups: [{ opaque: { phase: "future" } }, null],
+    };
+    const artifactDir = writeV1(root, "running", { subagentId, taskSlug, paneId: "pane-1", unknown });
+    const sessionFile = join(root, "tasks", `${subagentId}-g1.jsonl`);
+    const resultPath = join(artifactDir, "result-1.json");
+    const calls: string[] = [];
+    const runtime = new SubagentRuntime(transport(true, calls), handlerRegistry(), root);
+
+    await runtime.recover("/repo");
+    expect(runtime.inspect(subagentId)).toMatchObject({
+      subagentId, taskSlug, generation: 1, status: "running", sessionFile, resultPath, tabId: "tab-1", paneId: "pane-1",
+    });
+    expect(JSON.parse(readFileSync(join(artifactDir, "task.json"), "utf8"))).toMatchObject({
+      version: 2, subagentId, taskSlug, generation: 1, sessionFile, status: "running", ...unknown,
+    });
+
+    const malformed = { subagentId, generation: 1, status: "completed", result: 7 };
+    writeFileSync(resultPath, JSON.stringify(malformed));
+    await expect(runtime.join(subagentId)).resolves.toMatchObject({
+      subagentId, taskSlug, generation: 1, status: "failed", error: "invalid_result", sessionFile, resultPath, tabId: "tab-1", paneId: "pane-1",
+    });
+    const rewritten = JSON.parse(readFileSync(join(artifactDir, "task.json"), "utf8"));
+    expect(rewritten).toMatchObject({
+      version: 2, subagentId, taskSlug, generation: 1, sessionFile, status: "failed", error: "invalid_result", ...unknown,
+    });
+    expect(JSON.parse(readFileSync(resultPath, "utf8"))).toEqual(malformed);
+    expect(calls).toEqual(["pane-1"]);
+    runtime.stop();
+  });
+
+  test("ignores a V1 canonical record whose ID and slug disagree without rewriting retained files", async () => {
+    const root = mkdtempSync(join(tmpdir(), "subagent-v1-mismatched-identity-"));
+    const subagentId = "phase-a-2";
+    const artifactDir = writeV1(root, "running", {
+      subagentId,
+      taskSlug: "phase-b",
+      paneId: "pane-1",
+      result: { subagentId, generation: 1, status: "completed", result: "retained" },
+    });
+    const manifestPath = join(artifactDir, "task.json");
+    const resultPath = join(artifactDir, "result-1.json");
+    const manifest = readFileSync(manifestPath, "utf8");
+    const result = readFileSync(resultPath, "utf8");
+    const calls: string[] = [];
+    const runtime = new SubagentRuntime(transport(true, calls), handlerRegistry(), root);
+
+    await runtime.recover("/repo");
+
+    expect(runtime.listTasks()).toEqual([]);
+    expect(() => runtime.inspect(subagentId)).toThrow("Unknown subagent");
+    expect(calls).toEqual([]);
+    expect(readFileSync(manifestPath, "utf8")).toBe(manifest);
+    expect(readFileSync(resultPath, "utf8")).toBe(result);
+    runtime.stop();
   });
 
   test("maps missing and failed pane verification to the existing failure reasons", async () => {

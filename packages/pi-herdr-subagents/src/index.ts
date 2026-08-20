@@ -73,6 +73,13 @@ export type HerdrTransport = {
 };
 
 type Json = Record<string, unknown>;
+const manifestOwnedFields = new Set([
+  "version", "subagentId", "taskSlug", "generation", "agent", "cwd", "label", "model", "thinking", "sessionFile",
+  "tabId", "paneId", "status", "createdAt", "queuedAt", "startedAt", "updatedAt", "error", "notifiedGeneration",
+]);
+function manifestUnknownFields(value: Json): Json {
+  return Object.fromEntries(Object.entries(value).filter(([key]) => !manifestOwnedFields.has(key)));
+}
 function unwrap(value: Json): Json { return value.result && typeof value.result === "object" && !Array.isArray(value.result) ? value.result as Json : value; }
 function powerShellInvocation(command: string, args: string[]): string {
   const quote = (value: string) => `'${value.replaceAll("'", "''")}'`;
@@ -296,6 +303,7 @@ export class SubagentRuntime {
   private activeTasksDir?: string;
   private monitors = new Map<string, AbortController>();
   private notified = new Set<string>();
+  private manifestUnknown = new Map<string, Json>();
   private taskUpdateListeners = new Set<() => void>();
   private completionNotifier?: CompletionNotifier;
 
@@ -348,6 +356,7 @@ export class SubagentRuntime {
     this.selectScope(tasksDir);
     this.stop();
     this.tasks.clear();
+    this.manifestUnknown.clear();
     for (const key of notifiedKeys) this.notified.add(key);
     if (!existsSync(tasksDir)) {
       this.notifyTaskUpdate();
@@ -360,6 +369,7 @@ export class SubagentRuntime {
       const artifactDir = join(tasksDir, entry.name);
       const record = this.readTaskRecord(join(artifactDir, "task.json"), tasksDir, artifactDir, subagentId);
       if (!record) continue;
+      this.manifestUnknown.set(subagentId, manifestUnknownFields(record as unknown as Json));
       const task = this.taskFromRecord(record, artifactDir);
       if (record.notifiedGeneration === record.generation) this.notified.add(this.taskKey(task));
       const result = existsSync(task.resultPath) ? this.readResult(task) : undefined;
@@ -450,6 +460,7 @@ export class SubagentRuntime {
     this.activeTasksDir = scope;
     this.tasks.clear();
     this.notified.clear();
+    this.manifestUnknown.clear();
   }
 
   private reserveSubagentId(tasksDir: string, taskSlug: string): { subagentId: string; artifactDir: string } {
@@ -605,6 +616,7 @@ export class SubagentRuntime {
     this.stopMonitor(task);
     if (isActiveStatus(task.status) && task.paneId) await this.transport.closePane(task.paneId);
     this.tasks.delete(id);
+    this.manifestUnknown.delete(id);
     this.notifyTaskUpdate();
     rmSync(task.sessionFile, { force: true });
     rmSync(dirname(task.resultPath), { recursive: true, force: true });
@@ -693,6 +705,7 @@ export class SubagentRuntime {
 
   private async persist(task: SubagentTask): Promise<void> {
     const record: TaskRecordV2 = {
+      ...(this.manifestUnknown.get(task.subagentId) ?? {}),
       version: 2, subagentId: task.subagentId, ...(task.taskSlug ? { taskSlug: task.taskSlug } : {}), generation: task.generation, agent: task.agent, cwd: task.cwd, label: task.label,
       ...(task.model ? { model: task.model } : {}), ...(task.thinking ? { thinking: task.thinking } : {}), sessionFile: task.sessionFile,
       tabId: task.tabId || undefined, paneId: task.paneId || undefined, status: task.status, queuedAt: task.queuedAt,
@@ -780,6 +793,7 @@ function isLegacySubagentId(value: string): boolean {
 function isCanonicalFinalId(subagentId: string, taskSlug: string): boolean {
   if (!isCanonicalTaskSlug(taskSlug)) return false;
   if (subagentId === taskSlug) return true;
+  if (!subagentId.startsWith(`${taskSlug}-`)) return false;
   const suffix = subagentId.slice(taskSlug.length);
   return /^-(?:[2-9]|[1-9]\d|100)$/.test(suffix);
 }

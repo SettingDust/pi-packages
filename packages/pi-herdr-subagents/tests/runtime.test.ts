@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { spawnSync } from "node:child_process";
-import { existsSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { createHerdrClient } from "pi-herdr";
@@ -233,6 +233,78 @@ describe("pi-herdr-subagents runtime", () => {
     await rebuilt.recover("/repo", parentSessionFile);
     await expect(rebuilt.join(first.subagentId)).resolves.toMatchObject({ status: "cancelled", generation: 1 });
     expect(calls).toHaveLength(0);
+  });
+
+  test("preserves unknown top-level manifest values across V1 migration and V2 rewrites", async () => {
+    const createdAt = "2026-01-01T00:00:00.000Z";
+    for (const input of [
+      { version: 1 as const, subagentId: "subagent-7", taskSlug: undefined, status: "cancelled" as const },
+      { version: 1 as const, subagentId: "phase-a", taskSlug: "phase-a", status: "cancelled" as const },
+      { version: 1 as const, subagentId: "phase-a-2", taskSlug: "phase-a", status: "cancelled" as const },
+      { version: 2 as const, subagentId: "phase-a-3", taskSlug: "phase-a", status: "cancelled" as const },
+    ]) {
+      const root = mkdtempSync(join(tmpdir(), "subagents-manifest-passthrough-"));
+      const tasksDir = join(root, "tasks");
+      const artifactDir = join(tasksDir, `${input.subagentId}-artifacts`);
+      const sessionFile = join(tasksDir, `${input.subagentId}-g1.jsonl`);
+      mkdirSync(artifactDir, { recursive: true });
+      writeFileSync(sessionFile, "");
+      const unknown = {
+        unknownScalar: "preserve me",
+        unknownObject: { nested: ["value", 3] },
+        unknownArray: ["value", { nested: true }],
+        unknownNull: null,
+        surfaceCleanups: [{ opaque: { phase: "future" } }, null],
+      };
+      const record = input.version === 1
+        ? {
+            ...input,
+            generation: 1,
+            agent: "handler",
+            cwd: "/repo",
+            label: "phase-a",
+            sessionFile,
+            createdAt,
+            updatedAt: createdAt,
+            tabId: "tab-1",
+            paneId: "pane-1",
+            ...unknown,
+          }
+        : {
+            ...input,
+            generation: 1,
+            agent: "handler",
+            cwd: "/repo",
+            label: "phase-a",
+            sessionFile,
+            queuedAt: createdAt,
+            startedAt: createdAt,
+            updatedAt: createdAt,
+            tabId: "tab-1",
+            paneId: "pane-1",
+            ...unknown,
+          };
+      writeFileSync(join(artifactDir, "task.json"), JSON.stringify(record));
+
+      const { calls, transport } = fakeTransport(false);
+      const runtime = new SubagentRuntime(transport, handlerRegistry(), root);
+      await runtime.recover("/repo");
+
+      const migrated = JSON.parse(readFileSync(join(artifactDir, "task.json"), "utf8"));
+      expect(migrated).toMatchObject({
+        version: 2,
+        subagentId: input.subagentId,
+        ...(input.taskSlug ? { taskSlug: input.taskSlug } : {}),
+        sessionFile,
+        status: "cancelled",
+        ...unknown,
+      });
+      expect(migrated.unknownObject).toEqual(unknown.unknownObject);
+      expect(migrated.unknownArray).toEqual(unknown.unknownArray);
+      expect(migrated.surfaceCleanups).toEqual(unknown.surfaceCleanups);
+      expect(calls.filter(call => (call as { op?: string }).op === "close")).toHaveLength(0);
+      runtime.stop();
+    }
   });
 
   test("persists pane_closed when a running task's pane is missing", async () => {
