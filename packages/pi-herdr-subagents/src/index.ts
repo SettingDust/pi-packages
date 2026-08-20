@@ -352,6 +352,7 @@ export class SubagentRuntime {
   }
 
   async recover(cwd: string, parentSessionFile?: string, notifiedKeys: Iterable<string> = []): Promise<void> {
+    const completionNotifier = this.completionNotifier;
     const tasksDir = this.tasksDir(cwd, parentSessionFile);
     this.selectScope(tasksDir);
     this.stop();
@@ -423,7 +424,7 @@ export class SubagentRuntime {
       this.tasks.set(task.subagentId, task);
       await this.persist(task);
       if (task.status === "running") this.startMonitor(task);
-      else if (isTerminalStatus(task.status)) await this.notifyTerminal(task);
+      else if (isTerminalStatus(task.status)) await this.notifyTerminal(task, completionNotifier);
     }
     this.notifyTaskUpdate();
   }
@@ -495,6 +496,7 @@ export class SubagentRuntime {
     sessionFile?: string;
     artifactDir?: string;
   }): Promise<SubagentTask> {
+    const completionNotifier = this.completionNotifier;
     const agent = this.resolveAgent(input.agent);
     const tasksDir = input.artifactDir ? dirname(input.artifactDir) : this.tasksDir(input.cwd, input.parentSessionFile);
     this.selectScope(tasksDir);
@@ -524,7 +526,7 @@ export class SubagentRuntime {
       task.tabId = surface.tabId;
       task.paneId = surface.paneId;
     } catch (error) {
-      await this.settle(task, "failed", undefined, String(error));
+      await this.settle(task, "failed", completionNotifier, undefined, String(error));
       throw error;
     }
     if (this.tasks.get(task.subagentId) !== task) {
@@ -550,7 +552,7 @@ export class SubagentRuntime {
       await writeFile(launchScript, `\ufeff$ErrorActionPreference = 'Stop'\r\n${powerShellInvocation(bootstrapRuntime(), [bootstrapScript])}\r\nexit $LASTEXITCODE\r\n`);
       await this.transport.run(task.paneId, "powershell.exe", ["-NoLogo", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", launchScript]);
     } catch (error) {
-      await this.settle(task, "failed", undefined, String(error));
+      await this.settle(task, "failed", completionNotifier, undefined, String(error));
       throw error;
     }
     this.startMonitor(task);
@@ -583,8 +585,9 @@ export class SubagentRuntime {
   async join(id: string, generation = this.get(id).generation, signal?: AbortSignal): Promise<SubagentTask> {
     const task = this.get(id);
     if (task.generation !== generation) throw new Error("Subagent generation is no longer current");
+    const completionNotifier = this.completionNotifier;
     while (isActiveStatus(task.status)) {
-      if (existsSync(task.resultPath)) await this.settleFromResult(task);
+      if (existsSync(task.resultPath)) await this.settleFromResult(task, completionNotifier);
       else await delay(50, undefined, { signal });
     }
     return { ...task };
@@ -599,6 +602,7 @@ export class SubagentRuntime {
 
   async cancel(id: string): Promise<SubagentTask> {
     const task = this.get(id);
+    const completionNotifier = this.completionNotifier;
     if (isActiveStatus(task.status)) {
       this.stopMonitor(task);
       if (task.paneId) {
@@ -606,7 +610,7 @@ export class SubagentRuntime {
         catch (error) { this.startMonitor(task); throw error; }
       }
       await writeAtomic(task.resultPath, { subagentId: id, generation: task.generation, status: "cancelled" });
-      await this.settle(task, "cancelled");
+      await this.settle(task, "cancelled", completionNotifier);
     }
     return { ...task };
   }
@@ -635,25 +639,26 @@ export class SubagentRuntime {
     const key = this.taskKey(task);
     if (this.monitors.has(key) || task.status !== "running") return;
     const controller = new AbortController();
+    const completionNotifier = this.completionNotifier;
     this.monitors.set(key, controller);
     void (async () => {
       while (!controller.signal.aborted && task.status === "running") {
         try { await delay(500, undefined, { signal: controller.signal, ref: false }); }
         catch { break; }
         if (existsSync(task.resultPath)) {
-          await this.settleFromResult(task);
+          await this.settleFromResult(task, completionNotifier);
           break;
         }
         try {
           const paneExists = await this.transport.paneExists(task.paneId);
           if (controller.signal.aborted) break;
           if (!paneExists) {
-            await this.settle(task, "failed", undefined, "pane_closed");
+            await this.settle(task, "failed", completionNotifier, undefined, "pane_closed");
             break;
           }
         } catch (error) {
           if (controller.signal.aborted) break;
-          await this.settle(task, "failed", undefined, `pane_verification_failed: ${error instanceof Error ? error.message : String(error)}`);
+          await this.settle(task, "failed", completionNotifier, undefined, `pane_verification_failed: ${error instanceof Error ? error.message : String(error)}`);
           break;
         }
       }
@@ -667,13 +672,13 @@ export class SubagentRuntime {
     this.monitors.delete(key);
   }
 
-  private async settleFromResult(task: SubagentTask): Promise<void> {
+  private async settleFromResult(task: SubagentTask, completionNotifier: CompletionNotifier | undefined): Promise<void> {
     const result = this.readResult(task);
-    if (result.valid) await this.settle(task, result.status, result.result, result.error);
-    else await this.settle(task, "failed", undefined, result.error);
+    if (result.valid) await this.settle(task, result.status, completionNotifier, result.result, result.error);
+    else await this.settle(task, "failed", completionNotifier, undefined, result.error);
   }
 
-  private async settle(task: SubagentTask, status: Exclude<TaskStatus, ActiveTaskStatus>, result?: string, error?: string): Promise<void> {
+  private async settle(task: SubagentTask, status: Exclude<TaskStatus, ActiveTaskStatus>, completionNotifier: CompletionNotifier | undefined, result?: string, error?: string): Promise<void> {
     if (!isActiveStatus(task.status)) return;
     this.stopMonitor(task);
     task.status = status;
@@ -682,11 +687,12 @@ export class SubagentRuntime {
     task.updatedAt = new Date().toISOString();
     await this.persist(task);
     this.notifyTaskUpdate();
-    await this.notifyTerminal(task);
+    await this.notifyTerminal(task, completionNotifier);
   }
 
-  private async notifyTerminal(task: SubagentTask): Promise<void> {
-    if (isActiveStatus(task.status) || !this.completionNotifier || this.notified.has(this.taskKey(task))) return;
+
+  private async notifyTerminal(task: SubagentTask, completionNotifier: CompletionNotifier | undefined): Promise<void> {
+    if (isActiveStatus(task.status) || !completionNotifier) return;
     const notification: CompletionNotification = {
       subagentId: task.subagentId,
       generation: task.generation,
@@ -695,9 +701,7 @@ export class SubagentRuntime {
       ...(task.error ? { reason: briefReason(task.error) } : {}),
     };
     try {
-      await this.completionNotifier(notification);
-      this.notified.add(this.taskKey(task));
-      await this.persist(task);
+      await completionNotifier(notification);
     } catch { /* Recovery retries notifications without a persisted marker. */ }
   }
 
@@ -711,7 +715,6 @@ export class SubagentRuntime {
       tabId: task.tabId || undefined, paneId: task.paneId || undefined, status: task.status, queuedAt: task.queuedAt,
       ...(task.startedAt ? { startedAt: task.startedAt } : {}), updatedAt: task.updatedAt,
       ...(task.error ? { error: task.error } : {}),
-      ...(this.notified.has(this.taskKey(task)) ? { notifiedGeneration: task.generation } : {}),
     };
     await writeAtomic(this.recordPath(task), record);
   }
@@ -1020,18 +1023,22 @@ export function createSubagentStatusWidget(
 
 const completionMessageType = "pi-herdr-subagent-completion";
 
-function notificationKey(value: Pick<CompletionNotification, "subagentId" | "generation">): string {
-  return `${value.subagentId}:${value.generation}`;
+function notificationKey(value: Pick<CompletionNotification, "subagentId" | "generation" | "status">): string {
+  return `${completionMessageType}/v1:${value.subagentId}:${value.generation}:${value.status}`;
 }
 
 function completionNotificationKeys(entries: readonly { type: string; customType?: string; details?: unknown }[]): string[] {
   const keys: string[] = [];
   for (const entry of entries) {
     if (entry.type !== "custom_message" || entry.customType !== completionMessageType || !entry.details || typeof entry.details !== "object") continue;
-    const details = entry.details as Partial<CompletionNotification>;
+    const details = entry.details as Partial<CompletionNotification> & { schema?: unknown; reason?: unknown };
+    if (details.schema !== `${completionMessageType}/v1`) continue;
     if (typeof details.subagentId === "string" && isNotificationSubagentId(details.subagentId)
       && Number.isInteger(details.generation) && details.generation! >= 1
-      && isTerminalStatus(details.status) && typeof details.label === "string") keys.push(notificationKey(details as CompletionNotification));
+      && isTerminalStatus(details.status) && typeof details.label === "string"
+      && (details.reason === undefined || typeof details.reason === "string")) {
+      keys.push(notificationKey(details as CompletionNotification));
+    }
   }
   return keys;
 }
@@ -1053,7 +1060,19 @@ export default function subagentsExtension(pi: ExtensionAPI, dependencies: {
   let widgetContext: ExtensionContext | undefined;
   let warningContext: ExtensionContext | undefined;
   let unsubscribeTaskUpdates: (() => void) | undefined;
+  const createNotificationCoordinator = (epoch: number) => ({
+    epoch,
+    active: true,
+    context: undefined as ExtensionContext | undefined,
+    startupDelivery: false,
+    parentRunActive: false,
+    flushPromise: undefined as Promise<void> | undefined,
+    pendingNotifications: new Map<string, CompletionNotification>(),
+    attemptedNotifications: new Set<string>(),
+  });
+  let notificationCoordinator = createNotificationCoordinator(0);
   const widgetKey = "pi-herdr-subagent-progress";
+
   const refreshWidget = () => {
     if (!widgetContext) return;
     try {
@@ -1091,31 +1110,108 @@ export default function subagentsExtension(pi: ExtensionAPI, dependencies: {
     unsubscribeTaskUpdates = runtime.onTaskUpdate(refreshWidget);
     refreshWidget();
   };
-  runtime.setCompletionNotifier(notification => {
-    pi.sendMessage({
-      customType: completionMessageType,
-      content: `Subagent terminal notification: ${JSON.stringify(notification)}. Call subagent_join to read the full Result.`,
-      display: true,
-      details: notification,
-    }, { triggerTurn: true, deliverAs: "followUp" });
-  });
-  const recoverCurrent = async (ctx: ExtensionContext) => {
+  const isIdle = (ctx: ExtensionContext): boolean => {
+    const idle = (ctx as ExtensionContext & { isIdle?: () => boolean }).isIdle;
+    return typeof idle === "function" && idle();
+  };
+  const branchKeys = (ctx: ExtensionContext): Set<string> => {
+    const manager = ctx.sessionManager as typeof ctx.sessionManager & { getBranch?: () => readonly { type: string; customType?: string; details?: unknown }[] };
+    return new Set(completionNotificationKeys(typeof manager.getBranch === "function" ? manager.getBranch() : []));
+  };
+  const isCurrentCoordinator = (coordinator: ReturnType<typeof createNotificationCoordinator>): boolean => coordinator.active && notificationCoordinator === coordinator && coordinator.epoch === notificationCoordinator.epoch;
+  const resetNotificationCoordinator = async (): Promise<void> => {
+    const previous = notificationCoordinator;
+    previous.active = false;
+    notificationCoordinator = createNotificationCoordinator(previous.epoch + 1);
+    await previous.flushPromise?.catch(() => {});
+  };
+  const flushNotifications = (coordinator: ReturnType<typeof createNotificationCoordinator>, ctx: ExtensionContext, triggerTurn: boolean): void => {
+    if (!isCurrentCoordinator(coordinator)) return;
+    const acknowledged = branchKeys(ctx);
+    for (const key of coordinator.pendingNotifications.keys()) {
+      if (acknowledged.has(key)) {
+        coordinator.pendingNotifications.delete(key);
+        coordinator.attemptedNotifications.delete(key);
+      } else {
+        coordinator.attemptedNotifications.delete(key);
+      }
+    }
+    for (const [key, notification] of coordinator.pendingNotifications) {
+      if (!isCurrentCoordinator(coordinator)) return;
+      if (coordinator.attemptedNotifications.has(key)) continue;
+      coordinator.attemptedNotifications.add(key);
+      try {
+        pi.sendMessage({
+          customType: completionMessageType,
+          content: `Subagent terminal notification: ${JSON.stringify(notification)}. Call subagent_join to read the full Result.`,
+          display: true,
+          details: { schema: `${completionMessageType}/v1`, ...notification },
+        }, { triggerTurn, deliverAs: "followUp" });
+      } catch {
+        coordinator.attemptedNotifications.delete(key);
+      }
+    }
+  };
+  const requestFlush = (coordinator: ReturnType<typeof createNotificationCoordinator>, ctx: ExtensionContext, triggerTurn: boolean): Promise<void> => {
+    if (!isCurrentCoordinator(coordinator)) return Promise.resolve();
+    if (coordinator.flushPromise) return coordinator.flushPromise;
+    const flush = Promise.resolve()
+      .then(() => flushNotifications(coordinator, ctx, triggerTurn))
+      .catch(() => {});
+    coordinator.flushPromise = flush;
+    void flush.then(() => {
+      if (coordinator.flushPromise === flush) coordinator.flushPromise = undefined;
+    });
+    return flush;
+  };
+  const registerNotification = async (notification: CompletionNotification, coordinator: ReturnType<typeof createNotificationCoordinator> = notificationCoordinator): Promise<void> => {
+    const key = notificationKey(notification);
+    coordinator.pendingNotifications.set(key, notification);
+    const ctx = coordinator.context;
+    if (!ctx || coordinator.startupDelivery || coordinator.parentRunActive || !isIdle(ctx)) return;
+    await requestFlush(coordinator, ctx, true);
+  };
+  const bindNotificationNotifier = (coordinator: ReturnType<typeof createNotificationCoordinator>) => {
+    runtime.setCompletionNotifier(notification => registerNotification(notification, coordinator));
+  };
+  bindNotificationNotifier(notificationCoordinator);
+
+  const recoverCurrent = async (ctx: ExtensionContext, startup = false) => {
+    const coordinator = notificationCoordinator;
+    runtime.setCompletionNotifier(notification => registerNotification(notification, coordinator));
+    coordinator.context = ctx;
     unbindWidget();
     warningContext = ctx;
+    if (startup) coordinator.startupDelivery = true;
+    let recovered = false;
     settingsStore ??= createSettingsStore(message => warningContext?.ui.notify(message, "warning"));
     try {
       try { settings = settingsStore.load(); }
       catch { settings = { ...defaultSubagentUiSettings }; }
       const parentSessionFile = ctx.sessionManager?.getSessionFile?.();
-      await runtime.recover(ctx.cwd, parentSessionFile, completionNotificationKeys(ctx.sessionManager.getEntries()));
+      await runtime.recover(ctx.cwd, parentSessionFile, [...branchKeys(ctx)]);
       bindWidget(ctx);
+      recovered = true;
     } catch (error) {
       warningContext = undefined;
       throw error;
+    } finally {
+      if (startup) {
+        coordinator.startupDelivery = false;
+        if (recovered) await requestFlush(coordinator, ctx, false);
+      }
     }
   };
-  pi.on("session_start", async (_event, ctx) => recoverCurrent(ctx));
+  pi.on("session_start", async (_event, ctx) => {
+    await resetNotificationCoordinator();
+    const coordinator = notificationCoordinator;
+    coordinator.parentRunActive = false;
+    await recoverCurrent(ctx, true);
+  });
   pi.on("before_agent_start", async (_event, ctx) => {
+    const coordinator = notificationCoordinator;
+    coordinator.parentRunActive = true;
+    coordinator.context = ctx;
     await registry.discover(ctx.cwd);
     const parentSessionFile = ctx.sessionManager?.getSessionFile?.();
     await recoverCurrent(ctx);
@@ -1123,9 +1219,25 @@ export default function subagentsExtension(pi: ExtensionAPI, dependencies: {
     for (const tool of tools) pi.registerTool(tool);
     pi.setActiveTools([...pi.getActiveTools().filter(name => !name.startsWith("subagent_")), ...tools.map(tool => tool.name)]);
   });
-  pi.on("session_shutdown", () => {
-    try { unbindWidget(); }
-    finally { runtime.stop(); }
+  pi.on("agent_start", (_event, ctx) => {
+    const coordinator = notificationCoordinator;
+    coordinator.parentRunActive = true;
+    coordinator.context = ctx;
+  });
+  pi.on("agent_end", () => {
+    // A low-level run can be followed by retry, compaction, or queued input.
+  });
+  pi.on("agent_settled", async (_event, ctx) => {
+    const coordinator = notificationCoordinator;
+    coordinator.context = ctx;
+    coordinator.parentRunActive = false;
+    if (!coordinator.startupDelivery && isIdle(ctx)) await requestFlush(coordinator, ctx, true);
+  });
+  pi.on("session_shutdown", async () => {
+    try {
+      await resetNotificationCoordinator();
+      unbindWidget();
+    } finally { runtime.stop(); }
   });
 }
 

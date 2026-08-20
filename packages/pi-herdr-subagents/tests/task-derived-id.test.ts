@@ -135,30 +135,6 @@ describe("task-derived subagent IDs", () => {
   });
 });
 
-test("completion notification recovery accepts canonical and legacy IDs but rejects malformed IDs", async () => {
-  const runtime = new SubagentRuntime({
-    async createTab() { return { tabId: "tab", paneId: "pane" }; }, async run() {}, async sendText() {}, async closePane() {}, async paneExists() { return true; },
-  }, new AgentRegistry());
-  const handlers: Record<string, (event: unknown, ctx: any) => Promise<void>> = {};
-  const previous = process.env.PI_HERDR_SUBAGENT_RESULT_PATH;
-  delete process.env.PI_HERDR_SUBAGENT_RESULT_PATH;
-  try {
-    activateSubagents({
-      on(event: string, handler: (event: unknown, ctx: any) => Promise<void>) { handlers[event] = handler; },
-      sendMessage() {}, registerTool() {}, getActiveTools() { return []; }, setActiveTools() {},
-    } as any, { runtime, registry: { async discover() {} } as any });
-    const entries = ["fix-steer-submit-2", "task-101", "task-02", "subagent-1", "fix-steer-submit-101", "subagent-01"].map(subagentId => ({
-      type: "custom_message", customType: "pi-herdr-subagent-completion", details: { subagentId, generation: 1, status: "completed", label: "task" },
-    }));
-    const observed: string[] = [];
-    (runtime.recover as any) = async (_cwd: string, _parent: string, keys: string[]) => { observed.push(...keys); };
-    await handlers.session_start!({}, { cwd: "/repo", sessionManager: { getSessionFile: () => "/repo/parent.jsonl", getEntries: () => entries }, ui: { setWidget() {} } });
-    expect(observed).toEqual(["fix-steer-submit-2:1", "task-101:1", "task-02:1", "subagent-1:1", "fix-steer-submit-101:1"]);
-  } finally {
-    if (previous === undefined) delete process.env.PI_HERDR_SUBAGENT_RESULT_PATH;
-    else process.env.PI_HERDR_SUBAGENT_RESULT_PATH = previous;
-  }
-});
 
 test("legacy numeric tasks recover, resume, and remove without renaming", async () => {
   const legacy = runtime();
@@ -212,5 +188,37 @@ test("reserves unique IDs from separate processes racing on one artifact directo
     if (!released) writeFileSync(join(root, "barrier", "release"), "go");
     left.kill();
     right.kill();
+  }
+});
+
+
+test("completion notification recovery accepts only supported current-branch correlations", async () => {
+  const runtime = new SubagentRuntime({
+    async createTab() { return { tabId: "tab", paneId: "pane" }; }, async run() {}, async sendText() {}, async closePane() {}, async paneExists() { return true; },
+  }, new AgentRegistry());
+  const handlers: Record<string, (event: unknown, ctx: any) => Promise<void>> = {};
+  const previous = process.env.PI_HERDR_SUBAGENT_RESULT_PATH;
+  delete process.env.PI_HERDR_SUBAGENT_RESULT_PATH;
+  try {
+    activateSubagents({
+      on(event: string, handler: (event: unknown, ctx: any) => Promise<void>) { handlers[event] = handler; },
+      sendMessage() {}, registerTool() {}, getActiveTools() { return []; }, setActiveTools() {},
+    } as any, { runtime, registry: { async discover() {} } as any });
+    const entries = ["fix-steer-submit-2", "task-101", "task-02", "subagent-1", "fix-steer-submit-101", "subagent-01"].map(subagentId => ({
+      type: "custom_message", customType: "pi-herdr-subagent-completion", details: { schema: "pi-herdr-subagent-completion/v1", subagentId, generation: 1, status: "completed", label: "task" },
+    }));
+    const observed: string[] = [];
+    (runtime.recover as any) = async (_cwd: string, _parent: string, keys: string[]) => { observed.push(...keys); };
+    await handlers.session_start!({}, { cwd: "/repo", sessionManager: { getSessionFile: () => "/repo/parent.jsonl", getBranch: () => entries }, ui: { setWidget() {} } });
+    expect(observed).toEqual([
+      "pi-herdr-subagent-completion/v1:fix-steer-submit-2:1:completed",
+      "pi-herdr-subagent-completion/v1:task-101:1:completed",
+      "pi-herdr-subagent-completion/v1:task-02:1:completed",
+      "pi-herdr-subagent-completion/v1:subagent-1:1:completed",
+      "pi-herdr-subagent-completion/v1:fix-steer-submit-101:1:completed",
+    ]);
+  } finally {
+    if (previous === undefined) delete process.env.PI_HERDR_SUBAGENT_RESULT_PATH;
+    else process.env.PI_HERDR_SUBAGENT_RESULT_PATH = previous;
   }
 });

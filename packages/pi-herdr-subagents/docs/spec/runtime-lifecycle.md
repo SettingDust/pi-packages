@@ -63,32 +63,46 @@ After each successful recovery, the runtime must persist the reconstructed state
 
 ## 4. Terminal Notification
 
-### 4.1 Terminal Coverage
+### 4.1 Terminal Coverage And Durable Source
 
-When a completion notifier is configured, the runtime must produce one terminal notification attempt for every terminal transition of the current generation, including:
+When a completion notifier is configured, every persisted terminal generation must remain eligible for parent-session delivery, including:
 
 - a valid completed, failed, or cancelled Result;
 - an invalid or stale Result that settles the task as failed;
 - an unexpectedly closed pane;
 - pane verification failure;
-- cancellation after the pane is closed; and
+- cancellation after the surface is closed; and
 - launch or launch-script failure before `spawn` rejects.
 
-The notification summary must contain `subagentId`, `generation`, terminal `status`, `label`, and an optional bounded `reason`. It must not contain the full Handler Result body, model output, session contents, or internal Result text. `subagent_join` remains the operation that returns the complete task snapshot and Result data; notification delivery must not replace or truncate it.
+The existing persisted terminal task state is the durable outbox. It consists of the validated terminal manifest and the generation-specific Result artifact when one exists; no second outbox file, queue, receipt store, or broker may be introduced. Delivery eligibility must survive process restart and must be reconstructed from those existing artifacts. A full Handler Result remains private to `subagent_join` and must not be copied into the parent notification.
 
-### 4.2 Pending State, Dedupe, And Replay
+The parent notification details must contain `schema`, `subagentId`, `generation`, terminal `status`, `label`, and an optional bounded `reason`. `schema` must identify the supported notification-correlation schema. The delivery correlation is exactly `<schema, subagentId, generation, status>`; `label` and `reason` are display data and are not correlation fields.
 
-A terminal task with no accepted notification marker is pending. The pending state is represented by the persisted terminal manifest without `notifiedGeneration` equal to the current generation. A successful notifier callback must mark that generation as notified and persist the marker.
+### 4.2 Parent-Session Acknowledgement
 
-The runtime must deduplicate notification attempts by the pair `<subagentId>:<generation>` during one runtime lifetime. On parent-session recovery, existing completion-message entries must be treated as consumed notification keys. A recovered terminal task whose notification key is neither persisted nor present in the parent-session marker set must be replayed once for that recovery, then marked after successful delivery. Repeating recovery or restarting after a persisted marker must not emit another notification for that key.
+A delivery is acknowledged only when `sessionManager.getBranch()` for the current parent branch contains a `custom_message` whose `customType` is the completion-message type and whose supported details exactly match the durable terminal source on `<schema, subagentId, generation, status>`. A marker on an abandoned branch, a marker returned only by an all-entry API, a legacy or unsupported schema, malformed details, or any correlation mismatch must be ignored.
 
-Notification delivery failure must not change task status or Result data. It must leave the notification pending so a later recovery can retry it. The notifier is allowed to be asynchronous, and notification failure must not prevent `inspect`, `join`, task persistence, or unrelated task operations.
+`sendMessage` returning is not acknowledgement because the API returns `void` and does not prove append. `message_end` is not acknowledgement because it occurs before the message is appended. A legacy manifest `notifiedGeneration` value is not acknowledgement. The runtime must not persist a new delivery-receipt field; the matching current-branch `custom_message` is the durable receipt.
 
-The implementation currently persists the marker after the notifier callback succeeds. Therefore this Spec does not claim a crash-proof distributed exactly-once guarantee across a process crash in the interval between callback success and marker persistence. The durable contract is exactly-once replay under successful marker persistence and parent-session marker recognition; the crash window is an explicit follow-up risk in the reconciliation Work.
+Before every safe flush, the extension must scan the current branch and remove acknowledged correlations from its pending in-memory attempt set. A missing correlation remains pending. Within one process, an attempted correlation may be suppressed until the next acknowledgement scan or safe flush boundary, but it must become retryable when a later scan still finds no matching message and after restart.
 
-### 4.3 Parent Message Boundary
+### 4.3 Safe Delivery Envelope
 
-The parent extension must send a visible completion message that can trigger a parent follow-up turn. Its details must be the summary-only notification shape. The message must instruct the parent to use `subagent_join` for the full Result, but must not embed that Result in the notification content or details.
+The extension must send zero completion notifications from `before_agent_start`, `message_end`, or `agent_end`, and while a parent lifecycle may continue. Pi 0.84.2 defines `agent_end` as the end of one low-level run; automatic retry, auto-compaction retry, or queued follow-up may still continue. A live idle boundary exists only at `agent_settled`, and only when `ctx.isIdle()` is true.
+
+A safe flush must use one of these envelopes:
+
+1. **startup idle flush:** `session_start` may recover durable terminal sources, scan the current branch, and append missing completion messages without triggering an agent turn. Startup delivery must use `triggerTurn: false`; the send remains unacknowledged until a later current-branch scan observes the supported correlation.
+2. **live idle flush:** when a terminal source becomes pending while the parent is already verified idle, or when `agent_settled` fires and `ctx.isIdle()` is true, the extension may scan and send missing messages with `deliverAs: "followUp"` and `triggerTurn: true`.
+3. **active deferral:** when terminal settlement occurs during an active parent lifecycle, the extension records only in-memory pending work backed by the durable terminal source. Every `agent_end` performs zero notification sends. A non-idle `agent_settled` leaves delivery pending; the first later idle `agent_settled` owns the live scan and send.
+
+The custom-message envelope must be visible, summary-only, and instruct the parent to call `subagent_join` for the full Result. Existing tool registration and task recovery may still occur in their owning lifecycle hooks, but notification delivery must obey this envelope independently.
+
+### 4.4 Delivery Guarantee And Failures
+
+The contract is at-least-once delivery into the current parent branch, not exactly-once delivery and not a guarantee that the Router processes or acts on the message. A process crash before append leaves no current-branch acknowledgement and restart must resend. A crash after append is recovered by branch correlation and must not require a separate receipt. If append visibility is delayed or uncertain, a later safe flush may send a duplicate.
+
+Notification send or branch-inspection failure must not change task status, Result data, cleanup state, `inspect`, `join`, resume, remove, or unrelated task operation. The durable terminal source remains retryable. Unsupported markers must be ignored rather than rewritten or treated as proof of delivery.
 
 ## 5. Unlimited Child Continuation
 
@@ -151,7 +165,7 @@ Focused checks must demonstrate:
 5. recovery is scope-local and idempotent;
 6. resume retains identity/session and increments generation, while remove deletes session/artifacts;
 7. completed, failed, cancelled, pane-closed, verification-failure, cancellation, and launch-failure paths produce summary-only terminal notifications;
-8. notification keys deduplicate repeated recovery, pending notifications replay after restart, and the full Result is absent from notification payloads;
+8. durable terminal sources survive restart; only a supported matching `custom_message` on `sessionManager.getBranch()` acknowledges delivery; absent, abandoned-branch, legacy, unsupported, malformed, or mismatched markers cause retry; startup append does not trigger a turn and remains unacknowledged until observed; active delivery sends zero through `agent_end` and flushes only when `agent_settled` observes `ctx.isIdle()` as true; and the full Result is absent from notification payloads;
 9. child continuation deduplicates `agent_end` timers, clears on input/start/shutdown, supports another unfinished turn without a retry limit, and stops after `subagent_done`; focused checks must separately verify input cleanup, `agent_start` reset, shutdown after a nudge has fired, and at least two successive unfinished continuation cycles;
 10. package typecheck, the full package tests, and a fresh independent review pass against this Spec and the reconciliation Work; and
 11. an aborted `subagent_join` stops promptly while the task remains running, with no Result, notification, manifest, generation, or pane mutation until an explicit lifecycle operation.
@@ -160,7 +174,7 @@ Focused checks must demonstrate:
 
 The current package test run covers the listed recovery and notification paths and only part of the continuation acceptance. `tests/pane-child.test.ts` verifies pending-timer deduplication/cleanup, continuation after input followed by a later unfinished `agent_end`, and `subagent_done` cleanup and Result writing. It does not independently demonstrate `agent_start` reset, shutdown after a nudge has fired, or multiple successive continuation cycles. These remain explicit acceptance requirements; the gap is evidence coverage, not a reduction of the unlimited-continuation or cleanup contract. Task 2 in the reconciliation Work records the future regression checks.
 
-The recorded package verification at HEAD `a43f0e1f557c02c1a31cecf45733e33b482882c4` is `56 pass`, `0 fail`, and `299 assertions` for `bun run --cwd packages/pi-herdr-subagents test`. The source and test paths were clean at that HEAD. This documentation-only amendment does not treat that aggregate result as evidence that the three continuation gaps are covered, and it does not erase the notification callback/marker crash window.
+The historical package run recorded by the retrospective reconciliation covers the prior callback-plus-manifest-marker notification implementation, not the durable parent-session delivery amendment in section 4. The terminal-notification Work's implementation and red-seam evidence are now present in the current worktree, and this session closes the remaining F8 evidence gap with focused checks for repeated `agent_end`, non-idle `agent_settled`, and later idle delivery. Final ownership/commit gating remains tracked in the Work; no commit is implied by this reconciliation.
 
 ## 9. Join Caller Cancellation Amendment
 

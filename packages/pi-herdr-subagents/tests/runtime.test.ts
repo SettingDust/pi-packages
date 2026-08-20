@@ -424,7 +424,7 @@ describe("pi-herdr-subagents runtime", () => {
     }]);
   });
 
-  test("backfills a missed notification after restart and deduplicates repeated recovery", async () => {
+  test("replays a missed notification on every recovery until the parent branch observes it", async () => {
     const parentSessionFile = join(mkdtempSync(join(tmpdir(), "subagents-notify-recover-")), "parent.jsonl");
     const original = new SubagentRuntime(fakeTransport().transport, handlerRegistry());
     const task = await original.spawn({ agent: "handler", cwd: "/repo", prompt: "work", label: "recover", taskSlug: "task", parentSessionFile });
@@ -436,11 +436,11 @@ describe("pi-herdr-subagents runtime", () => {
     const notifications: CompletionNotification[] = [];
     const rebuilt = new SubagentRuntime(fakeTransport().transport, handlerRegistry(), undefined, notification => { notifications.push(notification); });
     await rebuilt.recover("/repo", parentSessionFile);
-    expect(notifications).toEqual([{ subagentId: task.subagentId, generation: 1, status: "completed", label: "recover" }]);
     await rebuilt.recover("/repo", parentSessionFile);
+    expect(notifications).toHaveLength(2);
     const restartedAgain = new SubagentRuntime(fakeTransport().transport, handlerRegistry(), undefined, notification => { notifications.push(notification); });
     await restartedAgain.recover("/repo", parentSessionFile);
-    expect(notifications).toHaveLength(1);
+    expect(notifications).toHaveLength(3);
   });
 
   test("session startup backfills missed notifications and honors parent-session markers", async () => {
@@ -467,16 +467,17 @@ describe("pi-herdr-subagents runtime", () => {
     const consumedEntry = {
       type: "custom_message",
       customType: "pi-herdr-subagent-completion",
-      details: { subagentId: consumed.subagentId, generation: 1, status: "completed", label: "consumed" },
+       details: { schema: "pi-herdr-subagent-completion/v1", subagentId: consumed.subagentId, generation: 1, status: "completed", label: "consumed" },
     };
     const ctx = {
       cwd: "/repo",
-      sessionManager: { getSessionFile: () => parentSessionFile, getEntries: () => [consumedEntry] },
+      isIdle: () => true,
+      sessionManager: { getSessionFile: () => parentSessionFile, getEntries: () => [consumedEntry], getBranch: () => [consumedEntry] },
     };
     await handlers.session_start!({}, ctx);
     expect(messages).toHaveLength(1);
     expect(messages[0]!.message.details).toMatchObject({ subagentId: missed.subagentId, label: "missed" });
-    ctx.sessionManager.getEntries = () => [consumedEntry, { ...messages[0]!.message, type: "custom_message" }];
+    ctx.sessionManager.getBranch = () => [consumedEntry, { ...messages[0]!.message, type: "custom_message" }];
     await handlers.session_start!({}, ctx);
     expect(messages).toHaveLength(1);
   });
@@ -485,14 +486,22 @@ describe("pi-herdr-subagents runtime", () => {
     const registry = handlerRegistry();
     const runtime = new SubagentRuntime(fakeTransport().transport, registry, mkdtempSync(join(tmpdir(), "subagents-notify-pi-")));
     const messages: Array<{ message: any; options: any }> = [];
+    const handlers: Record<string, (event: unknown, ctx: any) => Promise<void>> = {};
     const childResultPath = process.env.PI_HERDR_SUBAGENT_RESULT_PATH;
     delete process.env.PI_HERDR_SUBAGENT_RESULT_PATH;
     activateSubagents({
-      on() {},
+      on(event: string, handler: (event: unknown, ctx: any) => Promise<void>) { handlers[event] = handler; },
       sendMessage(message: unknown, options: unknown) { messages.push({ message, options }); },
     } as any, { runtime, registry });
     if (childResultPath) process.env.PI_HERDR_SUBAGENT_RESULT_PATH = childResultPath;
-    const task = await runtime.spawn({ agent: "handler", cwd: "/repo", prompt: "work", label: "pi", taskSlug: "task",});
+    const ctx = {
+      cwd: "/repo",
+      isIdle: () => true,
+      sessionManager: { getSessionFile: () => "/repo/parent.jsonl", getBranch: () => [] },
+      ui: { setWidget() {} },
+    };
+    await handlers.session_start!({}, ctx);
+    const task = await runtime.spawn({ agent: "handler", cwd: "/repo", prompt: "work", label: "pi", taskSlug: "task" });
     writeFileSync(task.resultPath, JSON.stringify({
       subagentId: task.subagentId, generation: task.generation, status: "completed", result: "secret full YAML",
     }));
@@ -721,7 +730,8 @@ function widgetExtensionHarness(
   }
   const ctx = {
     cwd: "/repo",
-    sessionManager: { getSessionFile: () => "/repo/parent.jsonl", getEntries: () => [] },
+    isIdle: () => true,
+    sessionManager: { getSessionFile: () => "/repo/parent.jsonl", getEntries: () => [], getBranch: () => [] },
     ui: { setWidget },
   };
   return { handlers, messages, ctx };
@@ -1202,4 +1212,389 @@ test("steer transport rejection leaves the task and notifications unchanged", as
     .toEqual({ status: before.status, generation: before.generation, result: before.result, error: before.error });
   expect(notifications).toEqual([]);
   runtime.stop();
+});
+
+
+type NotificationHarness = {
+  handlers: Record<string, (event: unknown, ctx: any) => Promise<unknown> | unknown>;
+  ctx: any;
+  messages: Array<{ message: any; options: any }>;
+  notify(notification: CompletionNotification): Promise<void>;
+  branchReads: () => number;
+  setBranch(value: unknown[]): void;
+  setFailures(value: { branch?: boolean; send?: boolean }): void;
+  setIdle(value: boolean): void;
+};
+
+type NotificationHarnessOptions = {
+  branch?: unknown[];
+  entries?: unknown[];
+  idle?: boolean;
+  recoverNotification?: CompletionNotification;
+  onBranchScan?: () => void;
+  onSend?: () => void;
+};
+
+function notificationHarness(options: NotificationHarnessOptions = {}): NotificationHarness {
+  let notifier: ((notification: CompletionNotification) => void | Promise<void>) | undefined;
+  let branch = options.branch ?? [];
+  let reads = 0;
+  let idle = options.idle ?? true;
+  let failBranch = false;
+  let failSend = false;
+  const handlers: Record<string, (event: unknown, ctx: any) => Promise<unknown> | unknown> = {};
+  const messages: Array<{ message: any; options: any }> = [];
+  const runtime = {
+    setCompletionNotifier(value: typeof notifier) { notifier = value; },
+    listTasks() { return []; },
+    onTaskUpdate() { return () => {}; },
+    async recover() { if (options.recoverNotification) await notifier?.(options.recoverNotification); },
+    agentNames() { return ["handler"]; },
+    stop() {},
+  };
+  const registry = { async discover() {} };
+  const previousChildResultPath = process.env.PI_HERDR_SUBAGENT_RESULT_PATH;
+  delete process.env.PI_HERDR_SUBAGENT_RESULT_PATH;
+  try {
+    activateSubagents({
+      on(event: string, handler: (event: unknown, ctx: any) => unknown) { handlers[event] = handler; },
+      sendMessage(message: unknown, sendOptions: unknown) {
+        if (failSend) throw new Error("send failed");
+        options.onSend?.();
+        messages.push({ message, options: sendOptions });
+      },
+      registerTool() {},
+      getActiveTools() { return []; },
+      setActiveTools() {},
+    } as any, {
+      runtime: runtime as any,
+      registry: registry as any,
+      settingsStore: { load: () => ({ widgetPlacement: "off", widgetMode: "progress", useNerdFont: false }) } as any,
+    });
+  } finally {
+    if (previousChildResultPath === undefined) delete process.env.PI_HERDR_SUBAGENT_RESULT_PATH;
+    else process.env.PI_HERDR_SUBAGENT_RESULT_PATH = previousChildResultPath;
+  }
+  const ctx = {
+    cwd: "/repo",
+    isIdle: () => idle,
+    sessionManager: {
+      getSessionFile: () => "/repo/parent.jsonl",
+      getEntries: () => options.entries ?? [],
+      getBranch: () => {
+        reads++;
+        options.onBranchScan?.();
+        if (failBranch) throw new Error("scan failed");
+        return branch;
+      },
+    },
+    ui: { setWidget() {} },
+  };
+  return {
+    handlers,
+    ctx,
+    messages,
+    async notify(notification) { await notifier?.(notification); },
+    branchReads: () => reads,
+    setBranch(value) { branch = value; },
+    setFailures(value) {
+      failBranch = value.branch ?? false;
+      failSend = value.send ?? false;
+    },
+    setIdle(value) { idle = value; },
+  };
+}
+
+const terminalNotification = (overrides: Partial<CompletionNotification> = {}): CompletionNotification => ({
+  subagentId: "task",
+  generation: 1,
+  status: "completed",
+  label: "task",
+  ...overrides,
+});
+
+describe("durable terminal notification delivery red seams", () => {
+  test("R5 startup notification must not trigger a parent turn", async () => {
+    const harness = notificationHarness({ recoverNotification: terminalNotification() });
+    await harness.handlers.session_start!({}, harness.ctx);
+    expect(harness.messages).toHaveLength(1);
+    expect(harness.messages[0]!.options).toEqual({ triggerTurn: false, deliverAs: "followUp" });
+  });
+
+  test("R6 agent_end is not an idle boundary", async () => {
+    const harness = notificationHarness();
+    await harness.handlers.before_agent_start!({}, harness.ctx);
+    await harness.notify(terminalNotification());
+    expect(harness.messages).toHaveLength(0);
+    await harness.handlers.agent_end!({}, harness.ctx);
+    expect(harness.messages).toHaveLength(0);
+    await harness.handlers.agent_settled!({}, harness.ctx);
+    expect(harness.messages).toHaveLength(1);
+    expect(harness.messages[0]!.options).toEqual({ triggerTurn: true, deliverAs: "followUp" });
+  });
+
+  test("F8 keeps delivery active through repeated agent_end and non-idle settlement", async () => {
+    const harness = notificationHarness({ idle: false });
+    await harness.handlers.before_agent_start!({}, harness.ctx);
+    await harness.notify(terminalNotification());
+
+    for (let attempt = 0; attempt < 3; attempt++) {
+      await harness.handlers.agent_end!({}, harness.ctx);
+      expect(harness.messages).toHaveLength(0);
+    }
+
+    const readsBeforeSettled = harness.branchReads();
+    await harness.handlers.agent_settled!({}, harness.ctx);
+    expect(harness.messages).toHaveLength(0);
+    expect(harness.branchReads()).toBe(readsBeforeSettled);
+
+    harness.setIdle(true);
+    await harness.handlers.agent_settled!({}, harness.ctx);
+    expect(harness.messages).toHaveLength(1);
+    expect(harness.messages[0]!.options).toEqual({ triggerTurn: true, deliverAs: "followUp" });
+  });
+
+  test("R7 an already-idle terminal source flushes through a current-branch scan", async () => {
+    const harness = notificationHarness();
+    await harness.handlers.session_start!({}, harness.ctx);
+    await harness.handlers.agent_settled!({}, harness.ctx);
+    await harness.notify(terminalNotification());
+    expect(harness.branchReads()).toBeGreaterThan(0);
+    expect(harness.messages).toHaveLength(1);
+    expect(harness.messages[0]!.options).toEqual({ triggerTurn: true, deliverAs: "followUp" });
+  });
+
+  test("R8 concurrent safe flushes send once, then an absent marker is retryable", async () => {
+    let overlap: Promise<unknown> | undefined;
+    let harness!: NotificationHarness;
+    harness = notificationHarness({
+      onSend: () => { overlap = Promise.resolve(harness.handlers.agent_settled!({}, harness.ctx)); },
+    });
+    await harness.handlers.session_start!({}, harness.ctx);
+    const first = harness.notify(terminalNotification());
+    await first;
+    await (overlap ?? Promise.reject(new Error("R8 did not overlap a second flush request")));
+    expect(harness.messages).toHaveLength(1);
+    await harness.handlers.agent_settled!({}, harness.ctx);
+    expect(harness.messages).toHaveLength(2);
+  });
+});
+
+
+describe("review #27 notification regressions", () => {
+  const supported = (notification: CompletionNotification, overrides: Record<string, unknown> = {}) => ({
+    type: "custom_message",
+    customType: "pi-herdr-subagent-completion",
+    details: { schema: "pi-herdr-subagent-completion/v1", ...notification, ...overrides },
+  });
+
+  test("R1 ignores a matching marker from an abandoned branch", async () => {
+    const notification = terminalNotification({ label: "current" });
+    const harness = notificationHarness({ entries: [supported(notification)], recoverNotification: notification });
+    await harness.handlers.session_start!({}, harness.ctx);
+    expect(harness.messages).toHaveLength(1);
+    expect(harness.messages[0]!.message.details.label).toBe("current");
+    expect(harness.messages[0]!.options).toEqual({ triggerTurn: false, deliverAs: "followUp" });
+  });
+
+  test("R2 ignores schema-less, unsupported, and malformed markers", async () => {
+    const notification = terminalNotification();
+    const harness = notificationHarness({ branch: [
+      supported(notification, { schema: undefined }),
+      supported(notification, { schema: "pi-herdr-subagent-completion/v2" }),
+      supported(notification, { generation: "1" }),
+      supported(notification, { reason: 7 }),
+    ] });
+    await harness.handlers.before_agent_start!({}, harness.ctx);
+    await harness.notify(notification);
+    await harness.handlers.agent_settled!({}, harness.ctx);
+    expect(harness.messages).toHaveLength(1);
+  });
+
+  test("R3 requires status in the current-branch correlation", async () => {
+    const notification = terminalNotification({ status: "completed" });
+    const harness = notificationHarness({ branch: [supported(notification, { status: "failed" })] });
+    await harness.handlers.before_agent_start!({}, harness.ctx);
+    await harness.notify(notification);
+    await harness.handlers.agent_settled!({}, harness.ctx);
+    expect(harness.messages).toHaveLength(1);
+    expect(harness.messages[0]!.message.details.status).toBe("completed");
+  });
+
+  test("R4 retries after send returns without branch visibility", async () => {
+    const notification = terminalNotification();
+    const harness = notificationHarness();
+    await harness.handlers.session_start!({}, harness.ctx);
+    await harness.notify(notification);
+    expect(harness.messages).toHaveLength(1);
+    await harness.handlers.agent_settled!({}, harness.ctx);
+    expect(harness.messages).toHaveLength(2);
+  });
+
+  test("F12 replays an absent append after restart", async () => {
+    const notification = terminalNotification();
+    const first = notificationHarness({ recoverNotification: notification });
+    await first.handlers.session_start!({}, first.ctx);
+    expect(first.messages).toHaveLength(1);
+
+    const second = notificationHarness({ recoverNotification: notification });
+    await second.handlers.session_start!({}, second.ctx);
+    expect(second.messages).toHaveLength(1);
+    expect(second.messages[0]!.message.details).toMatchObject(notification);
+  });
+
+  test("F13 keeps a failed scan retryable", async () => {
+    const notification = terminalNotification();
+    const harness = notificationHarness();
+    await harness.handlers.session_start!({}, harness.ctx);
+    harness.setFailures({ branch: true });
+    await harness.notify(notification);
+    expect(harness.messages).toHaveLength(0);
+    harness.setFailures({});
+    await harness.handlers.agent_settled!({}, harness.ctx);
+    expect(harness.messages).toHaveLength(1);
+  });
+
+  test("isolates a pending notification across sessions with a reused correlation", async () => {
+    const harness = notificationHarness({ idle: false });
+    const contextA = harness.ctx;
+    await harness.handlers.session_start!({}, contextA);
+    await harness.handlers.before_agent_start!({}, contextA);
+    await harness.notify(terminalNotification({ label: "session-a" }));
+    expect(harness.messages).toHaveLength(0);
+
+    const contextB = {
+      ...contextA,
+      isIdle: () => true,
+      sessionManager: {
+        ...contextA.sessionManager,
+        getBranch: () => [],
+      },
+    };
+    await harness.handlers.session_start!({}, contextB);
+    expect(harness.messages).toHaveLength(0);
+
+    await harness.notify(terminalNotification({ label: "session-b" }));
+    expect(harness.messages).toHaveLength(1);
+    expect(harness.messages[0]!.message.details.label).toBe("session-b");
+  });
+});
+
+
+function completionMarker(notification: CompletionNotification, overrides: Record<string, unknown> = {}) {
+  return {
+    type: "custom_message",
+    customType: "pi-herdr-subagent-completion",
+    details: { schema: "pi-herdr-subagent-completion/v1", ...notification, ...overrides },
+  };
+}
+
+test("F9 message_end does not acknowledge or flush a pending notification", async () => {
+  const harness = notificationHarness();
+  await harness.handlers.before_agent_start!({}, harness.ctx);
+  await harness.handlers.message_end?.({}, harness.ctx);
+  await harness.notify(terminalNotification());
+  expect(harness.messages).toHaveLength(0);
+  await harness.handlers.agent_settled!({}, harness.ctx);
+  expect(harness.messages).toHaveLength(1);
+});
+
+test("F13 retries after send failure without changing task delivery state", async () => {
+  const harness = notificationHarness();
+  await harness.handlers.session_start!({}, harness.ctx);
+  harness.setFailures({ send: true });
+  await harness.notify(terminalNotification());
+  expect(harness.messages).toHaveLength(0);
+  harness.setFailures({});
+  await harness.handlers.agent_settled!({}, harness.ctx);
+  expect(harness.messages).toHaveLength(1);
+});
+
+test("F16 delivers two generations independently", async () => {
+  const harness = notificationHarness();
+  await harness.handlers.before_agent_start!({}, harness.ctx);
+  await Promise.all([
+    harness.notify(terminalNotification({ generation: 1, label: "first" })),
+    harness.notify(terminalNotification({ generation: 2, label: "second" })),
+  ]);
+  await harness.handlers.agent_settled!({}, harness.ctx);
+  expect(harness.messages.map(({ message }) => [message.details.generation, message.details.label])).toEqual([[1, "first"], [2, "second"]]);
+});
+
+test("wrong ID, wrong generation, and display-only markers do not acknowledge", async () => {
+  for (const overrides of [
+    { subagentId: "other" },
+    { generation: 2 },
+    { subagentId: undefined, generation: undefined, status: undefined, label: "display-only" },
+  ]) {
+    const notification = terminalNotification();
+    const harness = notificationHarness({ branch: [completionMarker(notification, overrides)] });
+    await harness.handlers.before_agent_start!({}, harness.ctx);
+    await harness.notify(notification);
+    await harness.handlers.agent_settled!({}, harness.ctx);
+    expect(harness.messages).toHaveLength(1);
+  }
+});
+
+test("terminal statuses retain independent delivery correlation", async () => {
+  for (const status of ["completed", "failed", "cancelled"] as const) {
+    const harness = notificationHarness();
+    const notification = terminalNotification({ status, label: status });
+    await harness.handlers.before_agent_start!({}, harness.ctx);
+    await harness.notify(notification);
+    await harness.handlers.agent_settled!({}, harness.ctx);
+    expect(harness.messages[0]!.message.details).toMatchObject({ status, label: status });
+  }
+});
+
+test("late prior-session settlements are discarded when the Result appears after an epoch switch", async () => {
+  const parentA = join(mkdtempSync(join(tmpdir(), "subagents-late-a-")), "parent.jsonl");
+  const parentB = join(mkdtempSync(join(tmpdir(), "subagents-late-b-")), "parent.jsonl");
+  const runtime = new SubagentRuntime(fakeTransport().transport, handlerRegistry());
+
+
+  const handlers: Record<string, (event: unknown, ctx: any) => Promise<void>> = {};
+  const messages: Array<{ message: any; options: any }> = [];
+  const context = (sessionFile: string) => ({
+    cwd: "/repo",
+    isIdle: () => true,
+    sessionManager: {
+      getSessionFile: () => sessionFile,
+      getBranch: () => [],
+    },
+    ui: { setWidget() {} },
+  });
+  const previousChildResultPath = process.env.PI_HERDR_SUBAGENT_RESULT_PATH;
+  delete process.env.PI_HERDR_SUBAGENT_RESULT_PATH;
+  try {
+    activateSubagents({
+      on(event: string, handler: (event: unknown, ctx: any) => Promise<void>) { handlers[event] = handler; },
+      sendMessage(message: unknown, options: unknown) { messages.push({ message, options }); },
+      registerTool() {},
+      getActiveTools() { return []; },
+      setActiveTools() {},
+    } as any, { runtime, registry: handlerRegistry(), settingsStore: { load: () => ({ widgetPlacement: "off", widgetMode: "progress", useNerdFont: false }) } as any });
+
+    const contextA = context(parentA);
+    await handlers.session_start!({}, contextA);
+    await handlers.before_agent_start!({}, contextA);
+    const oldTask = await runtime.spawn({ agent: "handler", cwd: "/repo", prompt: "old", label: "old", taskSlug: "late", parentSessionFile: parentA });
+    runtime.stop();
+    const lateSettlement = runtime.join(oldTask.subagentId);
+
+    await handlers.session_start!({}, context(parentB));
+    writeFileSync(oldTask.resultPath, JSON.stringify({ subagentId: oldTask.subagentId, generation: 1, status: "completed", result: "old" }));
+    await lateSettlement;
+    expect(messages).toHaveLength(0);
+
+    const freshTask = await runtime.spawn({ agent: "handler", cwd: "/repo", prompt: "fresh", label: "fresh", taskSlug: "late", parentSessionFile: parentB });
+    writeFileSync(freshTask.resultPath, JSON.stringify({ subagentId: freshTask.subagentId, generation: 1, status: "completed", result: "fresh" }));
+    await runtime.join(freshTask.subagentId);
+    expect(messages).toHaveLength(1);
+    expect(messages[0]!.message.details).toMatchObject({ subagentId: "late", generation: 1, label: "fresh" });
+  } finally {
+    if (previousChildResultPath === undefined) delete process.env.PI_HERDR_SUBAGENT_RESULT_PATH;
+    else process.env.PI_HERDR_SUBAGENT_RESULT_PATH = previousChildResultPath;
+    runtime.stop();
+  }
 });
