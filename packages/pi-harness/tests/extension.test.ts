@@ -140,6 +140,7 @@ describe("Pi Harness Extension", () => {
           primarySkill: "research",
           context: [{ inline: "Use only supplied context.", purpose: "Scope boundary." }],
         },
+        admission: { path: "atomic", basis: ["The inspection is bounded."], verification: ["Validate the resolver result."] },
         modelRole: "standard",
       },
       undefined,

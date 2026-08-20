@@ -1,5 +1,11 @@
-import { access, constants, realpath } from "node:fs/promises";
-import { resolve } from "node:path";
+import { access, constants } from "node:fs/promises";
+import {
+  buildPlannedSubject,
+  canonicalPath,
+  canonicalJson,
+  type AuthoritySelectors,
+  type PlannedSubject,
+} from "./admission.js";
 
 export type ThinkingLevel = string;
 
@@ -38,9 +44,23 @@ export interface Handoff {
   deliverables?: string[];
 }
 
+export interface AtomicAdmission {
+  path: "atomic";
+  basis: string[];
+  verification: string[];
+}
+
+export interface PlannedAdmission {
+  path: "planned";
+  authority: AuthoritySelectors;
+}
+
+export type AdmissionInput = AtomicAdmission | PlannedAdmission;
+
 export interface ResolverInput {
   handoff: Handoff;
   modelRole: string;
+  admission: AdmissionInput;
 }
 
 export interface ResolverSchema {
@@ -55,7 +75,15 @@ export type BlockCode =
   | "invalid_reference"
   | "unknown_role"
   | "unavailable_model"
-  | "invalid_thinking";
+  | "invalid_thinking"
+  | "invalid_admission"
+  | "invalid_atomic_basis"
+  | "missing_authority"
+  | "receipt_corrupt"
+  | "authority_drift"
+  | "review_required"
+  | "acceptance_required"
+  | "amendment_invalidated";
 
 export interface BlockedResolution {
   status: "blocked";
@@ -126,6 +154,7 @@ export interface ResolveOptions {
   skills: SkillSummary[];
   roles: ModelRole[];
   cwd: string;
+  admitPlanned?: (subject: PlannedSubject, admission: PlannedAdmission, recompute: () => Promise<PlannedSubject>) => Promise<BlockedResolution | undefined>;
 }
 
 export async function resolveDelegation(
@@ -136,7 +165,7 @@ export async function resolveDelegation(
   if (!parsed.ok) return blocked(parsed.code, parsed.message);
 
   const skillNames = new Set(options.skills.map(({ name }) => name));
-  const { handoff, modelRole } = parsed.value;
+  const { handoff, modelRole, admission } = parsed.value;
   if (!skillNames.has(handoff.primarySkill)) {
     return blocked("invalid_skill", `Unknown primary Skill: ${handoff.primarySkill}`);
   }
@@ -161,8 +190,7 @@ export async function resolveDelegation(
   for (const item of handoff.context) {
     if ("ref" in item) {
       try {
-        const path = await readablePath(options.cwd, item.ref);
-        normalizedContext.push({ ref: path, purpose: item.purpose });
+        normalizedContext.push({ ref: await readablePath(options.cwd, item.ref), purpose: item.purpose });
       } catch {
         return blocked("invalid_reference", `Reference is missing or unreadable: ${item.ref}`);
       }
@@ -171,19 +199,64 @@ export async function resolveDelegation(
     }
   }
 
-  const normalizedHandoff: Handoff = {
-    ...handoff,
+  const normalizedHandoff: Handoff & Required<Pick<Handoff, "constraints" | "deliverables">> = {
+    objective: handoff.objective,
+    primarySkill: handoff.primarySkill,
+    companionSkills: [...handoff.companionSkills],
     context: normalizedContext,
-    ...(handoff.constraints ? { constraints: [...handoff.constraints] } : {}),
-    ...(handoff.deliverables ? { deliverables: [...handoff.deliverables] } : {}),
+    constraints: handoff.constraints ? [...handoff.constraints] : [],
+    deliverables: handoff.deliverables ? [...handoff.deliverables] : [],
   };
+  const admissionResult = validateAdmission(admission);
+  if (!admissionResult.ok) return blocked(admissionResult.code, admissionResult.message);
+  const validatedAdmission = admissionResult.value;
 
-  return {
-    status: "resolved",
-    prompt: Bun.YAML.stringify(normalizedHandoff),
-    model: role.model,
-    thinking: role.thinking,
-  };
+  if (validatedAdmission.path === "atomic") return resolved(normalizedHandoff, role);
+
+  let authorityPaths: AuthoritySelectors;
+  try {
+    authorityPaths = {
+      work: await canonicalPath(options.cwd, validatedAdmission.authority.work),
+      plan: await canonicalPath(options.cwd, validatedAdmission.authority.plan),
+      tasks: await canonicalPath(options.cwd, validatedAdmission.authority.tasks),
+    };
+  } catch {
+    return blocked("missing_authority", "Planned authority selectors must resolve to readable Handoff context references");
+  }
+  const selected = [authorityPaths.work, authorityPaths.plan, authorityPaths.tasks];
+  const counts = selected.map((path) => normalizedContext.filter((item) => "ref" in item && item.ref === path).length);
+  if (new Set(selected).size !== 3 || counts.some((count) => count !== 1)) {
+    return blocked("missing_authority", "Planned authority must select three distinct paths occurring exactly once in Handoff context");
+  }
+
+  let subject: PlannedSubject;
+  try {
+    subject = await buildPlannedSubject(options.cwd, authorityPaths, {
+      objective: normalizedHandoff.objective,
+      primarySkill: normalizedHandoff.primarySkill,
+      companionSkills: normalizedHandoff.companionSkills,
+      context: normalizedHandoff.context as Array<{ ref: string; purpose: string } | { inline: string; purpose: string }>,
+      constraints: normalizedHandoff.constraints,
+      deliverables: normalizedHandoff.deliverables,
+    });
+    canonicalJson(subject);
+  } catch (error) {
+    return blocked("invalid_admission", `Planned admission is not canonicalizable: ${errorMessage(error)}`);
+  }
+
+  const recompute = () => buildPlannedSubject(options.cwd, authorityPaths, {
+    objective: normalizedHandoff.objective,
+    primarySkill: normalizedHandoff.primarySkill,
+    companionSkills: normalizedHandoff.companionSkills,
+    context: normalizedHandoff.context as Array<{ ref: string; purpose: string } | { inline: string; purpose: string }>,
+    constraints: normalizedHandoff.constraints,
+    deliverables: normalizedHandoff.deliverables,
+  });
+  const admissionBlock = options.admitPlanned
+    ? await options.admitPlanned(subject, validatedAdmission, recompute)
+    : blocked("review_required", "Planned admission requires Extension-issued review and acceptance before delegation");
+  if (admissionBlock) return admissionBlock;
+  return resolved(normalizedHandoff, role);
 }
 
 export function parseHandlerResult(input: unknown): HandlerResultParse {
@@ -216,22 +289,14 @@ export function parseHandlerResult(input: unknown): HandlerResultParse {
   };
 }
 
-async function readablePath(cwd: string, ref: string): Promise<string> {
-  if (!nonEmptyString(ref)) throw new Error("empty reference");
-  const candidate = resolve(cwd, ref);
-  const canonical = await realpath(candidate);
-  await access(canonical, constants.R_OK);
-  return canonical;
-}
-
 function validateInput(input: unknown):
-  | { ok: true; value: ResolverInput }
+  | { ok: true; value: Omit<ResolverInput, "admission"> & { admission: unknown } }
   | { ok: false; code: BlockCode; message: string } {
   if (!isRecord(input) || !isRecord(input.handoff) || !nonEmptyString(input.modelRole)) {
-    return { ok: false, code: "invalid_config", message: "Resolver input requires handoff and modelRole" };
+    return { ok: false, code: "invalid_config", message: "Resolver input requires handoff, admission, and modelRole" };
   }
   const handoff = input.handoff;
-  const companionSkills = handoff.companionSkills ?? [];
+  const companionSkills = handoff.companionSkills === undefined ? [] : handoff.companionSkills;
   if (
     !nonEmptyString(handoff.objective) ||
     !nonEmptyString(handoff.primarySkill) ||
@@ -244,9 +309,7 @@ function validateInput(input: unknown):
   const context: ContextItem[] = [];
   for (const value of handoff.context) {
     const item = validateContext(value);
-    if (!item.ok) {
-      return { ok: false, code: "invalid_config", message: "Every context item needs one value and a purpose" };
-    }
+    if (!item.ok) return { ok: false, code: "invalid_config", message: "Every context item needs one value and a purpose" };
     context.push(item.value);
   }
   if (!optionalStringArray(handoff.constraints) || !optionalStringArray(handoff.deliverables)) {
@@ -261,28 +324,69 @@ function validateInput(input: unknown):
         primarySkill: handoff.primarySkill,
         companionSkills: [...companionSkills],
         context,
-        ...(handoff.constraints ? { constraints: [...handoff.constraints] } : {}),
-        ...(handoff.deliverables ? { deliverables: [...handoff.deliverables] } : {}),
+        constraints: handoff.constraints ? [...handoff.constraints] : [],
+        deliverables: handoff.deliverables ? [...handoff.deliverables] : [],
       },
+      admission: input.admission,
     },
   };
 }
 
+function validateAdmission(value: unknown):
+  | { ok: true; value: AdmissionInput }
+  | { ok: false; code: BlockCode; message: string } {
+  if (!isRecord(value)) return { ok: false, code: "invalid_admission", message: "Admission is required and must be an object" };
+  if (hasForbiddenAdmissionField(value)) return { ok: false, code: "invalid_admission", message: "Admission must not contain receipt, digest, reviewer, or workflow fields" };
+  if (value.path === "atomic") {
+    if (!exactKeys(value, ["path", "basis", "verification"])) return { ok: false, code: "invalid_admission", message: "Atomic admission has unsupported fields" };
+    if (!stringArray(value.basis) || !stringArray(value.verification) || value.basis.length === 0 || value.verification.length === 0) {
+      return { ok: false, code: "invalid_atomic_basis", message: "Atomic admission requires bounded basis and focused verification" };
+    }
+    return { ok: true, value: { path: "atomic", basis: [...value.basis], verification: [...value.verification] } };
+  }
+  if (value.path === "planned") {
+    if (!exactKeys(value, ["path", "authority"]) || !isRecord(value.authority) || hasForbiddenAdmissionField(value.authority) || !exactKeys(value.authority, ["work", "plan", "tasks"]) || ![value.authority.work, value.authority.plan, value.authority.tasks].every(nonEmptyString)) {
+      return { ok: false, code: "invalid_admission", message: "Planned admission must contain only work, plan, and tasks path selectors" };
+    }
+    return { ok: true, value: { path: "planned", authority: { work: value.authority.work, plan: value.authority.plan, tasks: value.authority.tasks } } };
+  }
+  return { ok: false, code: "invalid_admission", message: "Admission path must be atomic or planned" };
+}
 
-function validateContext(value: unknown):
-  | { ok: true; value: ContextItem }
-  | { ok: false } {
+function hasForbiddenAdmissionField(value: Record<string, unknown>): boolean {
+  const forbidden = /^(?:reviewed|review|acceptance|amendment|reviewer|outcome|reviewedAt|acceptedAt|sessionId|issuer|receipt|receiptId|receiptHandle|handle|digest|sha256|setSha256|handoffSha256|subjectSha256)$/i;
+  return Object.entries(value).some(([key, item]) => forbidden.test(key) || (isRecord(item) && hasForbiddenAdmissionField(item)) || (Array.isArray(item) && item.some((entry) => isRecord(entry) && hasForbiddenAdmissionField(entry))));
+}
+
+function exactKeys(value: Record<string, unknown>, keys: string[]): boolean {
+  const actual = Object.keys(value).sort();
+  return actual.length === keys.length && actual.every((key, index) => key === [...keys].sort()[index]);
+}
+
+function resolved(handoff: Handoff, role: ModelRole): ResolvedInvocation {
+  return { status: "resolved", prompt: Bun.YAML.stringify(handoff), model: role.model, thinking: role.thinking };
+}
+
+async function readablePath(cwd: string, ref: string): Promise<string> {
+  const path = await canonicalPath(cwd, ref);
+  await access(path, constants.R_OK);
+  return path;
+}
+
+function validateContext(value: unknown): { ok: true; value: ContextItem } | { ok: false } {
   if (!isRecord(value) || !nonEmptyString(value.purpose)) return { ok: false };
   const hasRef = nonEmptyString(value.ref);
   const hasInline = nonEmptyString(value.inline);
   if (hasRef === hasInline) return { ok: false };
-  return hasRef
-    ? { ok: true, value: { ref: value.ref, purpose: value.purpose } }
-    : { ok: true, value: { inline: value.inline, purpose: value.purpose } };
+  return hasRef ? { ok: true, value: { ref: value.ref, purpose: value.purpose } } : { ok: true, value: { inline: value.inline, purpose: value.purpose } };
+}
+
+function stringArray(value: unknown): value is string[] {
+  return Array.isArray(value) && value.every(nonEmptyString);
 }
 
 function optionalStringArray(value: unknown): value is undefined | string[] {
-  return value === undefined || (Array.isArray(value) && value.every(nonEmptyString));
+  return value === undefined || stringArray(value);
 }
 
 function isHandlerStatus(value: unknown): value is HandlerStatus {
@@ -290,9 +394,7 @@ function isHandlerStatus(value: unknown): value is HandlerStatus {
 }
 
 function isArtifacts(value: unknown): value is ResultArtifact[] {
-  return Array.isArray(value) && value.every(
-    (item) => isRecord(item) && nonEmptyString(item.ref) && nonEmptyString(item.purpose),
-  );
+  return Array.isArray(value) && value.every((item) => isRecord(item) && nonEmptyString(item.ref) && nonEmptyString(item.purpose));
 }
 
 function isRecord(value: unknown): value is Record<string, any> {
@@ -301,6 +403,10 @@ function isRecord(value: unknown): value is Record<string, any> {
 
 function nonEmptyString(value: unknown): value is string {
   return typeof value === "string" && value.trim().length > 0;
+}
+
+function errorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : "unknown admission validation error";
 }
 
 function blocked(code: BlockCode, message: string): BlockedResolution {
