@@ -97,3 +97,8 @@ A future ADR must supersede this record if those changes alter the lifecycle own
 ## Authority Reconciliation Outcome
 
 The three original behaviors now have explicit ADR and Spec ownership. The bounded post-reconciliation join amendment has its own current source/test evidence and does not alter that historical three-behavior record. The reconciliation Work records the implementation-versus-authority matrix, the historical/current evidence split, and the remaining fresh-review and regression tasks. No source, test, package metadata, README, shared index, or existing unrelated authority was changed by this reconciliation.
+
+
+## Subsequent Automatic Cleanup Decision
+
+The later accepted [Automatic terminal surface cleanup ADR](automatic-terminal-surface-cleanup.md) and [Spec section 10](../spec/runtime-lifecycle.md#10-automatic-terminal-surface-cleanup-amendment) supersede only the prospective exclusion in this record. They do not change the historical fact that automatic cleanup was not selected, required, implemented, or verified during this retrospective reconciliation. Review items `#18` and `#13` remain separate.

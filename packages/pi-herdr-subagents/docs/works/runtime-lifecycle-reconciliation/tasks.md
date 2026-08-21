@@ -74,3 +74,8 @@
 `Task 1 -> Task 2 if separately scoped -> Task 3 only when a commit is authorized`
 
 Task 2 is conditional. It remains pending because the continuation coverage gaps are real and intentionally visible. The Router/owner decides the next workflow action; these Tasks do not authorize implementation or commit by themselves.
+
+
+## Subsequent Automatic Cleanup Work
+
+Automatic terminal surface cleanup remains excluded from Task 2 above. It is now separately owned by [Terminal Surface Cleanup Work](../terminal-surface-cleanup/context.md), [Spec section 10](../../spec/runtime-lifecycle.md#10-automatic-terminal-surface-cleanup-amendment), and its own ADR. This preserves the reconciliation chronology and does not combine review items `#18` or `#13` with cleanup implementation.

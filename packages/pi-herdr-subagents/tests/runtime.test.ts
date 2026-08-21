@@ -12,7 +12,8 @@ function fakeTransport(paneExists: boolean | (() => boolean) = true) {
     async createTab(input) { calls.push({ op: "create", input }); return { tabId: "tab-1", paneId: "pane-1" }; },
     async run(paneId, command, args) { calls.push({ op: "run", paneId, command, args }); },
     async sendText(paneId, text) { calls.push({ op: "send", paneId, text }); },
-    async closePane(paneId) { calls.push({ op: "close", paneId }); },
+    async closePane(paneId) { calls.push({ op: "closePane", paneId }); },
+    async closeTab(tabId) { calls.push({ op: "closeTab", tabId }); return "closed"; },
     async paneExists(paneId) { calls.push({ op: "exists", paneId }); return typeof paneExists === "function" ? paneExists() : paneExists; },
   };
   return { calls, transport };
@@ -114,7 +115,7 @@ describe("pi-herdr-subagents runtime", () => {
     await runtime.remove(first.subagentId);
     expect(existsSync(first.sessionFile)).toBeFalse();
     expect(existsSync(dirname(second.resultPath))).toBeFalse();
-    expect(calls.filter(value => (value as { op?: string }).op === "close")).toHaveLength(1);
+    expect(calls.filter(value => (value as { op?: string }).op === "closeTab")).toHaveLength(2);
   });
 
   test("executes the named-Agent spawn tool under the parent session", async () => {
@@ -232,7 +233,7 @@ describe("pi-herdr-subagents runtime", () => {
     const rebuilt = new SubagentRuntime(transport, handlerRegistry());
     await rebuilt.recover("/repo", parentSessionFile);
     await expect(rebuilt.join(first.subagentId)).resolves.toMatchObject({ status: "cancelled", generation: 1 });
-    expect(calls).toHaveLength(0);
+    expect(calls).toEqual([{ op: "closeTab", tabId: first.tabId }]);
   });
 
   test("preserves unknown top-level manifest values across V1 migration and V2 rewrites", async () => {
@@ -297,12 +298,16 @@ describe("pi-herdr-subagents runtime", () => {
         ...(input.taskSlug ? { taskSlug: input.taskSlug } : {}),
         sessionFile,
         status: "cancelled",
-        ...unknown,
+        unknownScalar: unknown.unknownScalar,
+        unknownObject: unknown.unknownObject,
+        unknownArray: unknown.unknownArray,
+        unknownNull: unknown.unknownNull,
       });
       expect(migrated.unknownObject).toEqual(unknown.unknownObject);
       expect(migrated.unknownArray).toEqual(unknown.unknownArray);
-      expect(migrated.surfaceCleanups).toEqual(unknown.surfaceCleanups);
-      expect(calls.filter(call => (call as { op?: string }).op === "close")).toHaveLength(0);
+      expect(migrated.surfaceCleanups.slice(0, 2)).toEqual(unknown.surfaceCleanups);
+      expect(migrated.surfaceCleanups[2]).toMatchObject({ generation: 1, tabId: "tab-1", paneId: "pane-1", status: "closed" });
+      expect(calls.filter(call => (call as { op?: string }).op === "closeTab")).toHaveLength(1);
       runtime.stop();
     }
   });
@@ -319,7 +324,13 @@ describe("pi-herdr-subagents runtime", () => {
     await rebuilt.recover("/repo", parentSessionFile);
     await expect(rebuilt.join(first.subagentId)).resolves.toMatchObject({ status: "failed", error: "pane_closed" });
     const manifest = JSON.parse(readFileSync(join(dirname(first.resultPath), "task.json"), "utf8"));
-    expect(manifest).toMatchObject({ version: 2, subagentId: first.subagentId, status: "failed", error: "pane_closed" });
+    expect(manifest).toMatchObject({
+      version: 2,
+      subagentId: first.subagentId,
+      status: "failed",
+      error: "pane_closed",
+      surfaceCleanups: [{ generation: 1, tabId: "tab-1", paneId: "pane-1", status: "closed" }],
+    });
     await rebuilt.remove(first.subagentId);
     expect(existsSync(dirname(first.resultPath))).toBeFalse();
   });
@@ -944,10 +955,10 @@ test("aborting join leaves the running task unchanged until explicit cancellatio
   expect(existsSync(task.resultPath)).toBeFalse();
   expect(readFileSync(join(dirname(task.resultPath), "task.json"), "utf8")).toBe(manifest);
   expect(notifications).toEqual([]);
-  expect(calls.filter(call => (call as { op?: string }).op === "close")).toHaveLength(0);
+  expect(calls.filter(call => (call as { op?: string }).op === "closeTab")).toHaveLength(0);
 
   await expect(runtime.cancel(task.subagentId)).resolves.toMatchObject({ status: "cancelled" });
-  expect(calls.filter(call => (call as { op?: string }).op === "close")).toHaveLength(1);
+  expect(calls.filter(call => (call as { op?: string }).op === "closeTab")).toHaveLength(1);
   expect(notifications).toEqual([{ subagentId: task.subagentId, generation: task.generation, status: "cancelled", label: "join" }]);
 });
 
@@ -1595,6 +1606,511 @@ test("late prior-session settlements are discarded when the Result appears after
   } finally {
     if (previousChildResultPath === undefined) delete process.env.PI_HERDR_SUBAGENT_RESULT_PATH;
     else process.env.PI_HERDR_SUBAGENT_RESULT_PATH = previousChildResultPath;
+    runtime.stop();
+  }
+});
+
+
+describe("Phase B terminal surface cleanup", () => {
+  const cleanupFor = (task: { surfaceCleanups?: unknown[] }, generation: number) =>
+    (task.surfaceCleanups as Array<Record<string, unknown>> | undefined)?.find(value => value?.generation === generation && typeof value.status === "string");
+
+  test("translates accepted-tab close and classifies tab_not_found", async () => {
+    const calls: string[][] = [];
+    let missing = false;
+    const transport = createHerdrTransport(createHerdrClient(async (_command, args) => {
+      calls.push([...args]);
+      return missing
+        ? { code: 1, stdout: JSON.stringify({ error: { code: "tab_not_found" } }), stderr: "" }
+        : { code: 0, stdout: "{}", stderr: "" };
+    }), { workspaceId: "wF" });
+
+    await expect(transport.closeTab("wF:t9")).resolves.toBe("closed");
+    missing = true;
+    await expect(transport.closeTab("wF:t9")).resolves.toBe("already_closed");
+    expect(calls).toEqual([["tab", "close", "wF:t9"], ["tab", "close", "wF:t9"]]);
+  });
+
+  test("persists completed, failed, and cancelled outcomes before one close and retains artifacts", async () => {
+    for (const status of ["completed", "failed", "cancelled"] as const) {
+      const root = mkdtempSync(join(tmpdir(), `subagents-cleanup-${status}-`));
+      const notifications: CompletionNotification[] = [];
+      const { calls, transport } = fakeTransport();
+      transport.closeTab = async tabId => {
+        const manifest = JSON.parse(readFileSync(join(root, "tasks", "task-artifacts", "task.json"), "utf8"));
+        expect(manifest.status).toBe(status);
+        expect(manifest.surfaceCleanups[0]).toMatchObject({ generation: 1, tabId, paneId: "pane-1", status: "pending" });
+        expect(existsSync(join(root, "tasks", "task-artifacts", "result-1.json"))).toBeTrue();
+        calls.push({ op: "closeTab", tabId });
+        return "closed";
+      };
+      const runtime = new SubagentRuntime(transport, handlerRegistry(), root, value => { notifications.push(value); });
+      const task = await runtime.spawn({ agent: "handler", cwd: "/repo", prompt: "work", label: status, taskSlug: "task" });
+      writeFileSync(task.sessionFile, "session");
+      if (status === "cancelled") await Promise.all([runtime.cancel(task.subagentId), runtime.cancel(task.subagentId)]);
+      else {
+        writeFileSync(task.resultPath, JSON.stringify({
+          subagentId: task.subagentId,
+          generation: 1,
+          status,
+          ...(status === "completed" ? { result: "done" } : { error: "child failed" }),
+        }));
+        await Promise.all([runtime.join(task.subagentId), runtime.join(task.subagentId)]);
+      }
+
+      const settled = runtime.inspect(task.subagentId);
+      expect(settled).toMatchObject({ status, result: status === "completed" ? "done" : undefined, error: status === "failed" ? "child failed" : undefined });
+      expect(cleanupFor(settled, 1)).toEqual({
+        generation: 1, tabId: "tab-1", paneId: "pane-1", status: "closed", attemptedAt: expect.any(String),
+      });
+      expect(calls.filter(value => (value as { op?: string }).op === "closeTab")).toHaveLength(1);
+      expect(existsSync(task.sessionFile)).toBeTrue();
+      expect(existsSync(task.resultPath)).toBeTrue();
+      expect(existsSync(join(dirname(task.resultPath), "task.json"))).toBeTrue();
+      expect(existsSync(join(dirname(task.resultPath), "launch-1.ps1"))).toBeTrue();
+      expect(existsSync(join(dirname(task.resultPath), "launch-1.cjs"))).toBeTrue();
+      expect(notifications).toEqual([{
+        subagentId: task.subagentId,
+        generation: 1,
+        status,
+        label: status,
+        ...(status === "failed" ? { reason: "child failed" } : {}),
+      }]);
+      runtime.stop();
+    }
+  });
+
+  test("keeps inspect non-blocking, aborts only one join wait, and isolates close failure", async () => {
+    const root = mkdtempSync(join(tmpdir(), "subagents-cleanup-pending-"));
+    const notifications: CompletionNotification[] = [];
+    const { calls, transport } = fakeTransport();
+    let closeStarted!: () => void;
+    const started = new Promise<void>(resolve => { closeStarted = resolve; });
+    let rejectClose!: (error: Error) => void;
+    const close = new Promise<never>((_resolve, reject) => { rejectClose = reject; });
+    transport.closeTab = async tabId => { calls.push({ op: "closeTab", tabId }); closeStarted(); return close; };
+    const runtime = new SubagentRuntime(transport, handlerRegistry(), root, value => { notifications.push(value); });
+    const task = await runtime.spawn({ agent: "handler", cwd: "/repo", prompt: "work", label: "pending", taskSlug: "task" });
+    writeFileSync(task.sessionFile, "session");
+    writeFileSync(task.resultPath, JSON.stringify({ subagentId: task.subagentId, generation: 1, status: "completed", result: "done" }));
+    const joined = runtime.join(task.subagentId);
+    await started;
+
+    const pending = runtime.inspect(task.subagentId);
+    expect(pending.status).toBe("completed");
+    expect(cleanupFor(pending, 1)?.status).toBe("pending");
+    expect(JSON.parse(readFileSync(join(dirname(task.resultPath), "task.json"), "utf8"))).toMatchObject({ status: "completed", surfaceCleanups: [{ status: "pending" }] });
+    (pending.surfaceCleanups![0] as Record<string, unknown>).status = "closed";
+    expect(cleanupFor(runtime.inspect(task.subagentId), 1)?.status).toBe("pending");
+    expect(notifications).toEqual([]);
+
+    const controller = new AbortController();
+    const aborted = runtime.join(task.subagentId, 1, controller.signal);
+    controller.abort();
+    await expect(aborted).rejects.toMatchObject({ name: "AbortError" });
+    rejectClose(new Error("  close\n  denied  "));
+    await expect(joined).resolves.toMatchObject({ status: "completed", result: "done" });
+
+    const settled = runtime.inspect(task.subagentId);
+    expect(cleanupFor(settled, 1)).toMatchObject({ status: "failed", error: "close denied" });
+    expect(settled.status).toBe("completed");
+    expect(existsSync(task.sessionFile)).toBeTrue();
+    expect(existsSync(task.resultPath)).toBeTrue();
+    expect(notifications).toEqual([{ subagentId: task.subagentId, generation: 1, status: "completed", label: "pending" }]);
+    expect(calls.filter(value => (value as { op?: string }).op === "closeTab")).toHaveLength(1);
+    runtime.stop();
+  });
+
+  test("retries once per recovery, preserves opaque and nested unknown data, then stays idempotent", async () => {
+    const parentSessionFile = join(mkdtempSync(join(tmpdir(), "subagents-cleanup-retry-")), "parent.jsonl");
+    const firstTransport = fakeTransport().transport;
+    firstTransport.closeTab = async () => { throw new Error("first close failed"); };
+    const firstRuntime = new SubagentRuntime(firstTransport, handlerRegistry());
+    const task = await firstRuntime.spawn({ agent: "handler", cwd: "/repo", prompt: "work", label: "retry", taskSlug: "task", parentSessionFile });
+    writeFileSync(task.sessionFile, "session");
+    writeFileSync(task.resultPath, JSON.stringify({ subagentId: task.subagentId, generation: 1, status: "failed", error: "primary" }));
+    await firstRuntime.join(task.subagentId);
+    firstRuntime.stop();
+
+    const manifestPath = join(dirname(task.resultPath), "task.json");
+    const manifest = JSON.parse(readFileSync(manifestPath, "utf8"));
+    manifest.unknownTop = { keep: [1, null, { value: true }] };
+    manifest.surfaceCleanups[0].future = { keep: ["nested"] };
+    manifest.surfaceCleanups.push({ generation: 1, status: "future", opaque: { keep: true } }, null);
+    writeFileSync(manifestPath, JSON.stringify(manifest));
+
+    const { calls, transport } = fakeTransport();
+    transport.closeTab = async tabId => { calls.push({ op: "closeTab", tabId }); return "already_closed"; };
+    const rebuilt = new SubagentRuntime(transport, handlerRegistry());
+    await rebuilt.recover("/repo", parentSessionFile);
+    const recovered = rebuilt.inspect(task.subagentId);
+    expect(recovered).toMatchObject({ generation: 1, status: "failed", error: "primary" });
+    expect(cleanupFor(recovered, 1)).toMatchObject({ status: "already_closed", future: { keep: ["nested"] } });
+    expect(recovered.surfaceCleanups!.slice(1)).toEqual([{ generation: 1, status: "future", opaque: { keep: true } }, null]);
+    const persisted = JSON.parse(readFileSync(manifestPath, "utf8"));
+    expect(persisted.unknownTop).toEqual(manifest.unknownTop);
+    expect(persisted.surfaceCleanups[0].future).toEqual({ keep: ["nested"] });
+    expect(calls.filter(value => (value as { op?: string }).op === "closeTab")).toHaveLength(1);
+
+    (recovered.surfaceCleanups![0] as any).future.keep.push("mutated");
+    expect((cleanupFor(rebuilt.inspect(task.subagentId), 1) as any).future).toEqual({ keep: ["nested"] });
+    await rebuilt.recover("/repo", parentSessionFile);
+    expect(calls.filter(value => (value as { op?: string }).op === "closeTab")).toHaveLength(1);
+    rebuilt.stop();
+  });
+
+  test("retries failed prior generations without changing the resumed generation", async () => {
+    const parentSessionFile = join(mkdtempSync(join(tmpdir(), "subagents-cleanup-generations-")), "parent.jsonl");
+    const calls: string[] = [];
+    let created = 0;
+    const transport: HerdrTransport = {
+      async createTab() { created++; return { tabId: `tab-${created}`, paneId: `pane-${created}` }; },
+      async run() {}, async sendText() {}, async closePane() {}, async paneExists() { return true; },
+      async closeTab(tabId) { calls.push(tabId); if (tabId === "tab-1") throw new Error("old close failed"); return "closed"; },
+    };
+    const runtime = new SubagentRuntime(transport, handlerRegistry());
+    const first = await runtime.spawn({ agent: "handler", cwd: "/repo", prompt: "one", label: "generations", taskSlug: "task", parentSessionFile });
+    writeFileSync(first.sessionFile, "session");
+    writeFileSync(first.resultPath, JSON.stringify({ subagentId: first.subagentId, generation: 1, status: "failed", error: "retry task" }));
+    await runtime.join(first.subagentId);
+    const second = await runtime.resume(first.subagentId, "two");
+    writeFileSync(second.resultPath, JSON.stringify({ subagentId: second.subagentId, generation: 2, status: "completed", result: "done" }));
+    const completed = await runtime.join(second.subagentId);
+    expect(cleanupFor(completed, 1)).toMatchObject({ tabId: "tab-1", status: "failed" });
+    expect(cleanupFor(completed, 2)).toMatchObject({ tabId: "tab-2", status: "closed" });
+    expect(calls).toEqual(["tab-1", "tab-2"]);
+    runtime.stop();
+
+    const recoveryCalls: string[] = [];
+    const recovery = fakeTransport().transport;
+    recovery.closeTab = async tabId => { recoveryCalls.push(tabId); return "already_closed"; };
+    const rebuilt = new SubagentRuntime(recovery, handlerRegistry());
+    await rebuilt.recover("/repo", parentSessionFile);
+    const recovered = rebuilt.inspect(first.subagentId);
+    expect(recovered).toMatchObject({ generation: 2, status: "completed", result: "done" });
+    expect(cleanupFor(recovered, 1)).toMatchObject({ tabId: "tab-1", status: "already_closed" });
+    expect(cleanupFor(recovered, 2)).toMatchObject({ tabId: "tab-2", status: "closed" });
+    expect(recoveryCalls).toEqual(["tab-1"]);
+    rebuilt.stop();
+  });
+
+  test("classifies never-created and identity-missing terminal generations without a close", async () => {
+    const root = mkdtempSync(join(tmpdir(), "subagents-cleanup-not-created-"));
+    const createFailure = fakeTransport();
+    createFailure.transport.createTab = async () => { throw new Error("create failed"); };
+    const failed = new SubagentRuntime(createFailure.transport, handlerRegistry(), root);
+    await expect(failed.spawn({ agent: "handler", cwd: "/repo", prompt: "work", label: "none", taskSlug: "task" })).rejects.toThrow("create failed");
+    expect(cleanupFor(failed.inspect("task"), 1)).toMatchObject({ generation: 1, status: "not_created" });
+    expect(createFailure.calls.filter(value => (value as { op?: string }).op === "closeTab")).toHaveLength(0);
+    failed.stop();
+
+    const parentSessionFile = join(mkdtempSync(join(tmpdir(), "subagents-cleanup-identity-")), "parent.jsonl");
+    const original = new SubagentRuntime(fakeTransport().transport, handlerRegistry());
+    const task = await original.spawn({ agent: "handler", cwd: "/repo", prompt: "work", label: "identity", taskSlug: "task", parentSessionFile });
+    original.stop();
+    const manifestPath = join(dirname(task.resultPath), "task.json");
+    const manifest = JSON.parse(readFileSync(manifestPath, "utf8"));
+    delete manifest.tabId;
+    delete manifest.paneId;
+    manifest.status = "failed";
+    manifest.error = "lost identity";
+    writeFileSync(manifestPath, JSON.stringify(manifest));
+    const rebuiltTransport = fakeTransport();
+    const rebuilt = new SubagentRuntime(rebuiltTransport.transport, handlerRegistry());
+    await rebuilt.recover("/repo", parentSessionFile);
+    expect(cleanupFor(rebuilt.inspect(task.subagentId), 1)).toMatchObject({ generation: 1, status: "identity_missing" });
+    expect(rebuiltTransport.calls.filter(value => (value as { op?: string }).op === "closeTab")).toHaveLength(0);
+    rebuilt.stop();
+  });
+
+  test("closes accepted launch failures and active removals by tab, never pane", async () => {
+    const launch = fakeTransport();
+    launch.transport.run = async () => { throw new Error("run failed"); };
+    const failed = new SubagentRuntime(launch.transport, handlerRegistry(), mkdtempSync(join(tmpdir(), "subagents-cleanup-launch-")));
+    await expect(failed.spawn({ agent: "handler", cwd: "/repo", prompt: "work", label: "launch", taskSlug: "task" })).rejects.toThrow("run failed");
+    expect(cleanupFor(failed.inspect("task"), 1)).toMatchObject({ status: "closed", tabId: "tab-1" });
+    expect(launch.calls.filter(value => (value as { op?: string }).op === "closeTab")).toHaveLength(1);
+    expect(launch.calls.filter(value => (value as { op?: string }).op === "closePane")).toHaveLength(0);
+
+    const active = fakeTransport();
+    const root = mkdtempSync(join(tmpdir(), "subagents-cleanup-active-remove-"));
+    const runtime = new SubagentRuntime(active.transport, handlerRegistry(), root);
+    const task = await runtime.spawn({ agent: "handler", cwd: "/repo", prompt: "work", label: "remove", taskSlug: "task" });
+    writeFileSync(task.sessionFile, "session");
+    await runtime.remove(task.subagentId);
+    expect(active.calls.filter(value => (value as { op?: string }).op === "closeTab")).toEqual([{ op: "closeTab", tabId: "tab-1" }]);
+    expect(active.calls.filter(value => (value as { op?: string }).op === "closePane")).toHaveLength(0);
+    expect(existsSync(task.sessionFile)).toBeFalse();
+    expect(existsSync(dirname(task.resultPath))).toBeFalse();
+  });
+
+  test("blocks removal while actionable cleanup keeps failing, then deletes retained files after retry succeeds", async () => {
+    const root = mkdtempSync(join(tmpdir(), "subagents-cleanup-remove-"));
+    const { calls, transport } = fakeTransport();
+    let fail = true;
+    transport.closeTab = async tabId => { calls.push({ op: "closeTab", tabId }); if (fail) throw new Error("close blocked"); return "closed"; };
+    const runtime = new SubagentRuntime(transport, handlerRegistry(), root);
+    const task = await runtime.spawn({ agent: "handler", cwd: "/repo", prompt: "work", label: "remove", taskSlug: "task" });
+    writeFileSync(task.sessionFile, "session");
+    writeFileSync(task.resultPath, JSON.stringify({ subagentId: task.subagentId, generation: 1, status: "completed", result: "done" }));
+    await runtime.join(task.subagentId);
+    await expect(runtime.remove(task.subagentId)).rejects.toThrow("surface_cleanup_failed");
+    expect(existsSync(task.sessionFile)).toBeTrue();
+    expect(existsSync(dirname(task.resultPath))).toBeTrue();
+    expect(cleanupFor(runtime.inspect(task.subagentId), 1)?.status).toBe("failed");
+
+    fail = false;
+    await runtime.remove(task.subagentId);
+    expect(calls.filter(value => (value as { op?: string }).op === "closeTab")).toHaveLength(3);
+    expect(existsSync(task.sessionFile)).toBeFalse();
+    expect(existsSync(dirname(task.resultPath))).toBeFalse();
+  });
+
+  test("selects one fail-safe canonical duplicate per generation without rewriting the others", async () => {
+    const attemptedAt = "2026-01-01T00:00:00.000Z";
+    const record = (status: "pending" | "failed" | "closed" | "already_closed", marker: string) => ({
+      generation: 1,
+      tabId: "tab-1",
+      paneId: "pane-1",
+      status,
+      attemptedAt,
+      ...(status === "failed" ? { error: "retry close" } : {}),
+      opaque: { marker },
+    });
+    const cases = [
+      { name: "final-pending", entries: [record("closed", "final"), record("pending", "pending")], updatedIndex: 1, closes: 1 },
+      { name: "failed-final", entries: [record("failed", "failed"), record("already_closed", "final")], updatedIndex: 0, closes: 1 },
+      { name: "pending-failed", entries: [record("pending", "pending"), record("failed", "failed")], updatedIndex: 0, closes: 1 },
+      { name: "final-final", entries: [record("closed", "first"), record("already_closed", "second")], updatedIndex: undefined, closes: 0 },
+    ] as const;
+
+    for (const testCase of cases) {
+      const root = mkdtempSync(join(tmpdir(), `subagents-cleanup-duplicates-${testCase.name}-`));
+      const original = new SubagentRuntime(fakeTransport().transport, handlerRegistry(), root);
+      const task = await original.spawn({ agent: "handler", cwd: "/repo", prompt: "work", label: testCase.name, taskSlug: "task" });
+      writeFileSync(task.sessionFile, "session");
+      original.stop();
+      const manifestPath = join(dirname(task.resultPath), "task.json");
+      const manifest = JSON.parse(readFileSync(manifestPath, "utf8"));
+      manifest.status = "completed";
+      manifest.surfaceCleanups = testCase.entries;
+      writeFileSync(manifestPath, JSON.stringify(manifest));
+      const untouched = testCase.entries.map(value => JSON.stringify(value));
+
+      const { calls, transport } = fakeTransport();
+      const rebuilt = new SubagentRuntime(transport, handlerRegistry(), root);
+      await rebuilt.recover("/repo");
+
+      const persisted = JSON.parse(readFileSync(manifestPath, "utf8"));
+      expect(calls.filter(value => (value as { op?: string }).op === "closeTab")).toHaveLength(testCase.closes);
+      expect(persisted.surfaceCleanups).toHaveLength(2);
+      for (let index = 0; index < untouched.length; index++) {
+        if (index !== testCase.updatedIndex) expect(JSON.stringify(persisted.surfaceCleanups[index])).toBe(untouched[index]);
+      }
+      if (testCase.updatedIndex !== undefined) {
+        expect(persisted.surfaceCleanups[testCase.updatedIndex]).toMatchObject({ status: "closed", opaque: testCase.entries[testCase.updatedIndex].opaque });
+      }
+      rebuilt.stop();
+    }
+  });
+
+  test("validates cleanup timestamps, status identities/errors, and the 160-character diagnostic boundary", async () => {
+    const attemptedAt = "2026-01-01T00:00:00.000Z";
+    const validIdentity = { generation: 1, tabId: "tab-1", paneId: "pane-1", status: "pending", attemptedAt };
+    const cases: Array<{ name: string; record: Record<string, unknown>; valid?: boolean }> = [
+      { name: "malformed-timestamp", record: { ...validIdentity, attemptedAt: "not-a-date" } },
+      { name: "noncanonical-timestamp", record: { ...validIdentity, attemptedAt: "2026-01-01T00:00:00Z" } },
+      { name: "impossible-timestamp", record: { ...validIdentity, attemptedAt: "2026-02-30T00:00:00.000Z" } },
+      { name: "blank-tab", record: { ...validIdentity, tabId: " " } },
+      { name: "pending-missing-tab", record: { generation: 1, paneId: "pane-1", status: "pending", attemptedAt } },
+      { name: "closed-missing-tab", record: { generation: 1, status: "closed", attemptedAt } },
+      { name: "already-closed-missing-tab", record: { generation: 1, status: "already_closed", attemptedAt } },
+      { name: "failed-missing-tab", record: { generation: 1, status: "failed", attemptedAt, error: "failure" } },
+      { name: "failed-missing-error", record: { ...validIdentity, status: "failed" } },
+      { name: "failed-empty-error", record: { ...validIdentity, status: "failed", error: "" } },
+      { name: "pending-forbidden-error", record: { ...validIdentity, error: "failure" } },
+      { name: "closed-forbidden-error", record: { ...validIdentity, status: "closed", error: "failure" } },
+      { name: "not-created-forbidden-tab", record: { generation: 1, tabId: "tab-1", status: "not_created", attemptedAt } },
+      { name: "not-created-forbidden-pane", record: { generation: 1, paneId: "pane-1", status: "not_created", attemptedAt } },
+      { name: "identity-missing-forbidden-tab", record: { generation: 1, tabId: "tab-1", status: "identity_missing", attemptedAt } },
+      { name: "diagnostic-160", record: { ...validIdentity, status: "failed", error: "x".repeat(160) }, valid: true },
+      { name: "diagnostic-161", record: { ...validIdentity, status: "failed", error: "x".repeat(161) } },
+    ];
+
+    for (const testCase of cases) {
+      const root = mkdtempSync(join(tmpdir(), `subagents-cleanup-validation-${testCase.name}-`));
+      const original = new SubagentRuntime(fakeTransport().transport, handlerRegistry(), root);
+      const task = await original.spawn({ agent: "handler", cwd: "/repo", prompt: "work", label: testCase.name, taskSlug: "task" });
+      original.stop();
+      const manifestPath = join(dirname(task.resultPath), "task.json");
+      const manifest = JSON.parse(readFileSync(manifestPath, "utf8"));
+      manifest.status = "completed";
+      manifest.surfaceCleanups = [testCase.record];
+      writeFileSync(manifestPath, JSON.stringify(manifest));
+
+      const { transport } = fakeTransport();
+      const rebuilt = new SubagentRuntime(transport, handlerRegistry(), root);
+      await rebuilt.recover("/repo");
+      const persisted = JSON.parse(readFileSync(manifestPath, "utf8"));
+      if (testCase.valid) {
+        expect(persisted.surfaceCleanups).toHaveLength(1);
+        expect(persisted.surfaceCleanups[0]).toMatchObject({ generation: 1, status: "closed" });
+      } else {
+        expect(persisted.surfaceCleanups).toHaveLength(2);
+        expect(persisted.surfaceCleanups[0]).toEqual(testCase.record);
+        expect(persisted.surfaceCleanups[1]).toMatchObject({ generation: 1, tabId: task.tabId, paneId: task.paneId, status: "closed" });
+      }
+      rebuilt.stop();
+    }
+  });
+
+  test("normalizes close diagnostics at the exact 160/161-character boundary", async () => {
+    for (const length of [160, 161]) {
+      const reason = "x".repeat(length);
+      const { transport } = fakeTransport();
+      transport.closeTab = async () => { throw new Error(reason); };
+      const runtime = new SubagentRuntime(transport, handlerRegistry(), mkdtempSync(join(tmpdir(), `subagents-cleanup-diagnostic-${length}-`)));
+      const task = await runtime.spawn({ agent: "handler", cwd: "/repo", prompt: "work", label: String(length), taskSlug: "task" });
+      writeFileSync(task.resultPath, JSON.stringify({ subagentId: task.subagentId, generation: 1, status: "completed", result: "done" }));
+      const settled = await runtime.join(task.subagentId);
+      expect(cleanupFor(settled, 1)?.error).toBe(length === 160 ? reason : `${reason.slice(0, 157)}...`);
+      expect((cleanupFor(settled, 1)?.error as string).length).toBe(160);
+      runtime.stop();
+    }
+  });
+
+  test("blocks duplicate cleanup removal after one failed close and preserves all retained evidence", async () => {
+    const root = mkdtempSync(join(tmpdir(), "subagents-cleanup-duplicate-remove-"));
+    const original = new SubagentRuntime(fakeTransport().transport, handlerRegistry(), root);
+    const task = await original.spawn({ agent: "handler", cwd: "/repo", prompt: "work", label: "duplicate remove", taskSlug: "task" });
+    writeFileSync(task.sessionFile, "session");
+    original.stop();
+    const manifestPath = join(dirname(task.resultPath), "task.json");
+    const manifest = JSON.parse(readFileSync(manifestPath, "utf8"));
+    const final = { generation: 1, tabId: task.tabId, paneId: task.paneId, status: "closed", attemptedAt: "2026-01-01T00:00:00.000Z", opaque: { keep: "final" } };
+    manifest.status = "completed";
+    manifest.surfaceCleanups = [final, { generation: 1, tabId: task.tabId, paneId: task.paneId, status: "failed", attemptedAt: "2026-01-01T00:00:00.000Z", error: "retry", opaque: { keep: "failed" } }];
+    writeFileSync(manifestPath, JSON.stringify(manifest));
+
+    let closes = 0;
+    const { transport } = fakeTransport();
+    transport.closeTab = async () => { closes++; throw new Error("x".repeat(161)); };
+    const rebuilt = new SubagentRuntime(transport, handlerRegistry(), root);
+    await rebuilt.recover("/repo");
+    expect(closes).toBe(1);
+    await expect(rebuilt.remove(task.subagentId)).rejects.toThrow("surface_cleanup_failed");
+    expect(closes).toBe(2);
+    expect(existsSync(task.sessionFile)).toBeTrue();
+    expect(existsSync(dirname(task.resultPath))).toBeTrue();
+    const retained = JSON.parse(readFileSync(manifestPath, "utf8"));
+    expect(JSON.stringify(retained.surfaceCleanups[0])).toBe(JSON.stringify(final));
+    expect(retained.surfaceCleanups[1]).toMatchObject({ status: "failed", error: `${"x".repeat(157)}...`, opaque: { keep: "failed" } });
+    rebuilt.stop();
+  });
+});
+
+
+describe("Phase B launch and running-generation overlap", () => {
+  const cleanupForGeneration = (task: { surfaceCleanups?: unknown[] }, generation: number) =>
+    (task.surfaceCleanups as Array<Record<string, unknown>> | undefined)?.find(value => value?.generation === generation && typeof value.status === "string");
+
+  test("waits for accepted launch ownership before concurrent cancellation", async () => {
+    const root = mkdtempSync(join(tmpdir(), "subagents-cleanup-launch-cancel-"));
+    const notifications: CompletionNotification[] = [];
+    const { calls, transport } = fakeTransport();
+    let admit!: (surface: { tabId: string; paneId: string }) => void;
+    transport.createTab = async () => new Promise(resolve => { admit = resolve; });
+    const runtime = new SubagentRuntime(transport, handlerRegistry(), root, value => { notifications.push(value); });
+    const spawning = runtime.spawn({ agent: "handler", cwd: "/repo", prompt: "work", label: "launch cancel", taskSlug: "task" });
+    while (!admit) await Bun.sleep(1);
+    const cancelling = runtime.cancel("task");
+    let cancelled = false;
+    void cancelling.then(() => { cancelled = true; });
+    await Bun.sleep(5);
+    expect(cancelled).toBeFalse();
+
+    admit({ tabId: "accepted-tab", paneId: "accepted-pane" });
+    await spawning;
+    const task = await cancelling;
+    expect(task).toMatchObject({ status: "cancelled", tabId: "accepted-tab", paneId: "accepted-pane" });
+    expect(cleanupForGeneration(task, 1)).toMatchObject({ tabId: "accepted-tab", paneId: "accepted-pane", status: "closed" });
+    expect(calls.filter(value => (value as { op?: string }).op === "closeTab")).toEqual([{ op: "closeTab", tabId: "accepted-tab" }]);
+    expect(calls.filter(value => (value as { op?: string }).op === "closePane")).toHaveLength(0);
+    expect(notifications).toEqual([{ subagentId: "task", generation: 1, status: "cancelled", label: "launch cancel" }]);
+    runtime.stop();
+  });
+
+  test("retries prior-generation cleanup while the current generation remains running", async () => {
+    const parentSessionFile = join(mkdtempSync(join(tmpdir(), "subagents-cleanup-running-recovery-")), "parent.jsonl");
+    let created = 0;
+    const first: HerdrTransport = {
+      async createTab() { created++; return { tabId: `tab-${created}`, paneId: `pane-${created}` }; },
+      async run() {}, async sendText() {}, async closePane() {}, async paneExists() { return true; },
+      async closeTab(tabId) { if (tabId === "tab-1") throw new Error("old close failed"); return "closed"; },
+    };
+    const runtime = new SubagentRuntime(first, handlerRegistry());
+    const generation1 = await runtime.spawn({ agent: "handler", cwd: "/repo", prompt: "one", label: "running recovery", taskSlug: "task", parentSessionFile });
+    writeFileSync(generation1.sessionFile, "session");
+    writeFileSync(generation1.resultPath, JSON.stringify({ subagentId: generation1.subagentId, generation: 1, status: "failed", error: "first" }));
+    await runtime.join(generation1.subagentId);
+    const generation2 = await runtime.resume(generation1.subagentId, "two");
+    expect(generation2.status).toBe("running");
+    runtime.stop();
+
+    const calls: string[] = [];
+    const recovery = fakeTransport().transport;
+    recovery.closeTab = async tabId => { calls.push(tabId); return "already_closed"; };
+    const rebuilt = new SubagentRuntime(recovery, handlerRegistry());
+    await rebuilt.recover("/repo", parentSessionFile);
+    const recovered = rebuilt.inspect(generation1.subagentId);
+    expect(recovered).toMatchObject({ generation: 2, status: "running", tabId: "tab-2", paneId: "pane-2" });
+    expect(cleanupForGeneration(recovered, 1)).toMatchObject({ tabId: "tab-1", status: "already_closed" });
+    expect(cleanupForGeneration(recovered, 2)).toBeUndefined();
+    expect(calls).toEqual(["tab-1"]);
+    rebuilt.stop();
+  });
+});
+
+
+test("coalesces recovery, resume, and remove with an in-flight terminal cleanup", async () => {
+  for (const action of ["recover", "resume", "remove"] as const) {
+    const parentSessionFile = join(mkdtempSync(join(tmpdir(), `subagents-cleanup-${action}-overlap-`)), "parent.jsonl");
+    const { calls, transport } = fakeTransport();
+    let closeStarted!: () => void;
+    const started = new Promise<void>(resolve => { closeStarted = resolve; });
+    let releaseClose!: () => void;
+    const release = new Promise<void>(resolve => { releaseClose = resolve; });
+    transport.closeTab = async tabId => { calls.push({ op: "closeTab", tabId }); closeStarted(); await release; return "closed"; };
+    const runtime = new SubagentRuntime(transport, handlerRegistry());
+    const task = await runtime.spawn({ agent: "handler", cwd: "/repo", prompt: "one", label: action, taskSlug: "task", parentSessionFile });
+    writeFileSync(task.sessionFile, "session");
+    writeFileSync(task.resultPath, JSON.stringify({ subagentId: task.subagentId, generation: 1, status: "completed", result: "done" }));
+    const joined = runtime.join(task.subagentId);
+    await started;
+
+    const operation = action === "recover"
+      ? runtime.recover("/repo", parentSessionFile)
+      : action === "resume"
+        ? runtime.resume(task.subagentId, "two")
+        : runtime.remove(task.subagentId);
+    let finished = false;
+    void operation.then(() => { finished = true; });
+    await Bun.sleep(5);
+    expect(finished).toBeFalse();
+    releaseClose();
+    await joined;
+    const outcome = await operation;
+
+    expect(calls.filter(value => (value as { op?: string }).op === "closeTab")).toHaveLength(1);
+    if (action === "recover") {
+      expect(runtime.inspect(task.subagentId)).toMatchObject({ generation: 1, status: "completed", result: "done" });
+    } else if (action === "resume") {
+      expect(outcome).toMatchObject({ generation: 2, status: "running" });
+      expect((outcome as any).surfaceCleanups).toEqual([expect.objectContaining({ generation: 1, status: "closed" })]);
+    } else {
+      expect(existsSync(task.sessionFile)).toBeFalse();
+      expect(existsSync(dirname(task.resultPath))).toBeFalse();
+    }
     runtime.stop();
   }
 });

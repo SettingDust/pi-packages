@@ -47,6 +47,7 @@ function transport(pane: true | false | Error, calls: string[]): HerdrTransport 
     async run() {},
     async sendText() {},
     async closePane() {},
+    async closeTab() { return "closed"; },
     async paneExists(paneId) {
       calls.push(paneId);
       if (pane instanceof Error) throw pane;
@@ -159,8 +160,20 @@ describe("V1 lifecycle migration", () => {
     });
     const rewritten = JSON.parse(readFileSync(join(artifactDir, "task.json"), "utf8"));
     expect(rewritten).toMatchObject({
-      version: 2, subagentId, taskSlug, generation: 1, sessionFile, status: "failed", error: "invalid_result", ...unknown,
+      version: 2,
+      subagentId,
+      taskSlug,
+      generation: 1,
+      sessionFile,
+      status: "failed",
+      error: "invalid_result",
+      unknownScalar: unknown.unknownScalar,
+      unknownObject: unknown.unknownObject,
+      unknownArray: unknown.unknownArray,
+      unknownNull: unknown.unknownNull,
     });
+    expect(rewritten.surfaceCleanups.slice(0, 2)).toEqual(unknown.surfaceCleanups);
+    expect(rewritten.surfaceCleanups[2]).toMatchObject({ generation: 1, tabId: "tab-1", paneId: "pane-1", status: "closed" });
     expect(JSON.parse(readFileSync(resultPath, "utf8"))).toEqual(malformed);
     expect(calls).toEqual(["pane-1"]);
     runtime.stop();

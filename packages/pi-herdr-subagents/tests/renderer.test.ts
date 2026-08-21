@@ -19,6 +19,7 @@ test("renders named-Agent spawn and join actions", async () => {
     async run() {},
     async sendText() {},
     async closePane() {},
+    async closeTab() { return "closed"; },
     async paneExists() { return true; },
   };
   const registry = new AgentRegistry();

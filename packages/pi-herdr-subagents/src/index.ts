@@ -17,10 +17,16 @@ export const paneChildExtensionPath = resolve(dirname(fileURLToPath(import.meta.
 export type AgentDefinition = { name: string; path: string; body: string; description: string };
 export type TaskStatus = "queued" | "running" | "completed" | "failed" | "cancelled";
 export type ActiveTaskStatus = Extract<TaskStatus, "queued" | "running">;
+export type SurfaceCleanupStatus = "pending" | "closed" | "already_closed" | "not_created" | "identity_missing" | "failed";
+export type SurfaceCleanupRecord = {
+  generation: number; tabId?: string; paneId?: string; status: SurfaceCleanupStatus; attemptedAt: string; error?: string;
+  [key: string]: unknown;
+};
 export type SubagentTask = {
   subagentId: string; taskSlug?: string; generation: number; agent: string; cwd: string; label: string; model?: string; thinking?: string;
   sessionFile: string; resultPath: string; tabId: string; paneId: string; status: TaskStatus;
   createdAt: string; queuedAt: string; startedAt?: string; updatedAt: string; result?: string; error?: string;
+  surfaceCleanups?: unknown[];
 };
 
 export type TaskIdAllocationErrorCode = "invalid_task_slug" | "task_id_exhausted" | "filesystem_reservation_failed";
@@ -61,7 +67,7 @@ export type TaskRecordV1 = {
 export type TaskRecordV2 = {
   version: 2; subagentId: string; taskSlug?: string; generation: number; agent: string; cwd: string; label: string; model?: string; thinking?: string;
   sessionFile: string; tabId?: string; paneId?: string; status: TaskStatus;
-  queuedAt: string; startedAt?: string; updatedAt: string; error?: string; notifiedGeneration?: number;
+  queuedAt: string; startedAt?: string; updatedAt: string; error?: string; notifiedGeneration?: number; surfaceCleanups?: unknown[];
 };
 type TaskRecord = TaskRecordV1 | TaskRecordV2;
 export type HerdrTransport = {
@@ -69,6 +75,7 @@ export type HerdrTransport = {
   run(paneId: string, command: string, args: string[]): Promise<void>;
   sendText(paneId: string, text: string): Promise<void>;
   closePane(paneId: string): Promise<void>;
+  closeTab(tabId: string): Promise<"closed" | "already_closed">;
   paneExists(paneId: string): Promise<boolean>;
 };
 
@@ -78,7 +85,7 @@ const manifestOwnedFields = new Set([
   "tabId", "paneId", "status", "createdAt", "queuedAt", "startedAt", "updatedAt", "error", "notifiedGeneration",
 ]);
 function manifestUnknownFields(value: Json): Json {
-  return Object.fromEntries(Object.entries(value).filter(([key]) => !manifestOwnedFields.has(key)));
+  return Object.fromEntries(Object.entries(value).filter(([key]) => !manifestOwnedFields.has(key) && (key !== "surfaceCleanups" || !Array.isArray(value.surfaceCleanups))));
 }
 function unwrap(value: Json): Json { return value.result && typeof value.result === "object" && !Array.isArray(value.result) ? value.result as Json : value; }
 function powerShellInvocation(command: string, args: string[]): string {
@@ -166,6 +173,13 @@ export function createHerdrTransport(client: HerdrClient<{ cwd?: string }> = cre
     async run(paneId, command, args) { await client.run(["pane", "run", paneId, powerShellInvocation(command, args)], {}); },
     async sendText(paneId, text) { await client.run(["pane", "run", paneId, text], {}); },
     async closePane(paneId) { await client.run(["pane", "close", paneId], {}); },
+    async closeTab(tabId) {
+      const args = ["tab", "close", tabId];
+      const result = await client.exec(args, {});
+      if (result.code === 0 && !result.killed) return "closed";
+      if (hasHerdrErrorCode(result, "tab_not_found") || `${result.stderr}\n${result.stdout}`.toLowerCase().includes("tab not found")) return "already_closed";
+      throw new Error(commandFailure(args, result));
+    },
     async paneExists(paneId) {
       const result = await client.exec(["pane", "get", paneId], {});
       if (result.code === 0 && !result.killed) return true;
@@ -304,6 +318,9 @@ export class SubagentRuntime {
   private monitors = new Map<string, AbortController>();
   private notified = new Set<string>();
   private manifestUnknown = new Map<string, Json>();
+  private launches = new Map<string, Promise<void>>();
+  private settlements = new Map<string, Promise<void>>();
+  private cleanups = new Map<string, Promise<void>>();
   private taskUpdateListeners = new Set<() => void>();
   private completionNotifier?: CompletionNotifier;
 
@@ -354,6 +371,7 @@ export class SubagentRuntime {
   async recover(cwd: string, parentSessionFile?: string, notifiedKeys: Iterable<string> = []): Promise<void> {
     const completionNotifier = this.completionNotifier;
     const tasksDir = this.tasksDir(cwd, parentSessionFile);
+    await this.awaitAllOperations();
     this.selectScope(tasksDir);
     this.stop();
     this.tasks.clear();
@@ -422,9 +440,11 @@ export class SubagentRuntime {
         }
       }
       this.tasks.set(task.subagentId, task);
+      this.prepareRecoveryCleanups(task);
       await this.persist(task);
       if (task.status === "running") this.startMonitor(task);
-      else if (isTerminalStatus(task.status)) await this.notifyTerminal(task, completionNotifier);
+      await this.runPendingCleanups(task);
+      if (isTerminalStatus(task.status)) await this.notifyTerminal(task, completionNotifier);
     }
     this.notifyTaskUpdate();
   }
@@ -432,6 +452,7 @@ export class SubagentRuntime {
   async resume(subagentId: string, prompt: string): Promise<SubagentTask> {
     const old = this.get(subagentId);
     if (isActiveStatus(old.status)) throw new Error("Cannot resume an active subagent");
+    await this.awaitTaskOperations(old);
     return this.start({
       subagentId: old.subagentId,
       taskSlug: old.taskSlug,
@@ -444,6 +465,7 @@ export class SubagentRuntime {
       thinking: old.thinking,
       sessionFile: old.sessionFile,
       artifactDir: dirname(old.resultPath),
+      surfaceCleanups: cloneJson(old.surfaceCleanups),
     });
   }
 
@@ -495,6 +517,7 @@ export class SubagentRuntime {
     parentSessionFile?: string;
     sessionFile?: string;
     artifactDir?: string;
+    surfaceCleanups?: unknown[];
   }): Promise<SubagentTask> {
     const completionNotifier = this.completionNotifier;
     const agent = this.resolveAgent(input.agent);
@@ -509,54 +532,66 @@ export class SubagentRuntime {
       subagentId: input.subagentId, taskSlug: input.taskSlug, generation: input.generation, agent: input.agent, cwd: input.cwd, label: input.label,
       model: input.model, thinking: input.thinking, sessionFile, resultPath, tabId: "", paneId: "", status: "queued",
       createdAt: queuedAt, queuedAt, updatedAt: queuedAt,
+      ...(input.surfaceCleanups ? { surfaceCleanups: cloneJson(input.surfaceCleanups) } : {}),
     };
     await this.persist(task);
     this.tasks.set(task.subagentId, task);
     this.notifyTaskUpdate();
+    const launchKey = this.taskKey(task);
+    let finishLaunch!: () => void;
+    const launch = new Promise<void>(resolve => { finishLaunch = resolve; });
+    this.launches.set(launchKey, launch);
     try {
-      const surface = await this.transport.createTab({
-        cwd: input.cwd,
-        label: input.label,
-        env: {
-          PI_HERDR_SUBAGENT_ID: input.subagentId,
-          PI_HERDR_SUBAGENT_GENERATION: String(input.generation),
-          PI_HERDR_SUBAGENT_RESULT_PATH: resultPath,
-        },
-      });
-      task.tabId = surface.tabId;
-      task.paneId = surface.paneId;
-    } catch (error) {
-      await this.settle(task, "failed", completionNotifier, undefined, String(error));
-      throw error;
+      try {
+        const surface = await this.transport.createTab({
+          cwd: input.cwd,
+          label: input.label,
+          env: {
+            PI_HERDR_SUBAGENT_ID: input.subagentId,
+            PI_HERDR_SUBAGENT_GENERATION: String(input.generation),
+            PI_HERDR_SUBAGENT_RESULT_PATH: resultPath,
+          },
+        });
+        task.tabId = surface.tabId;
+        task.paneId = surface.paneId;
+      } catch (error) {
+        await this.settle(task, "failed", completionNotifier, undefined, String(error), true);
+        throw error;
+      }
+      if (this.tasks.get(task.subagentId) !== task) {
+        try { await this.transport.closeTab(task.tabId); } catch { /* Removal already owns the visible state. */ }
+        throw new Error("Subagent was removed during launch");
+      }
+      if (task.status !== "queued") {
+        this.prepareCleanup(task, false, true);
+        await this.persist(task);
+        await this.runCleanup(task);
+        return snapshotTask(task);
+      }
+      task.status = "running";
+      task.startedAt = new Date().toISOString();
+      task.updatedAt = task.startedAt;
+      await this.persist(task);
+      this.notifyTaskUpdate();
+      const args = ["--session", sessionFile, "-e", paneChildExtensionPath, "--system-prompt", agent.body, "--tools", "read,bash,edit,write,subagent_done"];
+      if (input.model) args.push("--model", input.thinking ? `${input.model}:${input.thinking}` : input.model);
+      args.push(`${input.prompt}\n\nReturn the Handler Result as YAML, then call subagent_done with that exact YAML string.`);
+      const launchScript = join(artifactDir, `launch-${input.generation}.ps1`);
+      const bootstrapScript = join(artifactDir, `launch-${input.generation}.cjs`);
+      try {
+        await writeFile(bootstrapScript, buildNodeLaunchScript(input.cwd, "pi", args));
+        await writeFile(launchScript, `\ufeff$ErrorActionPreference = 'Stop'\r\n${powerShellInvocation(bootstrapRuntime(), [bootstrapScript])}\r\nexit $LASTEXITCODE\r\n`);
+        await this.transport.run(task.paneId, "powershell.exe", ["-NoLogo", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", launchScript]);
+      } catch (error) {
+        await this.settle(task, "failed", completionNotifier, undefined, String(error));
+        throw error;
+      }
+      this.startMonitor(task);
+      return snapshotTask(task);
+    } finally {
+      finishLaunch();
+      if (this.launches.get(launchKey) === launch) this.launches.delete(launchKey);
     }
-    if (this.tasks.get(task.subagentId) !== task) {
-      try { await this.transport.closePane(task.paneId); } catch { /* Removal already owns the visible state. */ }
-      throw new Error("Subagent was removed during launch");
-    }
-    if (task.status !== "queued") {
-      try { await this.transport.closePane(task.paneId); } catch { /* Cancellation remains terminal even if pane cleanup fails. */ }
-      return { ...task };
-    }
-    task.status = "running";
-    task.startedAt = new Date().toISOString();
-    task.updatedAt = task.startedAt;
-    await this.persist(task);
-    this.notifyTaskUpdate();
-    const args = ["--session", sessionFile, "-e", paneChildExtensionPath, "--system-prompt", agent.body, "--tools", "read,bash,edit,write,subagent_done"];
-    if (input.model) args.push("--model", input.thinking ? `${input.model}:${input.thinking}` : input.model);
-    args.push(`${input.prompt}\n\nReturn the Handler Result as YAML, then call subagent_done with that exact YAML string.`);
-    const launchScript = join(artifactDir, `launch-${input.generation}.ps1`);
-    const bootstrapScript = join(artifactDir, `launch-${input.generation}.cjs`);
-    try {
-      await writeFile(bootstrapScript, buildNodeLaunchScript(input.cwd, "pi", args));
-      await writeFile(launchScript, `\ufeff$ErrorActionPreference = 'Stop'\r\n${powerShellInvocation(bootstrapRuntime(), [bootstrapScript])}\r\nexit $LASTEXITCODE\r\n`);
-      await this.transport.run(task.paneId, "powershell.exe", ["-NoLogo", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", launchScript]);
-    } catch (error) {
-      await this.settle(task, "failed", completionNotifier, undefined, String(error));
-      throw error;
-    }
-    this.startMonitor(task);
-    return { ...task };
   }
 
   agentNames(): string[] { return this.registry.list().map(({ name }) => name); }
@@ -580,45 +615,53 @@ export class SubagentRuntime {
     }
   }
 
-  inspect(id: string): SubagentTask { return { ...this.get(id) }; }
+  inspect(id: string): SubagentTask { return snapshotTask(this.get(id)); }
 
   async join(id: string, generation = this.get(id).generation, signal?: AbortSignal): Promise<SubagentTask> {
     const task = this.get(id);
     if (task.generation !== generation) throw new Error("Subagent generation is no longer current");
+    await waitForPromise(this.launches.get(this.taskKey(task)), signal);
     const completionNotifier = this.completionNotifier;
     while (isActiveStatus(task.status)) {
-      if (existsSync(task.resultPath)) await this.settleFromResult(task, completionNotifier);
+      if (existsSync(task.resultPath)) await waitForPromise(this.settleFromResult(task, completionNotifier), signal);
       else await delay(50, undefined, { signal });
     }
-    return { ...task };
+    await waitForPromise(this.operationFor(task), signal);
+    return snapshotTask(task);
   }
 
   async steer(id: string, message: string): Promise<SubagentTask> {
     const task = this.get(id);
     if (task.status !== "running") throw new Error("Subagent is not running");
     await this.transport.sendText(task.paneId, message);
-    return { ...task };
+    return snapshotTask(task);
   }
 
   async cancel(id: string): Promise<SubagentTask> {
     const task = this.get(id);
     const completionNotifier = this.completionNotifier;
+    await this.launches.get(this.taskKey(task));
     if (isActiveStatus(task.status)) {
       this.stopMonitor(task);
-      if (task.paneId) {
-        try { await this.transport.closePane(task.paneId); }
-        catch (error) { this.startMonitor(task); throw error; }
-      }
-      await writeAtomic(task.resultPath, { subagentId: id, generation: task.generation, status: "cancelled" });
-      await this.settle(task, "cancelled", completionNotifier);
+      await this.settle(task, "cancelled", completionNotifier, undefined, undefined, !task.tabId, true);
+    } else {
+      await this.awaitTaskOperations(task);
     }
-    return { ...task };
+    return snapshotTask(task);
   }
 
   async remove(id: string): Promise<void> {
     const task = this.get(id);
     this.stopMonitor(task);
-    if (isActiveStatus(task.status) && task.paneId) await this.transport.closePane(task.paneId);
+    await this.launches.get(this.taskKey(task));
+    await this.awaitTaskOperations(task);
+    this.prepareRecoveryCleanups(task);
+    await this.persist(task);
+    await this.runPendingCleanups(task);
+    const cleanup = recognizedCleanupRecords(task.surfaceCleanups, task.generation)
+      .find(value => value.record.status === "pending" || value.record.status === "failed")?.record;
+    if (cleanup) throw new Error(`surface_cleanup_failed: ${cleanup.error ?? "cleanup remains pending"}`);
+    if (isActiveStatus(task.status) && task.tabId) await this.transport.closeTab(task.tabId);
     this.tasks.delete(id);
     this.manifestUnknown.delete(id);
     this.notifyTaskUpdate();
@@ -678,16 +721,113 @@ export class SubagentRuntime {
     else await this.settle(task, "failed", completionNotifier, undefined, result.error);
   }
 
-  private async settle(task: SubagentTask, status: Exclude<TaskStatus, ActiveTaskStatus>, completionNotifier: CompletionNotifier | undefined, result?: string, error?: string): Promise<void> {
-    if (!isActiveStatus(task.status)) return;
-    this.stopMonitor(task);
-    task.status = status;
-    task.result = result;
-    task.error = error;
-    task.updatedAt = new Date().toISOString();
-    await this.persist(task);
-    this.notifyTaskUpdate();
-    await this.notifyTerminal(task, completionNotifier);
+  private settle(
+    task: SubagentTask,
+    status: Exclude<TaskStatus, ActiveTaskStatus>,
+    completionNotifier: CompletionNotifier | undefined,
+    result?: string,
+    error?: string,
+    notCreated = false,
+    writeCancelledResult = false,
+  ): Promise<void> {
+    const key = this.taskKey(task);
+    const existing = this.settlements.get(key);
+    if (existing) return existing;
+    if (!isActiveStatus(task.status)) return Promise.resolve();
+    const operation = (async () => {
+      this.stopMonitor(task);
+      if (writeCancelledResult) await writeAtomic(task.resultPath, { subagentId: task.subagentId, generation: task.generation, status: "cancelled" });
+      task.status = status;
+      task.result = result;
+      task.error = error;
+      task.updatedAt = new Date().toISOString();
+      this.prepareCleanup(task, notCreated);
+      await this.persist(task);
+      this.notifyTaskUpdate();
+      await this.runCleanup(task);
+      await this.notifyTerminal(task, completionNotifier);
+    })();
+    this.settlements.set(key, operation);
+    void operation.then(
+      () => { if (this.settlements.get(key) === operation) this.settlements.delete(key); },
+      () => { if (this.settlements.get(key) === operation) this.settlements.delete(key); },
+    );
+    return operation;
+  }
+
+  private prepareCleanup(task: SubagentTask, notCreated: boolean, retry = false): void {
+    const existing = recognizedCleanup(task.surfaceCleanups, task.generation);
+    if (existing && isFinalCleanupStatus(existing.record.status)) return;
+    if (existing && !retry && existing.record.status === "pending") return;
+    const attemptedAt = new Date().toISOString();
+    const status: SurfaceCleanupStatus = notCreated ? "not_created" : task.tabId ? "pending" : "identity_missing";
+    const record = cleanupRecord(existing?.record, {
+      generation: task.generation,
+      ...(task.tabId ? { tabId: task.tabId } : {}),
+      ...(task.paneId ? { paneId: task.paneId } : {}),
+      status,
+      attemptedAt,
+    });
+    setCleanup(task, existing?.index, record);
+  }
+
+  private prepareRecoveryCleanups(task: SubagentTask): void {
+    if (isTerminalStatus(task.status)) this.prepareCleanup(task, false, true);
+    for (const cleanup of recognizedCleanupRecords(task.surfaceCleanups, task.generation)) {
+      if (cleanup.record.status !== "pending" && cleanup.record.status !== "failed") continue;
+      setCleanup(task, cleanup.index, cleanupRecord(cleanup.record, {
+        ...cleanup.record,
+        status: "pending",
+        attemptedAt: new Date().toISOString(),
+      }));
+    }
+  }
+
+  private async runPendingCleanups(task: SubagentTask): Promise<void> {
+    const generations = recognizedCleanupRecords(task.surfaceCleanups, task.generation)
+      .filter(value => value.record.status === "pending")
+      .map(value => value.record.generation);
+    for (const generation of generations) await this.runCleanup(task, generation);
+  }
+
+  private runCleanup(task: SubagentTask, generation = task.generation): Promise<void> {
+    const key = `${task.subagentId}:${generation}`;
+    const existing = this.cleanups.get(key);
+    if (existing) return existing;
+    const cleanup = recognizedCleanup(task.surfaceCleanups, generation);
+    if (!cleanup || cleanup.record.status !== "pending") return Promise.resolve();
+    const operation = (async () => {
+      try {
+        const status = await this.transport.closeTab(cleanup.record.tabId!);
+        setCleanup(task, cleanup.index, cleanupRecord(cleanup.record, { ...cleanup.record, status }));
+      } catch (error) {
+        setCleanup(task, cleanup.index, cleanupRecord(cleanup.record, {
+          ...cleanup.record,
+          status: "failed",
+          error: briefReason(error instanceof Error ? error.message : String(error)),
+        }));
+      }
+      await this.persist(task);
+    })();
+    this.cleanups.set(key, operation);
+    void operation.then(
+      () => { if (this.cleanups.get(key) === operation) this.cleanups.delete(key); },
+      () => { if (this.cleanups.get(key) === operation) this.cleanups.delete(key); },
+    );
+    return operation;
+  }
+
+  private operationFor(task: SubagentTask): Promise<void> | undefined {
+    const key = this.taskKey(task);
+    return this.settlements.get(key) ?? this.cleanups.get(key);
+  }
+
+  private async awaitTaskOperations(task: SubagentTask): Promise<void> {
+    await this.operationFor(task);
+  }
+
+  private async awaitAllOperations(): Promise<void> {
+    await Promise.all([...this.launches.values(), ...this.settlements.values(), ...this.cleanups.values()]);
   }
 
 
@@ -715,6 +855,7 @@ export class SubagentRuntime {
       tabId: task.tabId || undefined, paneId: task.paneId || undefined, status: task.status, queuedAt: task.queuedAt,
       ...(task.startedAt ? { startedAt: task.startedAt } : {}), updatedAt: task.updatedAt,
       ...(task.error ? { error: task.error } : {}),
+      ...(task.surfaceCleanups ? { surfaceCleanups: cloneJson(task.surfaceCleanups) } : {}),
     };
     await writeAtomic(this.recordPath(task), record);
   }
@@ -732,6 +873,7 @@ export class SubagentRuntime {
       model: record.model, thinking: record.thinking, sessionFile: record.sessionFile,
       resultPath: join(artifactDir, `result-${record.generation}.json`), tabId: record.tabId ?? "", paneId: record.paneId ?? "",
       status, createdAt: queuedAt, queuedAt, ...(startedAt ? { startedAt } : {}), updatedAt: record.updatedAt, error: record.error,
+      ...(Array.isArray((record as unknown as Json).surfaceCleanups) ? { surfaceCleanups: cloneJson((record as unknown as Json).surfaceCleanups as unknown[]) } : {}),
     };
   }
 
@@ -778,6 +920,92 @@ export class SubagentRuntime {
       return { valid: true, status: value.status, result: value.result as string | undefined, error: value.error as string | undefined };
     } catch { return { valid: false, error: "invalid_result" }; }
   }
+}
+
+function cloneJson<T>(value: T): T {
+  return value === undefined ? value : structuredClone(value);
+}
+
+function snapshotTask(task: SubagentTask): SubagentTask {
+  return { ...task, ...(task.surfaceCleanups ? { surfaceCleanups: cloneJson(task.surfaceCleanups) } : {}) };
+}
+
+function parseCleanupRecord(value: unknown): SurfaceCleanupRecord | undefined {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return;
+  const record = value as Json;
+  if (!Number.isInteger(record.generation) || (record.generation as number) < 1 || !isIsoTimestamp(record.attemptedAt)) return;
+  if (record.tabId !== undefined && (typeof record.tabId !== "string" || record.tabId.trim().length === 0)) return;
+  if (record.paneId !== undefined && (typeof record.paneId !== "string" || record.paneId.trim().length === 0)) return;
+  if (!isSurfaceCleanupStatus(record.status)) return;
+  if (record.status === "not_created" && (record.tabId !== undefined || record.paneId !== undefined)) return;
+  if (record.status === "identity_missing" && record.tabId !== undefined) return;
+  if ((record.status === "pending" || record.status === "closed" || record.status === "already_closed" || record.status === "failed") && typeof record.tabId !== "string") return;
+  if (record.status === "failed") {
+    if (typeof record.error !== "string" || !record.error || briefReason(record.error) !== record.error) return;
+  } else if (record.error !== undefined) return;
+  return record as SurfaceCleanupRecord;
+}
+
+function recognizedCleanup(values: unknown[] | undefined, generation: number): { index: number; record: SurfaceCleanupRecord } | undefined {
+  return recognizedCleanupRecords(values, generation).find(value => value.record.generation === generation);
+}
+
+function recognizedCleanupRecords(values: unknown[] | undefined, maximumGeneration: number): Array<{ index: number; record: SurfaceCleanupRecord }> {
+  if (!values) return [];
+  const selected = new Map<number, { index: number; record: SurfaceCleanupRecord }>();
+  for (let index = 0; index < values.length; index++) {
+    const record = parseCleanupRecord(values[index]);
+    if (!record || record.generation > maximumGeneration) continue;
+    const current = selected.get(record.generation);
+    const actionable = record.status === "pending" || record.status === "failed";
+    if (!current || (actionable && current.record.status !== "pending" && current.record.status !== "failed")) {
+      selected.set(record.generation, { index, record });
+    }
+  }
+  return [...selected.values()].sort((left, right) => left.index - right.index);
+}
+
+function cleanupRecord(existing: SurfaceCleanupRecord | undefined, value: SurfaceCleanupRecord): SurfaceCleanupRecord {
+  const unknown = existing
+    ? Object.fromEntries(Object.entries(existing).filter(([key]) => !["generation", "tabId", "paneId", "status", "attemptedAt", "error"].includes(key)))
+    : {};
+  return {
+    ...cloneJson(unknown),
+    generation: value.generation,
+    ...(value.tabId ? { tabId: value.tabId } : {}),
+    ...(value.paneId ? { paneId: value.paneId } : {}),
+    status: value.status,
+    attemptedAt: value.attemptedAt,
+    ...(value.status === "failed" && value.error ? { error: value.error } : {}),
+  };
+}
+
+function setCleanup(task: SubagentTask, index: number | undefined, record: SurfaceCleanupRecord): void {
+  const values = cloneJson(task.surfaceCleanups ?? []);
+  if (index === undefined) values.push(record);
+  else values[index] = record;
+  task.surfaceCleanups = values;
+}
+
+function isSurfaceCleanupStatus(value: unknown): value is SurfaceCleanupStatus {
+  return value === "pending" || value === "closed" || value === "already_closed" || value === "not_created" || value === "identity_missing" || value === "failed";
+}
+
+function isFinalCleanupStatus(value: SurfaceCleanupStatus): boolean {
+  return value === "closed" || value === "already_closed" || value === "not_created" || value === "identity_missing";
+}
+
+async function waitForPromise(promise: Promise<void> | undefined, signal?: AbortSignal): Promise<void> {
+  if (!promise) return;
+  if (!signal) return promise;
+  signal.throwIfAborted();
+  let abort!: () => void;
+  const aborted = new Promise<void>((_resolve, reject) => {
+    abort = () => reject(new DOMException("The operation was aborted", "AbortError"));
+    signal.addEventListener("abort", abort, { once: true });
+  });
+  try { await Promise.race([promise, aborted]); }
+  finally { signal.removeEventListener("abort", abort); }
 }
 
 function validateTaskSlug(value: unknown): string {

@@ -176,3 +176,8 @@ This Work does not modify:
 - Notification crash window: remains explicit and unresolved by design.
 - Source/test/package metadata changes: none; no source change was made for this reconciliation.
 - Documentation commit: not requested; no commit created.
+
+
+## Subsequent Automatic Cleanup Amendment
+
+The later accepted [Automatic terminal surface cleanup ADR](../../adr/automatic-terminal-surface-cleanup.md), [Spec section 10](../../spec/runtime-lifecycle.md#10-automatic-terminal-surface-cleanup-amendment), and [bounded Work](../terminal-surface-cleanup/context.md) now own prospective terminal tab/pane cleanup. This does not change this Work's retrospective conclusion that automatic cleanup was excluded and unimplemented when the original reconciliation was completed. Review items `#18` and `#13` remain separate.

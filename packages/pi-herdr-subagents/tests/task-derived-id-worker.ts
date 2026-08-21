@@ -14,6 +14,7 @@ const transport: HerdrTransport = {
   async run() {},
   async sendText() {},
   async closePane() {},
+  async closeTab() { return "closed"; },
   async paneExists() { return true; },
 };
 const registry = new AgentRegistry();

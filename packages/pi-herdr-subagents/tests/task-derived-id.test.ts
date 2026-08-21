@@ -11,6 +11,7 @@ function transport() {
     async run() { calls.push("run"); },
     async sendText() {},
     async closePane() {},
+    async closeTab() { return "closed"; },
     async paneExists() { return true; },
   };
   return { calls, value };
@@ -194,7 +195,7 @@ test("reserves unique IDs from separate processes racing on one artifact directo
 
 test("completion notification recovery accepts only supported current-branch correlations", async () => {
   const runtime = new SubagentRuntime({
-    async createTab() { return { tabId: "tab", paneId: "pane" }; }, async run() {}, async sendText() {}, async closePane() {}, async paneExists() { return true; },
+    async createTab() { return { tabId: "tab", paneId: "pane" }; }, async run() {}, async sendText() {}, async closePane() {}, async closeTab() { return "closed" as const; }, async paneExists() { return true; },
   }, new AgentRegistry());
   const handlers: Record<string, (event: unknown, ctx: any) => Promise<void>> = {};
   const previous = process.env.PI_HERDR_SUBAGENT_RESULT_PATH;

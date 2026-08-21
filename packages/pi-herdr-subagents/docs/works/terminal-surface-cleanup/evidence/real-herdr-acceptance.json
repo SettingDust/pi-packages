@@ -1,0 +1,94 @@
+{
+  "observedAt": "2026-08-21T15:34:53.756Z",
+  "provenance": {
+    "herdrVersion": {
+      "command": "herdr --version",
+      "output": "herdr 0.8.2-preview.2026-08-19-b5c4a0176e91"
+    },
+    "source": {
+      "path": "src/index.ts",
+      "sha256": "c6da5edbdee580078d3c6f6768bbd2021980f3978c321cb856ba2c9e85d6d363"
+    },
+    "acceptanceScript": {
+      "path": "docs/works/terminal-surface-cleanup/evidence/real-herdr-acceptance.ts",
+      "sha256": "326c79a3423db5c79b3cbe209ec1efa010c07aafcf6e323e2a6e67e6b9966161"
+    }
+  },
+  "herdrWorkspaceId": "wC",
+  "disposableTabCount": 1,
+  "scenarios": [
+    {
+      "name": "phase-b-real-close",
+      "tabId": "wC:t14",
+      "paneId": "wC:pJX",
+      "paneExistedBefore": true,
+      "paneExistsAfter": false,
+      "operations": [
+        {
+          "sequence": 1,
+          "operation": "create_no_focus",
+          "tabId": "wC:t14",
+          "paneId": "wC:pJX"
+        },
+        {
+          "sequence": 2,
+          "operation": "pane_exists_before",
+          "paneId": "wC:pJX",
+          "outcome": true
+        },
+        {
+          "sequence": 3,
+          "operation": "terminal_result_written",
+          "resultPath": "C:\\Users\\WINDOWS\\AppData\\Local\\Temp\\pi-herdr-phase-b-real-close-a8dByj\\tasks\\phase-b-real-close-artifacts\\result-1.json"
+        },
+        {
+          "sequence": 4,
+          "operation": "runtime_tab_close",
+          "tabId": "wC:t14",
+          "observation": {
+            "terminalStatus": "completed",
+            "cleanupStatus": "pending",
+            "resultExists": true
+          }
+        },
+        {
+          "sequence": 5,
+          "operation": "runtime_tab_close_outcome",
+          "tabId": "wC:t14",
+          "outcome": "closed"
+        },
+        {
+          "sequence": 6,
+          "operation": "pane_exists_after",
+          "paneId": "wC:pJX",
+          "outcome": false
+        },
+        {
+          "sequence": 7,
+          "operation": "repeat_tab_close",
+          "tabId": "wC:t14",
+          "outcome": "already_closed"
+        }
+      ],
+      "cleanup": {
+        "generation": 1,
+        "tabId": "wC:t14",
+        "paneId": "wC:pJX",
+        "status": "closed",
+        "attemptedAt": "2026-08-21T15:34:53.508Z"
+      },
+      "repeatClose": "already_closed",
+      "retained": {
+        "session": true,
+        "result": true,
+        "manifest": true,
+        "launchPowerShell": true,
+        "launchBootstrap": true
+      }
+    }
+  ],
+  "finallyCleanup": {
+    "attempts": [],
+    "remainingAcceptedTabs": []
+  }
+}
