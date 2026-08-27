@@ -118,20 +118,23 @@ There is no retry count, continuation count, or production time limit. Each late
 
 ### 5.2 Single Pending Continuation
 
-The child extension must keep at most one pending continuation timer. A later `agent_end` replaces the existing timer rather than accumulating follow-ups. A continuation timer may send only when the generation is not settled and no input has started after the relevant `agent_end`.
+The child extension must keep at most one pending continuation timer. A later `agent_end` replaces the existing timer rather than accumulating follow-ups. A continuation timer may send only when the generation's completion state is `active` and no input has started after the relevant `agent_end`.
 
 The following lifecycle events must clear a pending continuation:
 
 - `before_agent_start`;
 - `agent_start`;
-- `input`; and
-- `session_shutdown`.
+- `input`;
+- `session_shutdown`; and
+- an accepted `subagent_done` entering `settling`.
 
 `agent_start` must reset the input-after-end guard for the new turn. A later unfinished `agent_end` may then schedule one new continuation.
 
 ### 5.3 Terminal Result And Cleanup
 
-`subagent_done` must be idempotent for one child generation. The first call must mark the child settled, clear pending continuation, atomically write the generation Result artifact, and shut down the child execution after the write completes. Calls after settlement must not schedule or send another continuation or overwrite the first Result.
+[Terminal Input Barrier Specification](terminal-input-barrier.md) is the specialized normative authority for child completion persistence and controls if this lifecycle summary is read differently. `subagent_done` accepted while the child is `active` must synchronously enter `settling` and clear pending continuation. `settling` is not terminal: the child may enter `settled` only after the generation Result has been written and atomically renamed into place.
+
+A write or rename failure must restore `active` before the tool failure is propagated, must not call shutdown, and must permit a later completion attempt. Calls made while one attempt is `settling` must join that attempt's in-flight outcome without starting another write. The Result body of the first attempt whose atomic persistence succeeds wins; failed attempts and later calls must not overwrite it. After successful persistence, the child enters `settled`, calls shutdown once, and must not schedule or send another continuation.
 
 The continuation extension must not participate in parent-side task polling or notification dedupe. The parent runtime may continue its ordinary terminal Result/pane monitor; it must not need to poll the child to decide whether to send continuation.
 

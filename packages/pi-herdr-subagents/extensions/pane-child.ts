@@ -3,12 +3,22 @@ import { writeFile } from "node:fs/promises";
 import { Type } from "@earendil-works/pi-ai";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 
-export default function paneChild(pi: ExtensionAPI): void {
+type CompletionState = "active" | "settling" | "settled";
+type PaneChildOperations = {
+  writeFile(path: string, data: string): Promise<void>;
+  rename(source: string, destination: string): void;
+};
+
+export default function paneChild(
+  pi: ExtensionAPI,
+  operations: PaneChildOperations = { writeFile, rename: renameSync },
+): void {
   const resultPath = process.env.PI_HERDR_SUBAGENT_RESULT_PATH;
   const subagentId = process.env.PI_HERDR_SUBAGENT_ID;
   const generation = Number(process.env.PI_HERDR_SUBAGENT_GENERATION);
   if (!resultPath || !subagentId || !Number.isInteger(generation)) return;
-  let settled = false;
+  let completionState: CompletionState = "active";
+  let pendingCompletion: Promise<void> | undefined;
   const nudgeDelay = Math.max(1000, Number.parseInt(process.env.PI_SUBAGENT_NUDGE_DELAY_MS ?? "5000", 10) || 5000);
   let nudgeTimer: ReturnType<typeof setTimeout> | undefined;
   let inputAfterAgentEnd = false;
@@ -18,10 +28,10 @@ export default function paneChild(pi: ExtensionAPI): void {
   };
   const scheduleNudge = () => {
     clearNudge();
-    if (settled) return;
+    if (completionState !== "active") return;
     nudgeTimer = setTimeout(() => {
       nudgeTimer = undefined;
-      if (!settled && !inputAfterAgentEnd) {
+      if (completionState === "active" && !inputAfterAgentEnd) {
         pi.sendUserMessage("Your task is still active. Call subagent_done when finished.", { deliverAs: "followUp" });
       }
     }, nudgeDelay);
@@ -30,15 +40,34 @@ export default function paneChild(pi: ExtensionAPI): void {
   on("before_agent_start", clearNudge);
   on("agent_start", () => { inputAfterAgentEnd = false; clearNudge(); });
   on("agent_end", scheduleNudge);
-  on("input", () => { inputAfterAgentEnd = true; clearNudge(); });
+  on("input", () => {
+    if (completionState !== "active") return { action: "handled" };
+    inputAfterAgentEnd = true;
+    clearNudge();
+  });
   on("session_shutdown", clearNudge);
-  const finish = (result: string, ctx: { shutdown(): void }) => {
-    if (settled) return;
-    settled = true;
+  const finish = (result: string, ctx: { shutdown(): void }): Promise<void> => {
+    if (completionState === "settled") return Promise.resolve();
+    if (pendingCompletion) return pendingCompletion;
+
+    completionState = "settling";
     clearNudge();
     const temporary = `${resultPath}.${process.pid}.tmp`;
-    void writeFile(temporary, JSON.stringify({ subagentId, generation, status: "completed", result }))
-      .then(() => { renameSync(temporary, resultPath); ctx.shutdown(); });
+    const persistence = Promise.resolve()
+      .then(() => operations.writeFile(temporary, JSON.stringify({ subagentId, generation, status: "completed", result })))
+      .then(() => operations.rename(temporary, resultPath));
+    pendingCompletion = persistence.then(
+      () => {
+        completionState = "settled";
+        ctx.shutdown();
+      },
+      error => {
+        completionState = "active";
+        pendingCompletion = undefined;
+        throw error;
+      },
+    );
+    return pendingCompletion;
   };
   pi.registerTool({
     name: "subagent_done",
@@ -46,7 +75,7 @@ export default function paneChild(pi: ExtensionAPI): void {
     description: "Write the final YAML Handler Result and end this execution.",
     parameters: Type.Object({ result: Type.String({ minLength: 1 }) }),
     async execute(_id, params, _signal, _update, ctx) {
-      finish(params.result, ctx);
+      await finish(params.result, ctx);
       return { content: [{ type: "text", text: "Subagent result recorded." }], details: {} };
     },
   });
