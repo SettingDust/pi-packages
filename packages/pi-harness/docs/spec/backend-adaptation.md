@@ -1,5 +1,8 @@
 # Backend Adaptation Specification
 
+- Status: accepted base contract with draft host-compatibility amendment; amendment unaccepted and unimplemented
+- Host authority candidate: [ADR-0008](../adr/0008-host-owned-effective-tool-inventory.md), [Effective Tool Inventory Specification](effective-tool-inventory.md)
+
 ## 1. Inputs
 
 After `resolve_delegation` succeeds, the Router receives:
@@ -11,41 +14,62 @@ model: provider/model
 thinking: configured-thinking-level
 ```
 
-The Router maps these values to an environment-provided delegate tool. The Resolver does not discover, select, or call that tool.
+The Handler is the fixed Agent named `handler`. The Resolver does not discover, select, or call a delegate tool and returns no Handler path or body.
 
-The Handler is fixed as the Agent named `handler`. For a tool that accepts an Agent argument, the Router supplies that fixed literal; the compatible backend resolves it from its own registry. The Resolver returns no Handler name, path, or body.
+## 2. Compatibility Ownership
 
-## 2. Compatibility Requirements
+The Pi host effective-inventory module owns host-observed effective-tool preparation, active winner selection, exact provider-turn `context.tools` snapshots, compatibility-profile evaluation, runtime-generation validity, and dispatch pinning.
 
-Before calling a delegate tool, the Router must establish from its schema and description that it can:
+Before each delegation, Router/Harness must consume the current provider-turn `context.tools` snapshot's host-issued compatibility outcome for the intended backend profile. They must not establish compatibility from tool name, model-visible schema/description, package/version, model-supplied provenance, or historical source evidence.
 
-1. start an independent execution using the Router-supplied fixed `handler` Agent;
-2. guarantee the resolved `model` and `thinking` values;
-3. resolve that Agent's instructions from its own registry;
-4. provide the selected Pi Skills and read access to every Handoff reference;
-5. return a stable `taskId`; and
-6. return or later notify the Router of the Handler's YAML Result.
+A compatible outcome must cover:
 
-The package does not prescribe argument names. A backend is incompatible when any requirement cannot be established. The Router reports that block and must not omit or replace required values.
+1. the exact effective winning tool object in the current provider-turn `context.tools` snapshot and the active runtime generation;
+2. the host's semantic compatibility outcome for that object; exact configured/resolved path and reviewed digest values may be included only as compatibility-admission evidence;
+3. the fixed `handler` Agent capability;
+4. the exact prompt, label, taskSlug, model, and thinking invocation contract;
+5. normal dynamic Skill loading and reference read access;
+6. stable task identity;
+7. Handler Result persistence and return/notification;
+8. host dispatch pinning to that same `context.tools` object.
 
-### 2.1 `pi-herdr-subagents` Mapping
+Pi 0.84.2 does not expose the original, transformed, or evaluated jiti bytes, dependency graph, or execute-closure identity. Therefore the host outcome must not claim exact loaded-source-byte attestation, publisher/runtime attestation, or cryptographic closure sameness.
 
-When the independent `pi-herdr-subagents` tools are active, Router maps one resolved invocation to:
+An absent, stale, malformed, or incompatible host outcome blocks before resolution. Package name/version are diagnostic only. Historical research defines expected semantic behavior but never proves the current effective registration.
+
+Compatibility does not create a static Skill allowlist. The Resolver's current model-visible Skill set remains authoritative for Handoff validation.
+
+## 3. `pi-herdr-subagents` Mapping
+
+When the host issues a compatible outcome for the approved `pi-herdr-subagents/subagent_spawn` profile, Router maps one resolved invocation to:
 
 ```yaml
 subagent_spawn:
   agent: handler
   prompt: resolved.prompt
   label: concise delegated objective
+  taskSlug: canonical-task-slug
   model: resolved.model
   thinking: resolved.thinking
 ```
 
-`subagent_spawn` resolves its supplied `agent` from its local Agent registry; the Router always supplies `handler`. The tool returns a stable `subagentId` and must reserve an identity not represented by persisted task-session or artifact names in its task directory, including after backend runtime reconstruction. Completion notifications identify `subagentId` and the finished generation without exposing the Result body. Router calls `subagent_join({ subagentId })` to collect and validate that generation's private result pointer. `subagent_resume` retains the same `subagentId`; inspect, steer, cancel, and remove remain backend lifecycle operations rather than Harness workflow decisions.
+`taskSlug` is 3-48 lowercase ASCII letters or digits separated by single hyphens and must not begin with `subagent-`. `taskSlug` and `label` are invocation fields, not Handoff, admission, or Resolver fields.
 
-## 3. Launch Result
+After `resolved`, this call must be the Router's next environment action in the same Router pass. It must not emit prose, call another tool, batch another resolution, or retain the invocation for later. The host dispatches the exact snapshot-pinned winning registration rather than performing a fresh name-only lookup.
 
-An asynchronous launch returns enough information for the Router to correlate later completion:
+A successful launch returns a non-empty stable `subagentId` and active status, then ends the Router turn. A later terminal notification begins another pass. Routine immediate polling/join is forbidden.
+
+## 4. Source-Mapping Evidence
+
+[Atomic Router Delegation T1 research](../works/atomic-router-delegation/research.md) is the preserved source mapping for the first backend profile. It documents Agent resolution, invocation forwarding, child instructions/read access, stable task identity, Result persistence, notification, and join.
+
+T1 is an input to defining and reviewing the host semantic profile. It is not source-anchor authority, does not identify the current effective winner, and cannot substitute for the current host compatibility outcome.
+
+A different delegate tool remains possible under ADR-0005, but requires its own approved host compatibility profile and semantic mapping. Router must not improvise one after resolution.
+
+## 5. Launch and Completion
+
+An accepted asynchronous launch exposes enough information for correlation:
 
 ```yaml
 status: running
@@ -53,26 +77,38 @@ taskId: backend-assigned-id
 objective: delegated-objective
 ```
 
-A synchronous backend may instead return the completed Result immediately:
+For Herdr, `subagentId` is the stable `taskId`. Completion notification and later join preserve the generation-specific Result under the Router Delegation Specification. Notification delivery remains environment-owned.
 
-```yaml
-status: completed
-taskId: backend-assigned-id
-result: handler-yaml-result
-```
+## 6. Failure Behavior
 
-The exact tool response may differ, but the Router must be able to recover the same information without guessing identity.
+| Condition | Router behavior |
+|---|---|
+| host reports tool unavailable before resolution | `delegation_tool_unavailable`; do not resolve or substitute |
+| host reports ineligible runtime, source mismatch, semantic mismatch, or stale pre-resolution outcome | `delegation_contract_incompatible`; include actionable host code; do not resolve |
+| generation becomes stale or is revoked after `resolved` at pinned dispatch/execute guard | `delegation_launch_failed`; no name-only fallback or substitution |
+| launch lacks stable identity or active status | `delegation_launch_result_invalid`; do not claim running |
+| Resolver returns blocked | preserve Resolver code; no launch |
+| Handler Result malformed/missing | do not report successful work |
 
-## 4. Completion Return
+No unavailable model or thinking value may fall back silently. Compatibility, launch failures, Resolver blocks, and Handler Results remain distinct.
 
-For asynchronous execution, the environment emits a completion notification containing the original stable task identity, objective or label, terminal status, generation, and a best-effort active-task summary. Result content may remain in a private backend result file until an explicit join. This notification follows the Handler Completion Notification contract in `router-delegation.md`.
+## 7. Acceptance Conditions
 
-The Router parses a well-formed YAML Result into the normalized Result envelope. Notification display, wake-up mechanics, process lifecycle, and persistence remain environment responsibilities.
+- The current host compatibility outcome is required before every resolution.
+- The exact current-turn `context.tools` object approved by compatibility is the object dispatched and executed; no name-only rebind is allowed.
+- Configured/resolved path and reviewed digest values, when present, are compatibility-admission evidence only.
+- Pi 0.84.2 source mapping, tool name, schema/description, and package/version alone fail compatibility.
+- `resolved` is followed by one exact spawn call as the next action.
+- Old generations and changed registrations fail without fallback.
+- A model-submitted compatible projection, profile/version, run/turn generation, path/digest, or host code cannot replace the private current-turn outcome or trigger resolution/launch.
+- Before resolution, stale outcome maps only to `delegation_contract_incompatible`; after `resolved`, stale/revoked pinned dispatch or execute guard maps only to `delegation_launch_failed`.
 
-## 5. Failure Behavior
+## 8. Acceptance Boundary
 
-- Missing backend capability or the fixed `handler` Agent blocks launch before work starts.
-- A backend launch error is a backend failure, not a Resolver failure.
-- An unavailable configured model or thinking level must not fall back silently.
-- A malformed or missing Handler Result is not treated as successful work.
-- The package does not retry, cancel, queue, isolate, or switch delegate backends automatically.
+The host-compatibility amendment in this Specification remains draft, unaccepted, and unimplemented. It requires independent review with the complete host authority package and one later user confirmation of that reviewed set. No interaction mechanism is prescribed, and authoring creates no implementation authorization.
+
+## Host Outcome and Object Binding
+
+The host compatibility outcome is `effective-tool-compatibility/v1`, current-turn scoped, and non-model-addressable. It binds the exact `context.tools` object used for provider serialization and execution plus opaque run/turn generations. Path/digest/version evidence is trusted compatibility admission only; it is not publisher/runtime attestation, jiti evaluated-byte proof, or execute-closure proof.
+
+First-turn preparation runs before `Agent.prompt/createContextSnapshot` on common `_runAgentPrompt`, covering ordinary and triggerTurn-first. Later-turn revalidation runs before `prepareNextTurnWithContext`. Current queued steer/follow-up retains the current tool batch; ordinary changes apply at the later-turn boundary. Host revocation/reload blocks before package side effects.
