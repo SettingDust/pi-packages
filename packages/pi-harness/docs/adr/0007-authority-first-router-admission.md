@@ -1,78 +1,48 @@
 # ADR-0007: Authority-First Router Admission
 
-- Status: accepted
-- Date: 2026-08-19
-- Supersedes: none
-- Related: [Router Delegation PRD](../prd/router-delegation.md), [ADR-0001](0001-router-resolver-handler-boundaries.md), [ADR-0002](0002-structured-handoff-and-yaml-results.md), [Router Delegation Specification](../spec/router-delegation.md)
+- Status: draft; unaccepted; unimplemented
+- Date: 2026-08-25
+- Supersedes: the current accepted authority-first admission behavior only when this draft is accepted and implemented
+- Related: [Router Delegation Specification](../spec/router-delegation.md), [Authority-First Router Admission Work](../works/authority-first-router-admission/work.md)
 
 ## Context
 
-The Router coordinates substantive project-domain work, but a valid Handoff alone does not prove that a multi-step change has a reviewed execution boundary. The admission decision must preserve a low-friction path for genuinely small, behavior-neutral work while preventing a Handler from manufacturing its own authority or acceptance evidence.
+`pi-harness` validates and delegates Handoffs from a Pi main-session Router. A Handoff requests work; it never proves that the user accepted a Plan. The workflow owner, not the Harness admission boundary, must complete the Plan and Tasks, disclose the decision-relevant material in an ordinary message, obtain one user confirmation, and then invoke delegation.
 
-The existing package separates Router, Resolver, environment, and Handler responsibilities. The Resolver validates Handoff inputs and resolves invocation metadata; the environment launches the fixed Handler. Admission belongs at the Router/Extension boundary because it depends on user confirmation, current-session state, and reviewed project materials. It must be represented in the Resolver interaction so an incompatible or stale invocation cannot be launched accidentally.
+The current implementation instead contains an Extension-private `PlanAuthorizationRegistry`, a `PlanAuthorizationReceipt`, the `pi-harness:plan-activation-v1` EventBus channel, activation decision/context/outcome types, replay IDs and timestamps, session/generation authorization state, receipt integrity checks, and receipt-driven `acceptance_required` responses. That state machine duplicates workflow responsibility, cannot prove what the user saw or accepted, and creates a second confirmation protocol inside Harness.
 
-## Decision
+The cancelled predecessor draft removed only a decision discriminator. Its partial edits are superseded by this broader removal boundary; they must not be preserved merely because they are present in the worktree.
 
-`pi-harness` uses authority-first admission with two paths:
+## Decision — draft pending acceptance
 
-1. **Atomic path.** A behavior-neutral, small, single bounded change may be admitted without Work/Plan/Tasks only when the Router supplies invocation metadata describing the bounded change, its verifiable basis, and focused verification. The validator checks structural completeness and evidence references. Whether the change is truly small or behavior-neutral remains a Router judgment in this version; the judgment is recorded as soft evidence and is reviewable, not silently treated as a hard proof.
-2. **Planned path.** A multi-step, coordination-heavy, architectural, security, migration, or durable persistent-behavior change requires exact Work, Plan, and Tasks materials, a fresh independent review of those exact materials, and explicit user acceptance in the current main session before delegation is admitted.
+Remove the entire Harness Plan authorization/activation state machine. `pi-harness` must not use or expose `pi-harness:plan-activation-v1`, activation context/outcome/decision/disclosure transport owned by Harness, `PlanAuthorizationRegistry`, `PlanAuthorizationReceipt`, authorization replay identifiers or timestamps, receipt integrity checks, or receipt-based acceptance state.
 
-The Extension owns acceptance state. It records acceptance only after the Router has rendered the exact Work/Plan/Tasks identities and digests to the user and the user explicitly confirms them. Markdown documents cannot create or forge acceptance. Acceptance is bound to the current main-session identity and the exact reviewed material identity/digest.
+The Router/coordinator remains normatively responsible for completing and reviewing Plan/Tasks, ordinary-message disclosure, one confirmation, and delegation invocation. Handoff acceptance is never inferred by Harness, and Harness does not persist, replay-protect, clear, restore, issue, or audit confirmation state. Session reload, resume, fork, and shutdown therefore have no authorization state to clear or restore.
 
-A user-authorized bounded amendment may advance an accepted record to a new digest without repeating confirmation only when the amendment remains within the accepted scope, architecture, dependencies, risk, behavior, and acceptance criteria. Any material change in one of those dimensions invalidates acceptance and requires fresh independent review and explicit confirmation.
+`resolve_delegation` remains a non-interactive legality boundary. It validates Handoff schema, Skill/Role/model/thinking availability, readable references, the selected same-directory Work/Plan/Tasks tuple, canonical paths and document bytes, model-forbidden capability-shaped fields, normalized Handoff identity, and final current-call/JIT authority checks that remain meaningful without a receipt. It does not launch a Handler or ask for confirmation.
 
-Admission is not a fixed stage machine. The contract records evidence and decisions, but does not impose mandatory ceremony on atomic work.
+When current authority bytes differ from the bytes validated earlier in the same call, Harness may fail closed with a precise authority-drift result. That result does not mean that old or new Plan bytes were accepted; the Router must re-disclose and reconfirm substantive changes as a workflow rule before retrying delegation. Harness must not encode that rule as a receipt or token.
 
-The Resolver accepts admission metadata as part of its invocation input and returns a coded `blocked` resolution before serialization/launch when the metadata is missing, malformed, stale, unaccepted, or inconsistent with the selected path. It never launches a Handler and never treats authority-document edits by a Handler as acceptance.
+## Alternatives considered
 
-## Runtime Admission Contract Amendments (D1-A through D4-A)
-
-The following bounded contract decisions refine this accepted architecture without adding an implementation or backend dependency:
-
-- **D1-A JIT admission:** before every planned resolution, the Extension/Resolver reads the exact Work, Plan, and Tasks references, applies the canonicalization below, and computes current per-document and set SHA-256 digests. It also canonicalizes the normalized Handoff and computes the current admission subject digest. A previously captured digest is comparison evidence, never a substitute for this just-in-time check.
-- **D1-B accepted v0.1 TOCTOU boundary:** the authority guarantee ends when the final JIT recheck succeeds and the Resolver returns `resolved`. v0.1 does not snapshot authority documents, hold a read lock, or require a backend preflight before the Handler reads them. A local writer or another Handler may therefore modify or replace a selected path after that recheck; the later Handler read is not guaranteed to observe the reviewed bytes. This is an accepted security limitation, not evidence that the Handler executed against immutable reviewed material.
-- **D2-A runtime review receipt:** an independent review is represented only by an Extension-issued runtime receipt for the exact current subject. The D2 reviewer is the `current-interactive-user`, who is independent of the implementation Handler. Any external independent-review report is evidence the Extension may render to that user; Markdown claims, Handler Results, and the report itself neither create nor reconstruct a receipt.
-- **D3-A user-witnessed Extension receipt:** the Extension records acceptance only after it has rendered the exact reviewed paths and digests and received a second, explicit confirmation through the supported Pi interaction. Router prose, generic pacing commands, Handler Results, or edited project files cannot create it.
-- **D4-A private receipt channel:** the model supplies only the planned Work/Plan/Tasks selectors. It supplies no digest, reviewer, outcome, timestamp, session ID, receipt field, receipt ID, or receipt handle. The Extension derives the exact selected tuple, issues and looks up D2/D3 receipts solely in its private, current-runtime-session registry, and never exposes a registry handle as an authority capability. D2 and D3 are separate TUI confirmations in that order when issuance is required. A matching current D3 may resolve again in the same active runtime session without another prompt; a matching current D2 without D3 may request only D3. If a required interaction needs a dialog-capable TUI and none is available, planned admission fails closed with the deterministic review/acceptance status and no receipt is issued.
-
-Digest or normalized-Handoff drift invalidates a currently valid acceptance before backend adaptation. The registry retains an **authenticated prior receipt**—one issued by this Extension in this runtime session—for bounded-amendment comparison after it ceases to be a **currently valid acceptance**. For each canonical Work/Plan/Tasks path tuple, its private lineage index must record either no receipts or exactly one unique authenticated acceptance head. A first acceptance has no predecessor. When a same-tuple bounded-amendment flow produces a new D3, it must link privately to that head as its predecessor and atomically become the new head. The A.4 transition renders and evaluates only this head. A missing or non-unique head for a nonempty lineage, a cyclic or cross-tuple predecessor chain, or internally inconsistent issuer, session, or subject fields is receipt corruption: admission fails closed with `receipt_corrupt`, does not prompt or fall through to another flow, and cannot resolve. A differing old receipt starts a same-call transition rather than unconditionally returning `authority_drift`: a same-path authenticated prior may receive current-user bounded authorization and, if affirmative, new D2 then D3 for the new subject; no prior receipt or changed authority paths start the explicit D2-then-D3 flow for the current subject. A negative or material bounded-authorization decision returns `amendment_invalidated` and requires a later explicit flow. `authority_drift` is returned only when the JIT subject changes during the in-call flow or its final recheck. The shortcut is eligible only for the same canonical Work/Plan/Tasks path tuple; it never applies to a material scope, architecture, dependency, risk, behavior, or acceptance-criteria change.
-
-These amendments leave the Resolver's successful output and backend mapping unchanged. They do not add an admission inspection command or backend-specific admission behavior. The v0.1 TOCTOU boundary in D1-B is accepted authority for this review; the Specification Amendment A and its implementation remain under review, and this status does not claim implementation completion.
-
-## Exact Identity and Digest
-
-The reviewed set is one explicitly selected tuple `(work, plan, tasks)`, each identified by its canonical readable path and SHA-256 digest. It must satisfy Specification Amendment A.1's planned-admission-only direct-member grammar: one `work.md` and one matched Plan/Tasks pair under the same `docs/works/<work-name>` directory. A Work may contain multiple paired Plan/Tasks slices, but no directory scan, Work status, filename recency, or document order selects or admits another member. Canonical document bytes are the raw valid UTF-8 bytes after replacing every CRLF and bare CR byte sequence with LF; no BOM removal, trimming, Unicode normalization, or other rewrite occurs. The set digest is SHA-256 over the exact compact canonical JSON byte sequence defined in Specification Amendment A.1: entries are ordered `work`, `plan`, `tasks`, and each entry's keys are ordered `kind`, `path`, `sha256`.
-
-The Extension also derives `handoffSha256` from the exact normalized Handoff that the Handler will receive, including canonical context references, and derives `subjectSha256` from the canonical `{version, setSha256, handoffSha256}` object. D2 and D3 bind this full subject, not only the authority set, so an authority set cannot authorize a different objective, constraint, deliverable, Skill selection, or context. The three authority references must each occur exactly once in the Handoff's readable `context.ref` values after canonicalization. Specification Amendment A.1 rejects every unpaired UTF-16 surrogate in a string it encodes; Skills, Markdown headings/status text, and D2 review aid humans but do not prove document kind.
-
-The canonicalization rule is an implementation contract, not a requirement that the Resolver inline the documents into the Handler prompt. References remain references and are independently readable/validated as existing Resolver context rules require.
+- **Keep the current registry and receipts:** rejected; it retains the state machine and gives Harness authority it cannot establish.
+- **Keep only the activation channel with a validity-only payload:** rejected; it still transports and enforces confirmation state inside Harness.
+- **Add a compatibility shim for old activation APIs:** rejected unless a directly evidenced in-repository consumer requires one; no such consumer is in the traced target package surfaces. Prefer removal and an explicit migration note.
 
 ## Consequences
 
-Positive:
+Positive: one owner for confirmation; no forged or stale Harness acceptance history; no session/reload persistence semantics; fewer APIs, state transitions, and failure modes; planned admission can be tested as ordinary structural and current-call validation.
 
-- Multi-step delegation has a verifiable, exact authority and Handoff boundary through the final JIT recheck.
-- Acceptance cannot be forged by a Handler editing repository documents or by a model constructing receipt-shaped tool input.
-- The private registry supplies a minimal trusted D2/D3 channel without a backend dependency.
-- Receipt history can support a bounded amendment without treating a drifted record as currently valid.
-- Atomic work remains practical when planning provides no control value.
-- Authority drift invalidates stale confirmation instead of silently launching against changed material.
+Negative: callers that used activation events or receipt lookup must migrate atomically to Router-owned ordinary confirmation followed by normal delegation. `acceptance_required` can no longer represent a missing receipt. The Router must handle re-disclosure/reconfirmation after substantive Plan changes.
 
-Negative:
+Compatibility: remove the old channel, payload types, exported activation helpers, receipt registry, and receipt-specific result codes. If repository-wide evidence later finds an external consumer, stop and amend this draft before implementation rather than silently adding a shim.
 
-- The Extension must maintain ephemeral session state and provide two explicit confirmation interactions for a new planned subject.
-- New or amended planned receipt issuance is unavailable in noninteractive modes; an already matching active-session D3 may resolve without a TUI, but no non-TUI interaction can create, revalidate, or extend it.
-- The current interactive user is the v0.1 reviewer identity; third-party, signed, non-human, or cross-session review is not provided.
-- Atomic classification cannot be made fully hard-enforceable from repository documents alone in this version.
-- A user must reconfirm after material authority or Handoff change, even when the implementation intent feels unchanged.
-- The final JIT check does not provide immutable execution binding: the Handler receives path references, so a post-recheck filesystem change may alter what it later reads.
-- Resolver input and error handling gain a new admission contract.
+## Scope and exclusions
 
-## Non-goals
+Later implementation is limited to the exact surfaces in the accepted future Plan: `extensions/pi-harness.ts`, `src/admission.ts`, deletion of `src/admission-decision.ts` unless a narrower retained helper is proven necessary, `src/protocol.ts` for response/type changes, and directly coupled focused tests. No Pi core, Host seam, settings, sessions, Herdr, backend, source runtime activation, reload, staging, or commit operation is part of this draft.
 
-This decision does not add child write-capability gating, a fixed stage machine, CI enforcement, cross-session acceptance persistence, automatic review generation, reviewer identity discovery, external-review receipt transport, a user-facing admission inspection command, backend-specific admission behavior, immutable authority snapshots, read locks, backend preflight, a Work-owned persistent admission lifecycle, or a new adapter abstraction. The related `#3 atomic delegation` companion rule remains outside this decision and its implementation scope.
+This document and its linked Specification, Work, Context, Plan, and Tasks remain draft, unaccepted, and unimplemented. Documentation changes do not authorize source changes.
 
-## Revisit Criteria
+## Revisit
 
-Revisit this ADR if the project adopts enforceable child permissions, CI as an authority gate, cross-session approval, a third-party/non-human review model, noninteractive planned admission, or evidence that soft atomic classification causes unacceptable bypasses. Also revisit it if exact reviewed-byte execution becomes a requirement, or if the accepted post-recheck TOCTOU exposure causes an incident or unacceptable risk.
+Revisit only if direct consumer evidence requires a migration contract, if Router ownership of ordinary confirmation changes, or if current-call authority validation cannot be preserved without the removed state. Any such change requires a fresh reviewed authority decision.
