@@ -15,6 +15,120 @@ import { commandFailure, createHerdrClient, hasHerdrErrorCode, type HerdrClient 
 const exec = promisify(execFile);
 export const paneChildExtensionPath = resolve(dirname(fileURLToPath(import.meta.url)), "../extensions/pane-child.ts");
 export type AgentDefinition = { name: string; path: string; body: string; description: string };
+export type ExplicitSpawnModelFailureCode =
+  | "invalid_model_reference"
+  | "provider_unavailable"
+  | "model_not_found"
+  | "model_unavailable"
+  | "model_registry_error";
+export type ExplicitSpawnModelOperation = "registry" | "getProvider" | "auth" | "find" | "getAvailable";
+export type SpawnModelRegistry = {
+  getProvider(provider: string): unknown;
+  getProviderAuthStatus(provider: string): { configured?: unknown };
+  find(provider: string, modelId: string): { provider: string; id: string } | undefined;
+  getAvailable(): readonly { provider: string; id: string }[];
+};
+
+export class ExplicitSpawnModelError extends Error {
+  readonly code: ExplicitSpawnModelFailureCode;
+  readonly detail: string;
+  readonly operation?: ExplicitSpawnModelOperation;
+
+  constructor(code: ExplicitSpawnModelFailureCode, detail: string, operation?: ExplicitSpawnModelOperation) {
+    super(detail);
+    this.name = "ExplicitSpawnModelError";
+    this.code = code;
+    this.detail = detail;
+    if (operation !== undefined) this.operation = operation;
+  }
+}
+
+function bounded(value: string): string {
+  const points = [...value];
+  return points.length <= 120 ? value : `${points.slice(0, 120).join("")}…`;
+}
+
+function quoted(value: string): string { return JSON.stringify(bounded(value)); }
+function registryError(operation: ExplicitSpawnModelOperation): never {
+  throw new ExplicitSpawnModelError("model_registry_error", `Model registry integration failed at ${operation}.`, operation);
+}
+function registryIdentity(value: unknown, operation: "find" | "getAvailable"): { provider: string; id: string } {
+  if (value === null || typeof value !== "object" || Array.isArray(value)) registryError(operation);
+  const provider = (value as { provider?: unknown }).provider;
+  const id = (value as { id?: unknown }).id;
+  if (
+    typeof provider !== "string" || typeof id !== "string"
+    || provider.length === 0 || id.length === 0 || provider.includes("/")
+    || /[\u0000-\u001f\u007f]/.test(provider) || /[\u0000-\u001f\u007f]/.test(id)
+    || Buffer.byteLength(`${provider}/${id}`, "utf8") > 256
+  ) registryError(operation);
+  return { provider, id };
+}
+
+export function validateExplicitSpawnModel(model: unknown, registry?: SpawnModelRegistry): string | undefined {
+  if (model === undefined) return;
+  if (typeof model !== "string") {
+    const kind = model === null ? "null" : Array.isArray(model) ? "array" : typeof model;
+    throw new ExplicitSpawnModelError("invalid_model_reference", `Expected an exact provider/modelId string; received type ${quoted(kind)}.`);
+  }
+  const separator = model.indexOf("/");
+  if (separator <= 0 || separator === model.length - 1 || /[\u0000-\u001f\u007f]/.test(model) || Buffer.byteLength(model, "utf8") > 256) {
+    throw new ExplicitSpawnModelError("invalid_model_reference", `Expected an exact provider/modelId reference; received ${quoted(model)}.`);
+  }
+  const provider = model.slice(0, separator);
+  const modelId = model.slice(separator + 1);
+  if (!registry || typeof registry !== "object") registryError("registry");
+
+  let getProvider: SpawnModelRegistry["getProvider"];
+  try { getProvider = registry.getProvider; } catch { registryError("getProvider"); }
+  if (typeof getProvider !== "function") registryError("getProvider");
+  let knownProvider: unknown;
+  try { knownProvider = getProvider.call(registry, provider); } catch { registryError("getProvider"); }
+  if (knownProvider === undefined) {
+    throw new ExplicitSpawnModelError("provider_unavailable", `Provider ${quoted(provider)} is unavailable: unknown provider.`);
+  }
+
+  let getAuth: SpawnModelRegistry["getProviderAuthStatus"];
+  try { getAuth = registry.getProviderAuthStatus; } catch { registryError("auth"); }
+  if (typeof getAuth !== "function") registryError("auth");
+  let auth: { configured?: unknown };
+  try { auth = getAuth.call(registry, provider); } catch { registryError("auth"); }
+  let configured: unknown;
+  try { configured = auth?.configured; } catch { registryError("auth"); }
+  if (configured !== true) {
+    throw new ExplicitSpawnModelError("provider_unavailable", `Provider ${quoted(provider)} is unavailable: authentication is not configured.`);
+  }
+
+  let find: SpawnModelRegistry["find"];
+  try { find = registry.find; } catch { registryError("find"); }
+  if (typeof find !== "function") registryError("find");
+  let found: { provider: string; id: string } | undefined;
+  try {
+    const candidate: unknown = find.call(registry, provider, modelId);
+    found = candidate === undefined ? undefined : registryIdentity(candidate, "find");
+  } catch {
+    registryError("find");
+  }
+  if (found === undefined) throw new ExplicitSpawnModelError("model_not_found", `Model ${quoted(model)} was not found.`);
+  if (found.provider !== provider || found.id !== modelId) registryError("find");
+
+  let getAvailable: SpawnModelRegistry["getAvailable"];
+  try { getAvailable = registry.getAvailable; } catch { registryError("getAvailable"); }
+  if (typeof getAvailable !== "function") registryError("getAvailable");
+  let available = false;
+  try {
+    const snapshot = getAvailable.call(registry);
+    for (const candidate of snapshot) {
+      const identity = registryIdentity(candidate, "getAvailable");
+      if (identity.provider === provider && identity.id === modelId) available = true;
+    }
+  } catch { registryError("getAvailable"); }
+  if (!available) {
+    throw new ExplicitSpawnModelError("model_unavailable", `Model ${quoted(model)} is unavailable in the current catalog/auth snapshot.`);
+  }
+  return model;
+}
+
 export type TaskStatus = "queued" | "running" | "completed" | "failed" | "cancelled";
 export type ActiveTaskStatus = Extract<TaskStatus, "queued" | "running">;
 export type SurfaceCleanupStatus = "pending" | "closed" | "already_closed" | "not_created" | "identity_missing" | "failed";
@@ -356,16 +470,18 @@ export class SubagentRuntime {
     prompt: string;
     label: string;
     taskSlug?: string;
-    model?: string;
+    model?: unknown;
     thinking?: string;
     parentSessionFile?: string;
-  }): Promise<SubagentTask> {
+  }, registry?: SpawnModelRegistry): Promise<SubagentTask> {
+    const model = validateExplicitSpawnModel(input.model, registry);
     const taskSlug = validateTaskSlug(input.taskSlug);
     this.resolveAgent(input.agent);
     const tasksDir = this.tasksDir(input.cwd, input.parentSessionFile);
     this.selectScope(tasksDir);
     const { subagentId, artifactDir } = this.reserveSubagentId(tasksDir, taskSlug);
-    return this.start({ subagentId, taskSlug, generation: 1, artifactDir, ...input });
+    const launchArgs = model === undefined ? [] : ["--model", model, ...(input.thinking ? ["--thinking", input.thinking] : [])];
+    return this.start({ ...input, model, subagentId, taskSlug, generation: 1, artifactDir, launchArgs });
   }
 
   async recover(cwd: string, parentSessionFile?: string, notifiedKeys: Iterable<string> = []): Promise<void> {
@@ -465,6 +581,7 @@ export class SubagentRuntime {
       thinking: old.thinking,
       sessionFile: old.sessionFile,
       artifactDir: dirname(old.resultPath),
+      launchArgs: old.model ? ["--model", old.thinking ? `${old.model}:${old.thinking}` : old.model] : [],
       surfaceCleanups: cloneJson(old.surfaceCleanups),
     });
   }
@@ -517,6 +634,7 @@ export class SubagentRuntime {
     parentSessionFile?: string;
     sessionFile?: string;
     artifactDir?: string;
+    launchArgs: string[];
     surfaceCleanups?: unknown[];
   }): Promise<SubagentTask> {
     const completionNotifier = this.completionNotifier;
@@ -573,8 +691,7 @@ export class SubagentRuntime {
       task.updatedAt = task.startedAt;
       await this.persist(task);
       this.notifyTaskUpdate();
-      const args = ["--session", sessionFile, "-e", paneChildExtensionPath, "--system-prompt", agent.body, "--tools", "read,bash,edit,write,subagent_done"];
-      if (input.model) args.push("--model", input.thinking ? `${input.model}:${input.thinking}` : input.model);
+      const args = ["--session", sessionFile, "-e", paneChildExtensionPath, "--system-prompt", agent.body, "--tools", "read,bash,edit,write,subagent_done", ...input.launchArgs];
       args.push(`${input.prompt}\n\nReturn the Handler Result as YAML, then call subagent_done with that exact YAML string.`);
       const launchScript = join(artifactDir, `launch-${input.generation}.ps1`);
       const bootstrapScript = join(artifactDir, `launch-${input.generation}.cjs`);
@@ -1126,16 +1243,22 @@ function renderJoinResult(result: ToolResult, options: { expanded?: boolean; isP
 
 export function createSubagentTools(runtime: SubagentRuntime, cwd: string, parentSessionFile?: string) {
   const result = (details: unknown) => ({ content: [{ type: "text" as const, text: JSON.stringify(details) }], details });
-  const tool = (name: string, description: string, parameters: any, execute: (params: any, update?: ToolUpdate, signal?: AbortSignal) => Promise<unknown>, renderer: Record<string, unknown> = {}) => defineTool({
+  const tool = (name: string, description: string, parameters: any, execute: (params: any, update: ToolUpdate | undefined, signal: AbortSignal | undefined, ctx: ExtensionContext | undefined) => Promise<unknown>, renderer: Record<string, unknown> = {}) => defineTool({
     name, label: name, description, parameters, ...renderer,
-    async execute(_id, params, signal, onUpdate) {
-      const details = await execute(params, value => onUpdate?.(result(value)), signal);
+    async execute(_id, params, signal, onUpdate, ctx) {
+      const details = await execute(params, value => onUpdate?.(result(value)), signal, ctx);
       return result(details);
     },
   });
   return [
     // Optional avoids schema rejection so missing values use the stable runtime error contract.
-    tool("subagent_spawn", "Start one background subagent. taskSlug is required and must be a caller-provided canonical task identity; the parent receives a terminal completion notification without the full Result. After spawning, end the current turn and wait for that notification instead of polling or routinely calling inspect or join.", Type.Object({ agent: StringEnum(runtime.agentNames()), prompt: Type.String({ minLength: 1 }), label: Type.String({ minLength: 1 }), taskSlug: Type.Optional(Type.String()), model: Type.Optional(Type.String()), thinking: Type.Optional(Type.String()) }), params => runtime.spawn({ ...params, cwd, parentSessionFile }), { renderCall: renderSpawnCall, renderResult: renderSpawnResult }),
+    tool("subagent_spawn", "Start one background subagent. taskSlug is required and must be a caller-provided canonical task identity; the parent receives a terminal completion notification without the full Result. After spawning, end the current turn and wait for that notification instead of polling or routinely calling inspect or join.", Type.Object({ agent: StringEnum(runtime.agentNames()), prompt: Type.String({ minLength: 1 }), label: Type.String({ minLength: 1 }), taskSlug: Type.Optional(Type.String()), model: Type.Optional(Type.String()), thinking: Type.Optional(Type.String()) }), async (params, _update, _signal, ctx) => {
+      try { return await runtime.spawn({ ...params, cwd, parentSessionFile }, ctx?.modelRegistry); }
+      catch (error) {
+        if (!(error instanceof ExplicitSpawnModelError)) throw error;
+        return { code: error.code, detail: error.detail, ...(error.operation ? { operation: error.operation } : {}) };
+      }
+    }, { renderCall: renderSpawnCall, renderResult: renderSpawnResult }),
     tool("subagent_resume", "Resume a completed or failed subagent.", Type.Object({ subagentId: Type.String(), prompt: Type.String({ minLength: 1 }) }), params => runtime.resume(params.subagentId, params.prompt)),
     tool("subagent_inspect", "Return a non-blocking subagent snapshot for an explicit status check; do not poll this tool while waiting. Prefer the terminal completion notification, then use subagent_join for the full Result.", Type.Object({ subagentId: Type.String() }), params => Promise.resolve(runtime.inspect(params.subagentId))),
     tool("subagent_join", "Wait for a subagent and read its full Result. Use after a terminal completion notification, or when an explicit immediate Result wait is necessary; do not use it for routine polling. Caller cancellation, including ESC, stops only this wait and does not cancel the subagent; use subagent_cancel to cancel it.", Type.Object({ subagentId: Type.String(), generation: Type.Optional(Type.Number()) }), async (params, update, signal) => { update?.(runtime.inspect(params.subagentId)); return runtime.join(params.subagentId, params.generation, signal); }, { renderCall: renderJoinCall, renderResult: renderJoinResult }),

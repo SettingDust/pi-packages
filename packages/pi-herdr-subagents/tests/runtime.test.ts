@@ -1,10 +1,10 @@
 import { describe, expect, test } from "bun:test";
 import { spawnSync } from "node:child_process";
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { createHerdrClient } from "pi-herdr";
-import activateSubagents, { AgentRegistry, SubagentRuntime, createHerdrTransport, createSubagentTools, type CompletionNotification, type HerdrTransport } from "../src/index.js";
+import activateSubagents, { AgentRegistry, SubagentRuntime, createHerdrTransport, createSubagentTools, validateExplicitSpawnModel, type CompletionNotification, type HerdrTransport } from "../src/index.js";
 
 function fakeTransport(paneExists: boolean | (() => boolean) = true) {
   const calls: unknown[] = [];
@@ -58,7 +58,7 @@ describe("pi-herdr-subagents runtime", () => {
     const { calls, transport } = fakeTransport();
     const root = mkdtempSync(join(tmpdir(), "subagents-test-"));
     const runtime = new SubagentRuntime(transport, registry, root);
-    const task = await runtime.spawn({ agent: "handler", cwd: "/repo", prompt: "Do\nthe work", label: "task", taskSlug: "task", model: "test/model", thinking: "high" });
+    const task = await runtime.spawn({ agent: "handler", cwd: "/repo", prompt: "Do\nthe work", label: "task", taskSlug: "task", model: "test/model", thinking: "high" }, modelRegistry("test/model"));
     expect(task).toMatchObject({ subagentId: "task", generation: 1, sessionFile: join(root, "tasks", "task-g1.jsonl"), status: "running" });
     const manifest = JSON.parse(readFileSync(join(dirname(task.resultPath), "task.json"), "utf8"));
     expect(manifest).toMatchObject({
@@ -86,7 +86,10 @@ describe("pi-herdr-subagents runtime", () => {
     expect(spec.command).toBe(process.execPath);
     expect(spec.args[0]).toBe(process.argv[1]);
     expect(spec.args).toContain("Execute the Handoff.");
-    expect(spec.args).toContain("test/model:high");
+    expect(spec.args).toContain("--model");
+    expect(spec.args).toContain("test/model");
+    expect(spec.args).toContain("--thinking");
+    expect(spec.args).toContain("high");
     expect(spec.args.at(-1)).toContain("Do\nthe work");
 
     writeFileSync(task.resultPath, JSON.stringify({ subagentId: task.subagentId, generation: 1, status: "completed", result: "status: completed\nsummary: done\nreport: ok" }));
@@ -144,7 +147,7 @@ describe("pi-herdr-subagents runtime", () => {
       taskSlug: "tool-spawn",
       model: "test/model",
       thinking: "high",
-    });
+    }, undefined, undefined, { modelRegistry: modelRegistry("test/model") });
     expect(spawned.details).toMatchObject({
       model: "test/model",
       thinking: "high",
@@ -581,7 +584,7 @@ describe("runtime task observation", () => {
     });
 
     expect(events).toEqual([]);
-    const task = await runtime.spawn({ agent: "handler", cwd: "/repo", prompt: "work", label: "observe", taskSlug: "task", model: "secret-model", thinking: "secret-thinking" });
+    const task = await runtime.spawn({ agent: "handler", cwd: "/repo", prompt: "work", label: "observe", taskSlug: "task", model: "test/secret-model", thinking: "secret-thinking" }, modelRegistry("test/secret-model"));
     expect(events).toEqual(["queued", "running"]);
     const snapshot = runtime.listTasks();
     expect(snapshot).toHaveLength(1);
@@ -2113,4 +2116,516 @@ test("coalesces recovery, resume, and remove with an in-flight terminal cleanup"
     }
     runtime.stop();
   }
+});
+
+
+type FakeModelRegistry = {
+  getProvider(provider: string): unknown;
+  getProviderAuthStatus(provider: string): { configured?: unknown };
+  find(provider: string, modelId: string): { provider: string; id: string } | undefined;
+  getAvailable(): readonly { provider: string; id: string }[];
+};
+
+function modelRegistry(...models: string[]): FakeModelRegistry {
+  const entries = models.map(value => {
+    const separator = value.indexOf("/");
+    return { provider: value.slice(0, separator), id: value.slice(separator + 1) };
+  });
+  return {
+    getProvider(provider) { return entries.some(entry => entry.provider === provider) ? {} : undefined; },
+    getProviderAuthStatus() { return { configured: true }; },
+    find(provider, modelId) { return entries.find(entry => entry.provider === provider && entry.id === modelId); },
+    getAvailable() { return entries; },
+  };
+}
+
+function assertEmptySpawnLedger(
+  name: string,
+  runtime: SubagentRuntime,
+  root: string,
+  updates: string[],
+  notifications: CompletionNotification[],
+  transportCalls: unknown[],
+) {
+  expect(runtime.listTasks(), name).toEqual([]);
+  expect(() => runtime.inspect("task"), name).toThrow("Unknown subagent: task");
+  expect(updates, name).toEqual([]);
+  expect(notifications, name).toEqual([]);
+  expect(transportCalls, name).toEqual([]);
+  expect(readdirSync(root), name).toEqual([]);
+  const internals = runtime as any;
+  expect(internals.tasks.size, name).toBe(0);
+  expect(internals.monitors.size, name).toBe(0);
+  expect(internals.launches.size, name).toBe(0);
+  expect(internals.settlements.size, name).toBe(0);
+  expect(internals.cleanups.size, name).toBe(0);
+}
+
+describe("explicit spawn model validation", () => {
+  test("rejects malformed explicit models before slug, agent, filesystem, and transport effects", async () => {
+    const { calls, transport } = fakeTransport();
+    const root = mkdtempSync(join(tmpdir(), "subagents-model-rejection-"));
+    const runtime = new SubagentRuntime(transport, handlerRegistry(), root);
+    const updates: string[] = [];
+    runtime.onTaskUpdate(() => { updates.push("update"); });
+
+    await expect(runtime.spawn({ agent: "missing", cwd: "/repo", prompt: "work", label: "bad", taskSlug: "!", model: "bad" }, modelRegistry("test/model")))
+      .rejects.toMatchObject({ name: "ExplicitSpawnModelError", code: "invalid_model_reference" });
+    expect(runtime.listTasks()).toEqual([]);
+    expect(updates).toEqual([]);
+    expect(calls).toEqual([]);
+    expect(readdirSync(root)).toEqual([]);
+  });
+
+  test("uses exact first-slash registry order and rejects unavailable snapshots", () => {
+    const calls: string[] = [];
+    const registry: FakeModelRegistry = {
+      getProvider(provider) { calls.push(`provider:${provider}`); return {}; },
+      getProviderAuthStatus(provider) { calls.push(`auth:${provider}`); return { configured: true }; },
+      find(provider, modelId) { calls.push(`find:${provider}/${modelId}`); return { provider, id: modelId }; },
+      getAvailable() { calls.push("available"); return []; },
+    };
+    let failure: unknown;
+    try { validateExplicitSpawnModel("test/family/model", registry); } catch (error) { failure = error; }
+    expect(failure).toMatchObject({ code: "model_unavailable" });
+    expect(calls).toEqual(["provider:test", "auth:test", "find:test/family/model", "available"]);
+  });
+
+  test("emits separate initial model and thinking flags", async () => {
+    const { calls, transport } = fakeTransport();
+    const root = mkdtempSync(join(tmpdir(), "subagents-model-argv-"));
+    const runtime = new SubagentRuntime(transport, handlerRegistry(), root);
+    const task = await runtime.spawn({ agent: "handler", cwd: "/repo", prompt: "work", label: "task", taskSlug: "task", model: "test/model", thinking: "high" }, modelRegistry("test/model"));
+    const launch = calls[1] as { args: string[] };
+    const script = readFileSync(launch.args.at(-1)!, "utf8");
+    const bootstrapPath = join(root, "tasks", "task-artifacts", "launch-1.cjs");
+    const bootstrap = readFileSync(bootstrapPath, "utf8");
+    const encoded = bootstrap.match(/Buffer\.from\("([^"]+)"/)?.[1];
+    const spec = JSON.parse(Buffer.from(encoded!, "base64").toString("utf8")) as { args: string[] };
+    expect(spec.args).toContain("test/model");
+    expect(spec.args).toContain("high");
+    expect(spec.args).not.toContain("test/model:high");
+    expect(script).toContain(bootstrapPath);
+    writeFileSync(task.resultPath, JSON.stringify({ subagentId: task.subagentId, generation: 1, status: "completed", result: "done" }));
+    await runtime.join(task.subagentId);
+  });
+});
+
+
+test("maps typed validation failures to JSON content and details without lifecycle effects", async () => {
+  const { calls, transport } = fakeTransport();
+  const runtime = new SubagentRuntime(transport, handlerRegistry(), mkdtempSync(join(tmpdir(), "subagents-model-tool-error-")));
+  const tool = createSubagentTools(runtime, "/repo").find(value => value.name === "subagent_spawn")!;
+  const result = await (tool.execute as any)("call-error", {
+    agent: "handler", prompt: "work", label: "bad", taskSlug: "bad-model", model: "missing/model",
+  }, undefined, undefined, { modelRegistry: modelRegistry("test/model") });
+  expect(result.details).toEqual({ code: "provider_unavailable", detail: 'Provider "missing" is unavailable: unknown provider.' });
+  expect(result.content).toEqual([{ type: "text", text: JSON.stringify(result.details) }]);
+  expect(runtime.listTasks()).toEqual([]);
+  expect(calls).toEqual([]);
+});
+
+test("omitted model preserves the default path without registry access", async () => {
+  const { transport } = fakeTransport();
+  const runtime = new SubagentRuntime(transport, handlerRegistry(), mkdtempSync(join(tmpdir(), "subagents-model-default-")));
+  const task = await runtime.spawn({ agent: "handler", cwd: "/repo", prompt: "work", label: "default", taskSlug: "default" });
+  expect(task.model).toBeUndefined();
+  expect(task.thinking).toBeUndefined();
+  runtime.stop();
+});
+
+
+test("covers every present non-string model class and malformed boundary without registry access", () => {
+  const registry = modelRegistry("test/model");
+  const calls: string[] = [];
+  const observed = new Proxy(registry, { get(target, property, receiver) { calls.push(String(property)); return Reflect.get(target, property, receiver); } });
+  for (const value of [null, 7, {}, [], true]) {
+    expect(() => validateExplicitSpawnModel(value, observed)).toThrow(/Expected an exact provider\/modelId string/);
+  }
+  const malformed = ["", "/model", "provider/", "provider", "provider: model"];
+  for (const value of malformed) {
+    expect(() => validateExplicitSpawnModel(value, observed)).toThrow(`Expected an exact provider/modelId reference; received ${JSON.stringify(value)}.`);
+  }
+  for (const codePoint of [...Array.from({ length: 32 }, (_, index) => index), 0x7f]) {
+    const value = `provider/model${String.fromCodePoint(codePoint)}`;
+    expect(() => validateExplicitSpawnModel(value, observed)).toThrow(`Expected an exact provider/modelId reference; received ${JSON.stringify(value)}.`);
+  }
+  let boundaryError: unknown;
+  try { validateExplicitSpawnModel(`test/${"x".repeat(253)}`, observed); } catch (error) { boundaryError = error; }
+  expect(boundaryError).toMatchObject({ code: "invalid_model_reference" });
+  expect(Buffer.byteLength(`p/${"x".repeat(252)}`, "utf8")).toBe(254);
+  let unicodeBoundaryError: unknown;
+  try { validateExplicitSpawnModel(`p/${"😀".repeat(64)}`, observed); } catch (error) { unicodeBoundaryError = error; }
+  expect(unicodeBoundaryError).toMatchObject({ code: "invalid_model_reference" });
+  expect(calls).toEqual([]);
+});
+
+test("accepts the exact 256-byte reference and rejects the 257-byte reference before registry access", () => {
+  const exact = `p/${"x".repeat(254)}`;
+  const over = `p/${"x".repeat(255)}`;
+  expect(Buffer.byteLength(exact, "utf8")).toBe(256);
+  expect(Buffer.byteLength(over, "utf8")).toBe(257);
+  const calls: string[] = [];
+  const registry: FakeModelRegistry = {
+    getProvider(provider) { calls.push(`provider:${provider}`); return {}; },
+    getProviderAuthStatus(provider) { calls.push(`auth:${provider}`); return { configured: true }; },
+    find(provider, id) { calls.push(`find:${provider}/${id}`); return { provider, id }; },
+    getAvailable() { calls.push("available"); return [{ provider: "p", id: "x".repeat(254) }]; },
+  };
+  expect(validateExplicitSpawnModel(exact, registry)).toBe(exact);
+  let overError: unknown;
+  try { validateExplicitSpawnModel(over, registry); } catch (error) { overError = error; }
+  expect(overError).toMatchObject({ code: "invalid_model_reference" });
+  expect(calls).toHaveLength(4);
+});
+
+test("classifies every registry failure through spawn with a complete zero-effect ledger", async () => {
+  type Fault = { name: string; registry: unknown; operation: string; calls: string[] };
+  const faults: Fault[] = [
+    { name: "missing registry", registry: undefined, operation: "registry", calls: [] },
+    { name: "null registry", registry: null, operation: "registry", calls: [] },
+    { name: "primitive registry", registry: 7, operation: "registry", calls: [] },
+    { name: "missing provider", registry: {}, operation: "getProvider", calls: [] },
+    { name: "non-callable provider", registry: { getProvider: 1 }, operation: "getProvider", calls: [] },
+    { name: "provider property throw", registry: Object.defineProperty({}, "getProvider", { get() { throw new Error("secret-provider"); } }), operation: "getProvider", calls: [] },
+    { name: "provider call throw", registry: { getProvider() { throw new Error("secret-provider"); } }, operation: "getProvider", calls: ["getProvider"] },
+    { name: "missing auth", registry: { getProvider() { return {}; } }, operation: "auth", calls: ["getProvider"] },
+    { name: "non-callable auth", registry: { getProvider() { return {}; }, getProviderAuthStatus: 1 }, operation: "auth", calls: ["getProvider"] },
+    { name: "auth property throw", registry: Object.defineProperties({ getProvider() { return {}; } }, { getProviderAuthStatus: { get() { throw new Error("secret-auth"); } } }), operation: "auth", calls: ["getProvider"] },
+    { name: "auth call throw", registry: { getProvider() { return {}; }, getProviderAuthStatus() { throw new Error("secret-auth"); } }, operation: "auth", calls: ["getProvider", "auth"] },
+    { name: "missing find", registry: { getProvider() { return {}; }, getProviderAuthStatus() { return { configured: true }; } }, operation: "find", calls: ["getProvider", "auth"] },
+    { name: "non-callable find", registry: { getProvider() { return {}; }, getProviderAuthStatus() { return { configured: true }; }, find: 1 }, operation: "find", calls: ["getProvider", "auth"] },
+    { name: "find property throw", registry: Object.defineProperties({ getProvider() { return {}; }, getProviderAuthStatus() { return { configured: true }; } }, { find: { get() { throw new Error("secret-find"); } } }), operation: "find", calls: ["getProvider", "auth"] },
+    { name: "find call throw", registry: { getProvider() { return {}; }, getProviderAuthStatus() { return { configured: true }; }, find() { throw new Error("secret-find"); } }, operation: "find", calls: ["getProvider", "auth", "find"] },
+    { name: "find null return", registry: { getProvider() { return {}; }, getProviderAuthStatus() { return { configured: true }; }, find() { return null; } }, operation: "find", calls: ["getProvider", "auth", "find"] },
+    { name: "find primitive return", registry: { getProvider() { return {}; }, getProviderAuthStatus() { return { configured: true }; }, find() { return 7; } }, operation: "find", calls: ["getProvider", "auth", "find"] },
+    { name: "find array return", registry: { getProvider() { return {}; }, getProviderAuthStatus() { return { configured: true }; }, find() { return []; } }, operation: "find", calls: ["getProvider", "auth", "find"] },
+    { name: "find provider getter throw", registry: { getProvider() { return {}; }, getProviderAuthStatus() { return { configured: true }; }, find() { return Object.defineProperty({ id: "model" }, "provider", { get() { throw new Error("secret-find-provider"); } }); } }, operation: "find", calls: ["getProvider", "auth", "find"] },
+    { name: "find missing provider", registry: { getProvider() { return {}; }, getProviderAuthStatus() { return { configured: true }; }, find() { return { id: "model" }; } }, operation: "find", calls: ["getProvider", "auth", "find"] },
+    { name: "find missing id", registry: { getProvider() { return {}; }, getProviderAuthStatus() { return { configured: true }; }, find() { return { provider: "test" }; } }, operation: "find", calls: ["getProvider", "auth", "find"] },
+    { name: "find result id getter throw", registry: { getProvider() { return {}; }, getProviderAuthStatus() { return { configured: true }; }, find() { return Object.defineProperty({ provider: "test" }, "id", { get() { throw new Error("secret-find-id"); } }); } }, operation: "find", calls: ["getProvider", "auth", "find"] },
+    { name: "find mismatched provider", registry: { getProvider() { return {}; }, getProviderAuthStatus() { return { configured: true }; }, find() { return { provider: "other", id: "model" }; } }, operation: "find", calls: ["getProvider", "auth", "find"] },
+    { name: "find mismatched id", registry: { getProvider() { return {}; }, getProviderAuthStatus() { return { configured: true }; }, find() { return { provider: "test", id: "other" }; } }, operation: "find", calls: ["getProvider", "auth", "find"] },
+    { name: "find malformed identity", registry: { getProvider() { return {}; }, getProviderAuthStatus() { return { configured: true }; }, find() { return { provider: "bad/provider", id: "model" }; } }, operation: "find", calls: ["getProvider", "auth", "find"] },
+    { name: "missing available", registry: { getProvider() { return {}; }, getProviderAuthStatus() { return { configured: true }; }, find() { return { provider: "test", id: "model" }; } }, operation: "getAvailable", calls: ["getProvider", "auth", "find"] },
+    { name: "non-callable available", registry: { getProvider() { return {}; }, getProviderAuthStatus() { return { configured: true }; }, find() { return { provider: "test", id: "model" }; }, getAvailable: 1 }, operation: "getAvailable", calls: ["getProvider", "auth", "find"] },
+    { name: "available property throw", registry: Object.defineProperties({ getProvider() { return {}; }, getProviderAuthStatus() { return { configured: true }; }, find() { return { provider: "test", id: "model" }; } }, { getAvailable: { get() { throw new Error("secret-available"); } } }), operation: "getAvailable", calls: ["getProvider", "auth", "find"] },
+    { name: "available call throw", registry: { getProvider() { return {}; }, getProviderAuthStatus() { return { configured: true }; }, find() { return { provider: "test", id: "model" }; }, getAvailable() { throw new Error("secret-available"); } }, operation: "getAvailable", calls: ["getProvider", "auth", "find", "available"] },
+    { name: "available snapshot read throw", registry: { getProvider() { return {}; }, getProviderAuthStatus() { return { configured: true }; }, find() { return { provider: "test", id: "model" }; }, getAvailable() { return { [Symbol.iterator]() { throw new Error("secret-snapshot"); } }; } }, operation: "getAvailable", calls: ["getProvider", "auth", "find", "available"] },
+    { name: "available null entry", registry: { getProvider() { return {}; }, getProviderAuthStatus() { return { configured: true }; }, find() { return { provider: "test", id: "model" }; }, getAvailable() { return [null]; } }, operation: "getAvailable", calls: ["getProvider", "auth", "find", "available"] },
+    { name: "available malformed entry", registry: { getProvider() { return {}; }, getProviderAuthStatus() { return { configured: true }; }, find() { return { provider: "test", id: "model" }; }, getAvailable() { return [{ provider: "bad/provider", id: "model" }]; } }, operation: "getAvailable", calls: ["getProvider", "auth", "find", "available"] },
+    { name: "available entry getter throw", registry: { getProvider() { return {}; }, getProviderAuthStatus() { return { configured: true }; }, find() { return { provider: "test", id: "model" }; }, getAvailable() { return [Object.defineProperty({ id: "model" }, "provider", { get() { throw new Error("secret-entry"); } })]; } }, operation: "getAvailable", calls: ["getProvider", "auth", "find", "available"] },
+    { name: "available malformed after match", registry: { getProvider() { return {}; }, getProviderAuthStatus() { return { configured: true }; }, find() { return { provider: "test", id: "model" }; }, getAvailable() { return [{ provider: "test", id: "model" }, { provider: "test", id: "" }]; } }, operation: "getAvailable", calls: ["getProvider", "auth", "find", "available"] },
+  ];
+
+  for (const fault of faults) {
+    const { calls: transportCalls, transport } = fakeTransport();
+    const root = mkdtempSync(join(tmpdir(), `subagents-model-registry-${fault.name.replaceAll(" ", "-")}-`));
+    const notifications: CompletionNotification[] = [];
+    const runtime = new SubagentRuntime(transport, handlerRegistry(), root, notification => { notifications.push(notification); });
+    const updates: string[] = [];
+    runtime.onTaskUpdate(() => { updates.push("update"); });
+    const registryCalls: string[] = [];
+    const registry = fault.registry && typeof fault.registry === "object"
+      ? new Proxy(fault.registry as object, {
+          get(target, property, receiver) {
+            const value = Reflect.get(target, property, receiver);
+            if (typeof value !== "function") return value;
+            return (...args: unknown[]) => {
+              registryCalls.push(property === "getProviderAuthStatus" ? "auth" : property === "getAvailable" ? "available" : String(property));
+              return value.apply(target, args);
+            };
+          },
+        })
+      : fault.registry;
+
+    await expect(runtime.spawn({ agent: "missing", cwd: "/repo", prompt: "work", label: fault.name, taskSlug: "!", model: "test/model" }, registry as any))
+      .rejects.toMatchObject({
+        name: "ExplicitSpawnModelError",
+        code: "model_registry_error",
+        operation: fault.operation,
+        detail: `Model registry integration failed at ${fault.operation}.`,
+      });
+    expect(registryCalls, fault.name).toEqual(fault.calls);
+    assertEmptySpawnLedger(fault.name, runtime, root, updates, notifications, transportCalls);
+    runtime.stop();
+  }
+});
+
+
+test("proves every non-registry rejection category has the complete zero-effect ledger", async () => {
+  const cases = [
+    {
+      name: "invalid reference",
+      model: "invalid",
+      registry: undefined,
+      failure: { code: "invalid_model_reference", detail: 'Expected an exact provider/modelId reference; received "invalid".' },
+    },
+    {
+      name: "unknown provider",
+      model: "missing/model",
+      registry: modelRegistry("test/model"),
+      failure: { code: "provider_unavailable", detail: 'Provider "missing" is unavailable: unknown provider.' },
+    },
+    {
+      name: "missing catalog model",
+      model: "test/missing",
+      registry: {
+        getProvider() { return {}; },
+        getProviderAuthStatus() { return { configured: true }; },
+        find() { return undefined; },
+        getAvailable() { throw new Error("available reached"); },
+      },
+      failure: { code: "model_not_found", detail: 'Model "test/missing" was not found.' },
+    },
+    {
+      name: "unavailable catalog model",
+      model: "test/model",
+      registry: {
+        getProvider() { return {}; },
+        getProviderAuthStatus() { return { configured: true }; },
+        find() { return { provider: "test", id: "model" }; },
+        getAvailable() { return []; },
+      },
+      failure: { code: "model_unavailable", detail: 'Model "test/model" is unavailable in the current catalog/auth snapshot.' },
+    },
+  ];
+
+  for (const value of cases) {
+    const { calls, transport } = fakeTransport();
+    const root = mkdtempSync(join(tmpdir(), `subagents-model-${value.name.replaceAll(" ", "-")}-`));
+    const notifications: CompletionNotification[] = [];
+    const runtime = new SubagentRuntime(transport, new AgentRegistry(), root, notification => { notifications.push(notification); });
+    const updates: string[] = [];
+    runtime.onTaskUpdate(() => { updates.push("update"); });
+
+    await expect(runtime.spawn({ agent: "missing", cwd: "/repo", prompt: "work", label: value.name, taskSlug: "!", model: value.model }, value.registry as any))
+      .rejects.toMatchObject({ name: "ExplicitSpawnModelError", ...value.failure });
+    assertEmptySpawnLedger(value.name, runtime, root, updates, notifications, calls);
+    runtime.stop();
+  }
+});
+
+test("known unconfigured auth stops before catalog access and has zero spawn effects", async () => {
+  const calls: string[] = [];
+  const { calls: transportCalls, transport } = fakeTransport();
+  const root = mkdtempSync(join(tmpdir(), "subagents-model-unconfigured-"));
+  const runtime = new SubagentRuntime(transport, handlerRegistry(), root);
+  const registry = {
+    getProvider() { calls.push("getProvider"); return {}; },
+    getProviderAuthStatus() { calls.push("auth"); return { configured: false }; },
+    find() { calls.push("find"); throw new Error("find reached"); },
+    getAvailable() { calls.push("available"); throw new Error("available reached"); },
+  };
+  await expect(runtime.spawn({ agent: "missing", cwd: "/repo", prompt: "work", label: "auth", taskSlug: "!", model: "test/model" }, registry))
+    .rejects.toMatchObject({ code: "provider_unavailable", detail: 'Provider "test" is unavailable: authentication is not configured.' });
+  expect(calls).toEqual(["getProvider", "auth"]);
+  expect(runtime.listTasks()).toEqual([]);
+  expect(transportCalls).toEqual([]);
+  expect(readdirSync(root)).toEqual([]);
+  runtime.stop();
+});
+
+test("primitive registries fail closed before catalog or availability access", async () => {
+  for (const registry of [undefined, null, 0, false, "not-an-object", Symbol("registry")] as const) {
+    const { calls, transport } = fakeTransport();
+    const root = mkdtempSync(join(tmpdir(), "subagents-model-primitive-"));
+    const runtime = new SubagentRuntime(transport, handlerRegistry(), root);
+    await expect(runtime.spawn({ agent: "handler", cwd: "/repo", prompt: "work", label: "primitive", taskSlug: "task", model: "test/model" }, registry as any))
+      .rejects.toMatchObject({ code: "model_registry_error", operation: "registry" });
+    expect(runtime.listTasks()).toEqual([]);
+    expect(calls).toEqual([]);
+    expect(readdirSync(root)).toEqual([]);
+    runtime.stop();
+  }
+});
+
+test("does not cache invocation snapshots and excludes scoped model fixtures", () => {
+  let available = true;
+  let calls = 0;
+  const registry: FakeModelRegistry = {
+    getProvider() { return {}; },
+    getProviderAuthStatus() { return { configured: true }; },
+    find(provider, id) { return { provider, id }; },
+    getAvailable() { calls++; return available ? [{ provider: "test", id: "model" }] : []; },
+  };
+  const scopedModels = [];
+  expect(validateExplicitSpawnModel("test/model", { ...registry, getAvailable: registry.getAvailable })).toBe("test/model");
+  available = false;
+  let unavailableError: unknown;
+  try { validateExplicitSpawnModel("test/model", registry); } catch (error) { unavailableError = error; }
+  expect(unavailableError).toMatchObject({ code: "model_unavailable" });
+  available = true;
+  scopedModels.push("other/model");
+  expect(validateExplicitSpawnModel("test/model", { ...registry, scopedModels } as any)).toBe("test/model");
+  expect(calls).toBe(3);
+});
+
+test("covers provider/auth/catalog precedence, exact case, and later slash identity", () => {
+  let missingProviderError: unknown;
+  try { validateExplicitSpawnModel("missing/model", modelRegistry("test/model")); } catch (error) { missingProviderError = error; }
+  expect(missingProviderError).toMatchObject({ code: "provider_unavailable" });
+  const unconfigured: FakeModelRegistry = { ...modelRegistry("test/model"), getProviderAuthStatus() { return { configured: false }; } };
+  let authError: unknown;
+  try { validateExplicitSpawnModel("test/missing", unconfigured); } catch (error) { authError = error; }
+  expect(authError).toMatchObject({ code: "provider_unavailable" });
+  let caseError: unknown;
+  try { validateExplicitSpawnModel("test/MODEL", modelRegistry("test/model")); } catch (error) { caseError = error; }
+  expect(caseError).toMatchObject({ code: "model_not_found" });
+  expect(validateExplicitSpawnModel("test/family/model", modelRegistry("test/family/model"))).toBe("test/family/model");
+  expect(validateExplicitSpawnModel("提供者/模型/版本", modelRegistry("提供者/模型/版本"))).toBe("提供者/模型/版本");
+});
+
+test("invalid model dominates invalid slug and missing Agent with a complete zero-effect ledger", async () => {
+  const { calls, transport } = fakeTransport();
+  const root = mkdtempSync(join(tmpdir(), "subagents-model-precedence-"));
+  const runtime = new SubagentRuntime(transport, new AgentRegistry(), root);
+  const updates: string[] = [];
+  runtime.onTaskUpdate(() => updates.push("update"));
+  await expect(runtime.spawn({ agent: "missing", cwd: "/repo", prompt: "work", label: "bad", taskSlug: "!", model: null }, modelRegistry("test/model")))
+    .rejects.toMatchObject({ code: "invalid_model_reference", detail: 'Expected an exact provider/modelId string; received type "null".' });
+  expect(runtime.listTasks()).toEqual([]);
+  expect(updates).toEqual([]);
+  expect(calls).toEqual([]);
+  expect(readdirSync(root)).toEqual([]);
+});
+
+test("maps missing fifth context and optional registry through the same typed adapter contract", async () => {
+  const runtime = new SubagentRuntime(fakeTransport().transport, handlerRegistry(), mkdtempSync(join(tmpdir(), "subagents-model-context-")));
+  const tool = createSubagentTools(runtime, "/repo").find(value => value.name === "subagent_spawn")!;
+  for (const context of [undefined, {}, { modelRegistry: null }]) {
+    const result = await (tool.execute as any)("call-context", { agent: "handler", prompt: "work", label: "context", taskSlug: "context", model: "test/model" }, undefined, undefined, context);
+    expect(result.details).toEqual({ code: "model_registry_error", detail: "Model registry integration failed at registry.", operation: "registry" });
+    expect(result.content).toEqual([{ type: "text", text: JSON.stringify(result.details) }]);
+  }
+  expect(runtime.listTasks()).toEqual([]);
+});
+
+test("passes empty and invalid thinking unchanged while model-less thinking emits no flags", async () => {
+  const cases = [
+    { slug: "thinking-empty", model: "test/model", thinking: "", expected: ["--model", "test/model"] },
+    { slug: "thinking-invalid", model: "test/model", thinking: "not-a-level", expected: ["--model", "test/model", "--thinking", "not-a-level"] },
+    { slug: "thinking-without-model", model: undefined, thinking: "high", expected: [] },
+  ];
+  for (const value of cases) {
+    const { calls, transport } = fakeTransport();
+    const root = mkdtempSync(join(tmpdir(), `subagents-${value.slug}-`));
+    const runtime = new SubagentRuntime(transport, handlerRegistry(), root);
+    const task = await runtime.spawn({ agent: "handler", cwd: "/repo", prompt: "work", label: value.slug, taskSlug: value.slug, model: value.model, thinking: value.thinking }, value.model === undefined ? undefined : modelRegistry(value.model));
+    const bootstrap = readFileSync(join(root, "tasks", `${value.slug}-artifacts`, "launch-1.cjs"), "utf8");
+    const encoded = bootstrap.match(/Buffer.from\("([^"]+)"/)?.[1];
+    const spec = JSON.parse(Buffer.from(encoded!, "base64").toString("utf8")) as { args: string[] };
+    const index = spec.args.indexOf("--model");
+    const actual = index < 0 ? [] : spec.args.slice(index, index + (value.thinking ? 4 : 2));
+    expect(actual).toEqual(value.expected);
+    writeFileSync(task.resultPath, JSON.stringify({ subagentId: task.subagentId, generation: 1, status: "completed", result: "done" }));
+    await runtime.join(task.subagentId);
+  }
+});
+
+test("resume preserves the persisted generation-2 combined argv", async () => {
+  const parentSessionFile = join(mkdtempSync(join(tmpdir(), "subagents-resume-model-")), "parent.jsonl");
+  const first = await new SubagentRuntime(fakeTransport().transport, handlerRegistry()).spawn({ agent: "handler", cwd: "/repo", prompt: "one", label: "resume-model", taskSlug: "resume-model", parentSessionFile, model: "test/family/model", thinking: "high" }, modelRegistry("test/family/model"));
+  writeFileSync(first.sessionFile, "");
+  writeFileSync(first.resultPath, JSON.stringify({ subagentId: first.subagentId, generation: 1, status: "failed", error: "retry" }));
+  const firstRuntime = new SubagentRuntime(fakeTransport().transport, handlerRegistry());
+  await firstRuntime.recover("/repo", parentSessionFile);
+  const resumed = await firstRuntime.resume(first.subagentId, "two");
+  const bootstrap = readFileSync(join(dirname(resumed.resultPath), "launch-2.cjs"), "utf8");
+  const encoded = bootstrap.match(/Buffer.from\("([^"]+)"/)?.[1];
+  const spec = JSON.parse(Buffer.from(encoded!, "base64").toString("utf8")) as { args: string[] };
+  const modelIndex = spec.args.indexOf("--model");
+  expect(spec.args.slice(modelIndex, modelIndex + 2)).toEqual(["--model", "test/family/model:high"]);
+  expect(spec.args).not.toContain("--thinking");
+  writeFileSync(resumed.resultPath, JSON.stringify({ subagentId: resumed.subagentId, generation: 2, status: "completed", result: "done" }));
+  await firstRuntime.join(resumed.subagentId);
+});
+
+
+test("clamps a valid but unsupported thinking level at the upstream capability boundary", async () => {
+  const { clampThinkingLevel } = await import("@earendil-works/pi-ai/compat");
+  const model = { id: "model", provider: "test", reasoning: true, thinkingLevelMap: { minimal: null, low: "low", medium: null, high: null, xhigh: null, max: null } } as any;
+  expect(clampThinkingLevel(model, "max")).toBe("low");
+  expect(clampThinkingLevel(model, "high")).toBe("low");
+  expect(clampThinkingLevel(model, "low")).toBe("low");
+});
+test("Pi 0.84.2 parser warns and leaves invalid thinking unset", async () => {
+  const { parseArgs } = await import("@earendil-works/pi-coding-agent");
+  const parsed = parseArgs(["--model", "test/model", "--thinking", "not-a-level"]);
+  expect(parsed.thinking).toBeUndefined();
+  expect(parsed.diagnostics).toContainEqual({ type: "warning", message: expect.stringContaining("Invalid thinking level") });
+});
+
+
+function snapshotSpawnState(runtime: SubagentRuntime, root: string) {
+  const files: Record<string, string> = {};
+  const visit = (directory: string, prefix = "") => {
+    for (const entry of readdirSync(directory, { withFileTypes: true })) {
+      const relative = prefix ? `${prefix}/${entry.name}` : entry.name;
+      const path = join(directory, entry.name);
+      if (entry.isDirectory()) visit(path, relative);
+      else files[relative] = readFileSync(path).toString("base64");
+    }
+  };
+  visit(root);
+  const internals = runtime as any;
+  return {
+    files,
+    tasks: structuredClone([...internals.tasks.entries()]),
+    activeTasksDir: internals.activeTasksDir,
+    monitors: [...internals.monitors.keys()],
+    notified: [...internals.notified],
+    manifestUnknown: structuredClone([...internals.manifestUnknown.entries()]),
+    launches: [...internals.launches.keys()],
+    settlements: [...internals.settlements.keys()],
+    cleanups: [...internals.cleanups.keys()],
+  };
+}
+
+test("preserves seeded task and scope bytes across the registry rejection matrix", async () => {
+  const { calls, transport } = fakeTransport();
+  const root = mkdtempSync(join(tmpdir(), "subagents-model-seeded-ledger-"));
+  const otherRoot = mkdtempSync(join(tmpdir(), "subagents-model-seeded-other-"));
+  const parentSessionFile = join(root, "parent.jsonl");
+  const rejectedParentSessionFile = join(otherRoot, "parent.jsonl");
+  const notifications: CompletionNotification[] = [];
+  const updates: string[] = [];
+  const runtime = new SubagentRuntime(transport, handlerRegistry(), undefined, notification => { notifications.push(notification); });
+  runtime.onTaskUpdate(() => { updates.push("update"); });
+  const seed = await runtime.spawn({ agent: "handler", cwd: "/repo", prompt: "seed", label: "seed", taskSlug: "seed", parentSessionFile });
+  writeFileSync(seed.resultPath, JSON.stringify({ subagentId: seed.subagentId, generation: 1, status: "completed", result: "seeded" }));
+  await runtime.join(seed.subagentId);
+  const baseline = snapshotSpawnState(runtime, root);
+  const baselineUpdates = [...updates];
+  const baselineNotifications = structuredClone(notifications);
+  calls.length = 0;
+
+  const valid = {
+    getProvider() { return {}; },
+    getProviderAuthStatus() { return { configured: true }; },
+    find() { return { provider: "test", id: "model" }; },
+    getAvailable() { return [{ provider: "test", id: "model" }]; },
+  };
+  const cases = [
+    { name: "invalid reference", model: "invalid", registry: undefined, failure: { code: "invalid_model_reference" } },
+    { name: "unknown provider", model: "missing/model", registry: modelRegistry("test/model"), failure: { code: "provider_unavailable" } },
+    { name: "unconfigured provider", model: "test/model", registry: { ...valid, getProviderAuthStatus() { return { configured: false }; } }, failure: { code: "provider_unavailable" } },
+    { name: "absent find result", model: "test/model", registry: { ...valid, find() { return undefined; } }, failure: { code: "model_not_found" } },
+    { name: "mismatched find result", model: "test/model", registry: { ...valid, find() { return { provider: "test", id: "other" }; } }, failure: { code: "model_registry_error", operation: "find" } },
+    { name: "malformed find result", model: "test/model", registry: { ...valid, find() { return { provider: "", id: "model" }; } }, failure: { code: "model_registry_error", operation: "find" } },
+    { name: "valid unavailable snapshot", model: "test/model", registry: { ...valid, getAvailable() { return [{ provider: "test", id: "other" }]; } }, failure: { code: "model_unavailable" } },
+    { name: "malformed available before match", model: "test/model", registry: { ...valid, getAvailable() { return [null, { provider: "test", id: "model" }]; } }, failure: { code: "model_registry_error", operation: "getAvailable" } },
+    { name: "malformed available after match", model: "test/model", registry: { ...valid, getAvailable() { return [{ provider: "test", id: "model" }, { provider: "bad/provider", id: "other" }]; } }, failure: { code: "model_registry_error", operation: "getAvailable" } },
+  ];
+
+  for (const value of cases) {
+    await expect(runtime.spawn({ agent: "missing", cwd: "/other", prompt: "reject", label: value.name, taskSlug: "!", model: value.model, parentSessionFile: rejectedParentSessionFile }, value.registry as any))
+      .rejects.toMatchObject({ name: "ExplicitSpawnModelError", ...value.failure });
+    expect(snapshotSpawnState(runtime, root), value.name).toEqual(baseline);
+    expect(updates, value.name).toEqual(baselineUpdates);
+    expect(notifications, value.name).toEqual(baselineNotifications);
+    expect(calls, value.name).toEqual([]);
+    expect(readdirSync(otherRoot), value.name).toEqual([]);
+  }
+  runtime.stop();
 });
