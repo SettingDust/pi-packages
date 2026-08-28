@@ -25,7 +25,25 @@ No Pi core, Host, backend, settings, session persistence, Herdr, runtime activat
 
 ### P0 — Reconstruct the candidate and freeze evidence
 
-Confirm the six documents' identities and current worktree ownership, search all package and repository references to the old channel, module exports, registry, receipts, acceptance codes, callback, and helper names, and record any consumer not covered by current evidence. Stop on an external/unknown consumer or mixed unrelated ownership.
+Before any source or test change, create a reproducible deletion and ownership inventory. This draft does not authorize implementation.
+
+**Fixed inventory roots and methods.** Use all of the following roots for every search class: (1) the tracked package root, `packages/pi-harness/`; (2) the current tracked repository root, `.`; (3) the seven protected paths named below; and (4) the baseline and reconciliation history. Use `git grep -n -E` (or an equivalent repository-indexed regex search that records its exact query) for tracked content, `git diff --no-ext-diff` for the stated revisions, and a separately recorded current-worktree diff. For the history root, first verify that `c6a22d0d`, `d8c38e25`, `ee6a5eb3`, `9ff7269d`, `0ba5b60c`, and `86e0d1c2` resolve; then reconcile, in that order, each protected-file hunk from the `c6a22d0d` ownership baseline through those commits and the current worktree. A missing, non-ancestral, or otherwise unreconcilable revision is a stop condition.
+
+**Required deletion query classes.** Record the exact fixed-string or regex query used for each of these classes:
+
+1. `pi-harness:plan-activation-v1` and activation event/channel registration, dispatch, and transport terms.
+2. Activation decision, context, outcome, and disclosure surfaces, including `PlanActivationDecision`, `PlanActivationContext`, `PlanActivationOutcome`, `PlanActivationDisclosure`, and their actual discovered identifier variants.
+3. `PlanAuthorizationRegistry` and `PlanAuthorizationReceipt` definitions, uses, constructors, imports, exports, and type-only consumers.
+4. Replay, session, and generation authorization state: authorization/receipt queries paired with `replay`, `session`, `generation`, `reset`, or state-storage terms, so unrelated generic occurrences are not misclassified.
+5. Receipt issuance, integrity, reset, and block-code surfaces, including receipt issue/create/write, integrity/corruption validation, reset/clear/delete, `receipt_corrupt`, `acceptance_required`, and every discovered receipt/authorization-only `BlockCode` member.
+6. `ResolveOptions`, `admitPlanned`, and all Extension callback/listener/registration surfaces that pass, consume, or derive planned-admission behavior, including resolver registration and activation-related callbacks.
+7. `admission-decision` filenames and paths plus all definition, import, re-export, dynamic-import, and test references to that module.
+
+**Mechanical record.** For every root/query-class pair, record: the root; command/query class and exact query; each match's path and enclosing symbol (or line range when no symbol exists); a literal `zero results` entry when there is none; classification as `internal definition`, `import`, `test`, `direct consumer`, or `external consumer`; and disposition (`remove`, `retain for current-call final-JIT legality`, `out of scope`, or `stop`). Do not infer a zero-result conclusion from a different root or broader/narrower term.
+
+**Protected ownership baseline.** The inventory must map every file and every changed hunk/line range in `packages/pi-harness/extensions/pi-harness.ts`, `packages/pi-harness/src/admission.ts`, `packages/pi-harness/src/admission-decision.ts`, `packages/pi-harness/src/protocol.ts`, `packages/pi-harness/tests/admission.test.ts`, `packages/pi-harness/tests/admission-decision.test.ts`, and `packages/pi-harness/tests/protocol.test.ts`. Each mapping row names its baseline state at `c6a22d0d`, each transition through `d8c38e25`, `ee6a5eb3`, `9ff7269d`, `0ba5b60c`, and `86e0d1c2`, its current-worktree state, owner/classification, and the isolated removal disposition. Candidate scope may be frozen only after every selected hunk has such a mapping.
+
+Fail closed: stop and return for authority/Plan revision on any unmapped direct or external consumer, unknown hunk, mixed ownership that cannot be isolated, candidate drift, or required compatibility behavior. Never add a compatibility shim automatically. This inventory only establishes deletion legality; it neither changes the preserved final-JIT sequence nor relaxes any exclusion below.
 
 ### P1 — Simplify retained authority primitives
 

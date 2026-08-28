@@ -7,12 +7,14 @@
 
 These Tasks are draft decomposition only. They do not authorize implementation, issue a receipt, or replace ordinary user acceptance of the exact future Plan.
 
-## T1 — Establish the deletion inventory
+## T1 — Establish the reproducible deletion and ownership inventory
 
-- Depends on: none; documentation draft and clean worktree ownership review.
-- Outcome: every reference and consumer of the activation channel, activation decision/context/outcome/disclosure APIs, registry/receipt types, replay/session authorization state, receipt-specific codes, and `admitPlanned` coupling is mapped; unrelated dirty work is excluded.
-- Surfaces: repository/package search and the six documented candidate files.
-- Verification: inventory records direct consumers, no-consumer conclusions, migration impact, and any blocker. Unknown or external consumer stops T1.
+- Depends on: none; this is draft documentation decomposition only and must complete before any implementation task.
+- Outcome: a mechanical inventory proves the deletion candidate or stops. It covers every tracked match under both `packages/pi-harness/` and repository root `.`; all seven protected paths; the `c6a22d0d` ownership baseline; each reconciliation commit `d8c38e25`, `ee6a5eb3`, `9ff7269d`, `0ba5b60c`, and `86e0d1c2`; and the current worktree.
+- Required queries: record the exact fixed-string/regex query and method for (1) `pi-harness:plan-activation-v1` plus activation channel/transport registration and dispatch; (2) activation decision/context/outcome/disclosure identifiers and discovered variants; (3) `PlanAuthorizationRegistry` and `PlanAuthorizationReceipt`; (4) authorization/receipt state paired with replay, session, generation, reset, and storage; (5) receipt issuance/integrity/reset surfaces and every receipt/authorization-only block code, explicitly including `receipt_corrupt` and `acceptance_required`; (6) `ResolveOptions`, `admitPlanned`, and Extension callbacks/listeners/registrations that carry planned admission; and (7) `admission-decision` files, paths, definitions, imports, exports/re-exports, dynamic imports, and tests.
+- Search method and result record: use `git grep -n -E` or an equivalent indexed search for each query/root pair; verify the stated commits resolve; use `git diff --no-ext-diff` for the sequential history reconciliation and a separate current-worktree diff. For every pair, record root, method/query class, exact query, every match's path and enclosing symbol or line range, literal `zero results` when none, classification (`internal definition`, `import`, `test`, `direct consumer`, or `external consumer`), and disposition (`remove`, `retain for current-call final-JIT legality`, `out of scope`, or `stop`). A result in one root never supplies a zero-result record for another.
+- Ownership mapping: for each of `extensions/pi-harness.ts`, `src/admission.ts`, `src/admission-decision.ts`, `src/protocol.ts`, `tests/admission.test.ts`, `tests/admission-decision.test.ts`, and `tests/protocol.test.ts` under `packages/pi-harness/`, map every changed hunk/line range to its `c6a22d0d` baseline state, each named later-commit transition in order, current-worktree state, owner/classification, and isolated disposition. Do not select a candidate hunk until this mapping is complete.
+- Verification and stop gate: verify all roots/query classes have result records, all seven paths have per-file/per-hunk mappings, and the final candidate contains only isolated deletion-owned hunks. Stop and return for authority/Plan revision on an unmapped direct or external consumer, unknown hunk, non-resolving/non-reconcilable baseline history, mixed ownership that cannot be isolated, or candidate drift. Never add a compatibility shim automatically. T1 does not alter the final-JIT sequence, exclusions, or implementation authorization.
 
 ## T2 — Retain only current-call authority primitives
 
