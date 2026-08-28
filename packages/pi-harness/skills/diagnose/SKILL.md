@@ -15,7 +15,7 @@ Use `research-source-grounded` when claims depend on inspected project or extern
 4. Trace all relevant callers and sibling paths before changing a shared function. Locate the earliest boundary where actual behavior diverges from expected behavior.
 5. State the root cause as a falsifiable mechanism supported by reproduction and isolation evidence.
 6. Identify the smallest correction at the shared causal boundary and one focused regression check that fails before the fix and passes after it.
-7. If the Handoff authorizes repair, apply `implement-change`, run the regression check, and confirm the original reproduction. Otherwise stop at diagnosis and correction guidance.
+7. Stop at diagnosis and correction guidance. Repair is always a separate `implement-change` Handoff; a diagnosis Handoff cannot authorize applying the correction.
 
 ## Output
 
