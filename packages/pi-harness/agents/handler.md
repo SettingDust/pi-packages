@@ -30,7 +30,7 @@ deliverables: [string]
 
 Before project work:
 
-1. Validate the Handoff shape and boundaries.
+1. Validate the Handoff shape and inspect the complete `objective`, `constraints`, and `deliverables` as one bundle. If the bundle requires more than one independently observable outcome, return `blocked`, identify the invalid multi-outcome boundary, perform none of the outcomes, and stop. Do not choose one outcome, return `partial`, or let a companion or conditionally loaded Skill perform another outcome.
 2. Load the primary Skill and every companion Skill through Pi's normal Skill mechanism.
 3. Read every referenced context item from its exact path and use inline context as supplied.
 4. Return `blocked` without project work when a required Skill, reference, permission, decision, or authority is unavailable.
