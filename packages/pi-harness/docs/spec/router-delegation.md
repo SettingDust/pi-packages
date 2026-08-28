@@ -1,6 +1,6 @@
 # Router Delegation Specification
 
-- Status: draft; unaccepted; unimplemented
+- Status: accepted; implementation repairs, narrow Role validation, full technical validation, fresh final independent correctness/security/evidence review, and completion-status reconciliation complete; isolated commit pending
 - Authority: [ADR-0007](../adr/0007-authority-first-router-admission.md)
 
 ## 1. Boundary and trust ownership
@@ -41,7 +41,7 @@ The following are removed, not deprecated compatibility interfaces:
 - activation decision/outcome types, replay IDs, activation/decision timestamps, session-generation authorization state, and reset/restore/issuance logic; and
 - receipt-specific `acceptance_required`, `receipt_corrupt`, and amendment/authorization response semantics.
 
-No compatibility shim may accept, ignore, or translate the old activation payload unless direct consumer evidence is discovered before implementation. A removed API has no migration period inside Harness; the migration is to ordinary Router confirmation followed by normal delegation.
+No compatibility shim accepts, ignores, or translates the old activation payload; the completed repository-wide inventory found no direct consumer requiring one. A removed API has no migration period inside Harness; the migration is to ordinary Router confirmation followed by normal delegation.
 
 `acceptance_required` has no remaining role in this boundary: absence of a receipt is no longer a state. Any unrelated use discovered by repository-wide search must be explicitly justified in the implementation review or removed; it must not be retained by habit.
 
@@ -51,8 +51,22 @@ Malformed Handoffs, invalid Skills, unavailable or malformed Roles, unreadable r
 
 Reload, new session, resume, fork, shutdown, and session-generation changes do not clear or restore Harness authorization; there is nothing to clear or restore. No replacement marker, flag, audit event, confirmation token, persistence, or Host seam may be introduced.
 
+## Evidence ownership and lifecycle reconciliation
+
+The implementation repairs comprise three distinct findings with separate ownership:
+
+- First P2: Resolver root/Handoff/context runtime shape closure and recursive capability-field rejection belong to `src/protocol.ts`, with regression coverage in `tests/protocol.test.ts`.
+- Second P2: nested atomic/planned/authority TypeBox closure belongs to `extensions/pi-harness.ts`, with regression coverage in `tests/extension.test.ts`.
+- Final P2: non-string Role model/thinking fail-closed validation belongs to `src/protocol.ts`, with regression coverage in `tests/protocol.test.ts`.
+
+Fresh final technical evidence is complete: admission/protocol `50 pass, 0 fail, 102 assertions`; protocol-only `45 pass, 0 fail, 86 assertions`; Extension schema `1 pass, 0 fail, 41 assertions`; and full package `105 pass, 0 fail, 436 assertions across seven files`. TypeScript `5.9.3` typecheck passed, protocol import passed, and source-level `activateHarness` registration smoke passed.
+
+The four malformed Role cases (null/numeric model and null/numeric thinking) returned `unavailable_model` or `invalid_thinking`, did not throw, and produced zero subject observations. Stateless evidence retained: seven closed TypeBox shapes; Work and Plan drift each returned `authority_drift` after exactly two observations; recursive capability-shaped keys were rejected while prose was accepted; removed-state inventory returned zero results; both obsolete admission-decision files were absent.
+
+This reconciliation changes evidence and lifecycle status only, not the normative Resolver contract. The exact twelve-path boundary and unchanged six candidate source/test identities are recorded in [Work Context](../works/authority-first-router-admission/context.md). Full technical validation is complete. Fresh final independent correctness/security/evidence review is complete with P0/P1/P2/P3 all none; exact source/test and document identities matched, and no repair was required. Completion-status reconciliation is complete. GO for one isolated twelve-path commit; the commit remains pending and separately authorized. No reload, deployment, live Router/Handler launch, runtime activation, staging, or commit was performed.
+
 ## 6. Acceptance criteria and non-goals
 
-The future implementation is acceptable only if focused and full tests show: no removed channel, type, registry, receipt, or receipt-based response path; planned resolution performs only legality/authority/current-call validation; missing receipt is not an acceptance condition; authority drift remains precise and fail-closed; no interaction occurs in Resolver execution; and atomic behavior, Handoff normalization, tuple validation, model/Skill/Role validation, Handler Result parsing, and unrelated protocol behavior remain intact.
+The implementation candidate is acceptable only if focused and full tests show: no removed channel, type, registry, receipt, or receipt-based response path; planned resolution performs only legality/authority/current-call validation; missing receipt is not an acceptance condition; authority drift remains precise and fail-closed; no interaction occurs in Resolver execution; and atomic behavior, Handoff normalization, tuple validation, model/Skill/Role validation, Handler Result parsing, and unrelated protocol behavior remain intact.
 
 Non-goals: Pi-core changes, Host seams, persistence, authentication, confirmation UI, natural-language classification, per-Handoff confirmation, task lifecycle changes, backend changes, reload, staging, and commit.

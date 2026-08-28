@@ -7,6 +7,7 @@ import {
   type PlannedSubject,
 } from "./admission.js";
 
+
 export type ThinkingLevel = string;
 
 export interface SkillSummary {
@@ -79,11 +80,8 @@ export type BlockCode =
   | "invalid_admission"
   | "invalid_atomic_basis"
   | "missing_authority"
-  | "receipt_corrupt"
-  | "authority_drift"
-  | "review_required"
-  | "acceptance_required"
-  | "amendment_invalidated";
+  | "authority_drift";
+
 
 export interface BlockedResolution {
   status: "blocked";
@@ -154,7 +152,7 @@ export interface ResolveOptions {
   skills: SkillSummary[];
   roles: ModelRole[];
   cwd: string;
-  admitPlanned?: (subject: PlannedSubject, admission: PlannedAdmission, recompute: () => Promise<PlannedSubject>) => Promise<BlockedResolution | undefined>;
+  subjectBuilder?: typeof buildPlannedSubject;
 }
 
 export async function resolveDelegation(
@@ -183,8 +181,8 @@ export async function resolveDelegation(
   if (!role) return blocked("unknown_role", `Unknown Model Role: ${modelRole}`);
   if (!nonEmptyString(role.description)) return blocked("invalid_config", `Model Role is malformed: ${modelRole}`);
   if (!role.available) return blocked(role.unavailableCode ?? "unavailable_model", `Model Role is unavailable: ${modelRole}`);
-  if (!role.model.trim()) return blocked("unavailable_model", `Model Role has no model: ${modelRole}`);
-  if (!role.thinking.trim()) return blocked("invalid_thinking", `Model Role has no thinking level: ${modelRole}`);
+  if (!nonEmptyString(role.model)) return blocked("unavailable_model", `Model Role has no model: ${modelRole}`);
+  if (!nonEmptyString(role.thinking)) return blocked("invalid_thinking", `Model Role has no thinking level: ${modelRole}`);
 
   const normalizedContext: ContextItem[] = [];
   for (const item of handoff.context) {
@@ -213,6 +211,8 @@ export async function resolveDelegation(
 
   if (validatedAdmission.path === "atomic") return resolved(normalizedHandoff, role);
 
+  const subjectBuilder = options.subjectBuilder ?? buildPlannedSubject;
+
   let authorityPaths: AuthoritySelectors;
   try {
     authorityPaths = {
@@ -229,34 +229,32 @@ export async function resolveDelegation(
     return blocked("missing_authority", "Planned authority must select three distinct paths occurring exactly once in Handoff context");
   }
 
-  let subject: PlannedSubject;
-  try {
-    subject = await buildPlannedSubject(options.cwd, authorityPaths, {
-      objective: normalizedHandoff.objective,
-      primarySkill: normalizedHandoff.primarySkill,
-      companionSkills: normalizedHandoff.companionSkills,
-      context: normalizedHandoff.context as Array<{ ref: string; purpose: string } | { inline: string; purpose: string }>,
-      constraints: normalizedHandoff.constraints,
-      deliverables: normalizedHandoff.deliverables,
-    });
-    canonicalJson(subject);
-  } catch (error) {
-    return blocked("invalid_admission", `Planned admission is not canonicalizable: ${errorMessage(error)}`);
-  }
-
-  const recompute = () => buildPlannedSubject(options.cwd, authorityPaths, {
+  const subjectInput = {
     objective: normalizedHandoff.objective,
     primarySkill: normalizedHandoff.primarySkill,
     companionSkills: normalizedHandoff.companionSkills,
     context: normalizedHandoff.context as Array<{ ref: string; purpose: string } | { inline: string; purpose: string }>,
     constraints: normalizedHandoff.constraints,
     deliverables: normalizedHandoff.deliverables,
-  });
-  const admissionBlock = options.admitPlanned
-    ? await options.admitPlanned(subject, validatedAdmission, recompute)
-    : blocked("review_required", "Planned admission requires Extension-issued review and acceptance before delegation");
-  if (admissionBlock) return admissionBlock;
-  return resolved(normalizedHandoff, role);
+  };
+  let subject: PlannedSubject;
+  try {
+    subject = await subjectBuilder(options.cwd, authorityPaths, subjectInput);
+    canonicalJson(subject);
+  } catch (error) {
+    return blocked("invalid_admission", `Planned admission is not canonicalizable: ${errorMessage(error)}`);
+  }
+
+  const invocation = resolved(normalizedHandoff, role);
+  try {
+    const current = await subjectBuilder(options.cwd, authorityPaths, subjectInput);
+    if (canonicalJson(current) !== canonicalJson(subject)) {
+      return blocked("authority_drift", "The planned authority or normalized Handoff changed during admission");
+    }
+  } catch (error) {
+    return blocked("authority_drift", `The planned subject could not be revalidated: ${errorMessage(error)}`);
+  }
+  return invocation;
 }
 
 export function parseHandlerResult(input: unknown): HandlerResultParse {
@@ -292,10 +290,24 @@ export function parseHandlerResult(input: unknown): HandlerResultParse {
 function validateInput(input: unknown):
   | { ok: true; value: Omit<ResolverInput, "admission"> & { admission: unknown } }
   | { ok: false; code: BlockCode; message: string } {
-  if (!isRecord(input) || !isRecord(input.handoff) || !nonEmptyString(input.modelRole)) {
+  if (!isRecord(input)) {
+    return { ok: false, code: "invalid_config", message: "Resolver input requires handoff, admission, and modelRole" };
+  }
+  const inputWithoutAdmission = { ...input };
+  delete inputWithoutAdmission.admission;
+  if (hasForbiddenAdmissionField(inputWithoutAdmission)) {
+    return { ok: false, code: "invalid_config", message: "Resolver input must not contain capability-shaped fields" };
+  }
+  if (!hasOnlyKeys(input, ["handoff", "admission", "modelRole"])) {
+    return { ok: false, code: "invalid_config", message: "Resolver input has unsupported fields" };
+  }
+  if (!isRecord(input.handoff) || !nonEmptyString(input.modelRole)) {
     return { ok: false, code: "invalid_config", message: "Resolver input requires handoff, admission, and modelRole" };
   }
   const handoff = input.handoff;
+  if (!hasOnlyKeys(handoff, ["objective", "primarySkill", "companionSkills", "context", "constraints", "deliverables"])) {
+    return { ok: false, code: "invalid_config", message: "Handoff has unsupported fields" };
+  }
   const companionSkills = handoff.companionSkills === undefined ? [] : handoff.companionSkills;
   if (
     !nonEmptyString(handoff.objective) ||
@@ -354,13 +366,17 @@ function validateAdmission(value: unknown):
 }
 
 function hasForbiddenAdmissionField(value: Record<string, unknown>): boolean {
-  const forbidden = /^(?:reviewed|review|acceptance|amendment|reviewer|outcome|reviewedAt|acceptedAt|sessionId|issuer|receipt|receiptId|receiptHandle|handle|digest|sha256|setSha256|handoffSha256|subjectSha256)$/i;
+  const forbidden = /^(?:reviewed|review|acceptance|amendment|reviewer|outcome|reviewedAt|acceptedAt|sessionId|issuer|receipt|receiptId|receiptHandle|handle|digest|sha256|setSha256|handoffSha256|subjectSha256|planAuthorizationSha256|a3AuthoritySha256|a3DecisionSha256)$/i;
   return Object.entries(value).some(([key, item]) => forbidden.test(key) || (isRecord(item) && hasForbiddenAdmissionField(item)) || (Array.isArray(item) && item.some((entry) => isRecord(entry) && hasForbiddenAdmissionField(entry))));
 }
 
 function exactKeys(value: Record<string, unknown>, keys: string[]): boolean {
   const actual = Object.keys(value).sort();
   return actual.length === keys.length && actual.every((key, index) => key === [...keys].sort()[index]);
+}
+
+function hasOnlyKeys(value: Record<string, unknown>, keys: string[]): boolean {
+  return Object.keys(value).every((key) => keys.includes(key));
 }
 
 function resolved(handoff: Handoff, role: ModelRole): ResolvedInvocation {
@@ -378,6 +394,8 @@ function validateContext(value: unknown): { ok: true; value: ContextItem } | { o
   const hasRef = nonEmptyString(value.ref);
   const hasInline = nonEmptyString(value.inline);
   if (hasRef === hasInline) return { ok: false };
+  if (hasRef && !exactKeys(value, ["ref", "purpose"])) return { ok: false };
+  if (hasInline && !exactKeys(value, ["inline", "purpose"])) return { ok: false };
   return hasRef ? { ok: true, value: { ref: value.ref, purpose: value.purpose } } : { ok: true, value: { inline: value.inline, purpose: value.purpose } };
 }
 

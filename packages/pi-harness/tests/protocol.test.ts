@@ -9,9 +9,10 @@ import {
   resolveDelegation,
   type Handoff,
   type ModelRole,
+  type PlannedAdmission,
   type ResolveOptions,
   type SkillSummary,
-} from "../src/index.js";
+} from "../src/protocol.js";
 
 const skills: SkillSummary[] = [
   { name: "spec-driven-development", description: "Coordinate durable software delivery." },
@@ -119,41 +120,91 @@ describe("admission resolution", () => {
     expect(result).toMatchObject({ status: "blocked", code: "invalid_config" });
   });
 
+  for (const admissionPath of ["atomic", "planned"] as const) {
+    test.each([
+      ["Resolver root", (input: any) => { input.receipt = "model-supplied"; }],
+      ["Handoff", (input: any) => { input.handoff.sessionId = "model-supplied"; }],
+      ["context item", (input: any) => { input.handoff.context[0].digest = "model-supplied"; }],
+    ])(`rejects capability-shaped input at %s under ${admissionPath} admission`, async (_location, addCapability) => {
+      const authority = { work: "docs/works/admission/work.md", plan: "docs/works/admission/plan-slice.md", tasks: "docs/works/admission/tasks-slice.md" };
+      const input = admissionPath === "atomic"
+        ? request()
+        : request(plannedHandoff(), { path: "planned", authority });
+      addCapability(input);
+      let observations = 0;
+      const result = await resolveDelegation(input, {
+        ...options,
+        subjectBuilder: async (subjectCwd, selectors, subjectHandoff) => {
+          observations++;
+          return buildPlannedSubject(subjectCwd, selectors, subjectHandoff);
+        },
+      });
+      expect(result).toMatchObject({ status: "blocked", code: "invalid_config" });
+      expect(result).not.toHaveProperty("prompt");
+      expect(observations).toBe(0);
+    });
+  }
+
+  test("accepts capability words in ordinary Handoff prose", async () => {
+    const candidate = handoff({
+      objective: "Explain receipt and session behavior.",
+      context: [{ inline: "A receipt or session word in prose is not a capability.", purpose: "Scope." }],
+    });
+    expect(await resolveDelegation(request(candidate), options)).toMatchObject({ status: "resolved" });
+  });
+
   test("materializes omitted optional arrays before planned subject hashing", async () => {
     const authority = { work: "docs/works/admission/work.md", plan: "docs/works/admission/plan-slice.md", tasks: "docs/works/admission/tasks-slice.md" };
     const candidate = plannedHandoff();
     delete candidate.constraints;
     delete candidate.deliverables;
-    let admitted: Awaited<ReturnType<typeof buildPlannedSubject>> | undefined;
-    const result = await resolveDelegation({ handoff: candidate, admission: { path: "planned", authority }, modelRole: "standard" }, {
-      ...options,
-      admitPlanned: async (subject) => {
-        admitted = subject;
-        return undefined;
-      },
-    });
+    const result = await resolveDelegation({ handoff: candidate, admission: { path: "planned", authority }, modelRole: "standard" }, options);
     expect(result.status).toBe("resolved");
-    if (result.status !== "resolved" || !admitted) return;
+    if (result.status !== "resolved") return;
     const prompt = Bun.YAML.parse(result.prompt) as Handoff;
     expect(prompt.constraints).toEqual([]);
     expect(prompt.deliverables).toEqual([]);
-    const expected = await buildPlannedSubject(cwd, authority, {
+    expect(await buildPlannedSubject(cwd, authority, {
       ...candidate,
       constraints: [],
       deliverables: [],
-    });
-    expect(admitted).toEqual(expected);
+    })).toMatchObject({ subjectSha256: expect.stringMatching(/^[0-9a-f]{64}$/) });
   });
+
+  test("planned admission performs current-call validation and does not leak admission into the prompt", async () => {
+    const result = await resolveDelegation({ handoff: plannedHandoff(), admission: { path: "planned", authority: { work: "docs/works/admission/work.md", plan: "docs/works/admission/plan-slice.md", tasks: "docs/works/admission/tasks-slice.md" } }, modelRole: "standard" }, options);
+    expect(result.status).toBe("resolved");
+    if (result.status === "resolved") expect(Bun.YAML.parse(result.prompt)).not.toHaveProperty("admission");
+  });
+
+  test.each(["work", "plan"] as const)("fails closed when %s bytes change between subject observations", async (member) => {
+    const authority = { work: "docs/works/admission/work.md", plan: "docs/works/admission/plan-slice.md", tasks: "docs/works/admission/tasks-slice.md" };
+    const path = join(authorityDir, member === "work" ? "work.md" : "plan-slice.md");
+    const original = await Bun.file(path).arrayBuffer();
+    let observations = 0;
+    try {
+      const result = await resolveDelegation({ handoff: plannedHandoff(), admission: { path: "planned", authority }, modelRole: "standard" }, {
+        ...options,
+        subjectBuilder: async (subjectCwd, selectors, subjectHandoff) => {
+          const subject = await buildPlannedSubject(subjectCwd, selectors, subjectHandoff);
+          observations++;
+          if (observations === 1) await writeFile(path, "changed\n", "utf8");
+          return subject;
+        },
+      });
+      expect(result).toMatchObject({ status: "blocked", code: "authority_drift" });
+      expect(observations).toBe(2);
+    } finally {
+      await writeFile(path, new Uint8Array(original));
+    }
+  });
+
 
   test("blocks malformed atomic evidence", async () => {
     expect(await resolveDelegation(request(handoff(), { path: "atomic", basis: [], verification: ["check"] }), options)).toMatchObject({ status: "blocked", code: "invalid_atomic_basis" });
     expect(await resolveDelegation(request(handoff(), { path: "atomic", basis: ["check"], verification: ["check"], receipt: "fake" }), options)).toMatchObject({ status: "blocked", code: "invalid_admission" });
   });
 
-  test("planned admission requires Extension review and does not leak admission into the prompt", async () => {
-    const result = await resolveDelegation({ handoff: plannedHandoff(), admission: { path: "planned", authority: { work: "docs/works/admission/work.md", plan: "docs/works/admission/plan-slice.md", tasks: "docs/works/admission/tasks-slice.md" } }, modelRole: "standard" }, options);
-    expect(result).toMatchObject({ status: "blocked", code: "review_required" });
-  });
 
   test("binds one exact authority tuple to context and preserves invalid_reference precedence", async () => {
     const missing = { path: "planned", authority: { work: "missing.md", plan: "plan.md", tasks: "tasks.md" } };
@@ -163,6 +214,20 @@ describe("admission resolution", () => {
 
   test("rejects forbidden receipt-shaped planned input", async () => {
     const admission = { path: "planned", authority: { work: "work.md", plan: "plan.md", tasks: "tasks.md" }, subjectSha256: "fake" };
+    expect(await resolveDelegation(request(plannedHandoff(), admission), options)).toMatchObject({ status: "blocked", code: "invalid_admission" });
+  });
+
+
+  test("production admission API rejects the removed knownMaterialDeviation field", async () => {
+    type LegacyFieldAbsent = "knownMaterialDeviation" extends keyof PlannedAdmission ? false : true;
+    const legacyFieldAbsent: LegacyFieldAbsent = true;
+    expect(legacyFieldAbsent).toBeTrue();
+
+    const admission = {
+      path: "planned",
+      authority: { work: "work.md", plan: "plan.md", tasks: "tasks.md" },
+      knownMaterialDeviation: false,
+    };
     expect(await resolveDelegation(request(plannedHandoff(), admission), options)).toMatchObject({ status: "blocked", code: "invalid_admission" });
   });
 
@@ -197,6 +262,29 @@ describe("admission resolution", () => {
     ["empty thinking", "broken-thinking", [...roles, { name: "broken-thinking", description: "Broken.", model: "test/model", thinking: "", available: true }], "invalid_thinking"],
   ])("blocks %s Role configuration", async (_name, modelRole, roleFixture, code) => {
     expect(await resolveDelegation(request(handoff(), atomic, modelRole as string), { ...options, roles: roleFixture as ModelRole[] })).toMatchObject({ status: "blocked", code });
+  });
+
+  test.each([
+    ["null model", null, "low", "unavailable_model"],
+    ["numeric model", 42, "low", "unavailable_model"],
+    ["null thinking", "test/model", null, "invalid_thinking"],
+    ["numeric thinking", "test/model", 42, "invalid_thinking"],
+  ])("blocks %s Role configuration without subject observation", async (name, model, thinking, code) => {
+    let observations = 0;
+    const result = await resolveDelegation(request(
+      plannedHandoff(),
+      { path: "planned", authority: { work: "docs/works/admission/work.md", plan: "docs/works/admission/plan-slice.md", tasks: "docs/works/admission/tasks-slice.md" } },
+      `malformed-${name}`,
+    ), {
+      ...options,
+      roles: [...roles, { name: `malformed-${name}`, description: "Malformed.", model, thinking, available: true } as ModelRole],
+      subjectBuilder: async (subjectCwd, selectors, subjectHandoff) => {
+        observations++;
+        return buildPlannedSubject(subjectCwd, selectors, subjectHandoff);
+      },
+    });
+    expect(result).toMatchObject({ status: "blocked", code });
+    expect(observations).toBe(0);
   });
 });
 

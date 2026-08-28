@@ -58,6 +58,25 @@ function context(): ExtensionContext {
   } as unknown as ExtensionContext;
 }
 
+function expectClosedObject(schema: unknown): Record<string, unknown> {
+  expect(schema).toMatchObject({ type: "object", additionalProperties: false });
+  return (schema as { properties: Record<string, unknown> }).properties;
+}
+
+function expectClosedResolverSchema(schema: unknown): void {
+  const root = expectClosedObject(schema);
+  const handoff = expectClosedObject(root.handoff);
+  const contextSchemas = (handoff.context as { items: { anyOf: unknown[] } }).items.anyOf;
+  expect(contextSchemas).toHaveLength(2);
+  contextSchemas.forEach(expectClosedObject);
+  const admissionSchemas = (root.admission as { anyOf: unknown[] }).anyOf;
+  expect(admissionSchemas).toHaveLength(2);
+  admissionSchemas.forEach(expectClosedObject);
+  const plannedSchema = admissionSchemas.find((candidate) => (candidate as { properties?: { path?: { const?: string } } }).properties?.path?.const === "planned");
+  expect(plannedSchema).toBeDefined();
+  expectClosedObject(expectClosedObject(plannedSchema).authority);
+}
+
 describe("Pi Harness Extension", () => {
   test("replaces only the standard main prompt and refreshes the resolver schema", async () => {
     let before: BeforeHandler | undefined;
@@ -110,6 +129,7 @@ describe("Pi Harness Extension", () => {
 
     const resolver = tools.get("resolve_delegation");
     expect(resolver).toBeDefined();
+    expectClosedResolverSchema(resolver!.parameters);
     const firstSchema = JSON.stringify(resolver!.parameters);
     expect(firstSchema).toContain("research");
     expect(firstSchema).not.toContain("hidden");
