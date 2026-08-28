@@ -14,7 +14,9 @@ description: Write or update an implementation Plan derived from accepted author
 5. Define verification for each material behavior and a final integration gate.
 6. Include rollback, transition, security, observability, documentation, or release handling only when required by authority or risk.
 7. Record risks and evidence-backed mitigations. Do not add speculative infrastructure or future flexibility.
-8. Validate that every plan commitment derives from authority and that the Plan does not create new product or architecture decisions.
+8. When a `pi-harness` Plan participates in planned admission, place it as one direct Plan member paired with its Tasks member under the same Work directory. Multiple explicit pairs may share a Work, but a delegation selects one pair only; do not infer selection from status, order, or a lifecycle label.
+9. The Router Delegation Specification owns tuple grammar and admission validation. This Skill's naming guidance, headings, links, and status text do not prove document kind or acceptance.
+10. Validate that every plan commitment derives from authority and that the Plan does not create new product or architecture decisions.
 
 ## Output
 

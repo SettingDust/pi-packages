@@ -14,6 +14,8 @@ description: Determine repository locations, naming, authority relationships, an
 5. Bound Work artifacts by one coherent delivery objective. Split only when lifecycles, authority, dependencies, or review boundaries materially differ.
 6. Define links from derived artifacts to authority and from indexes only where navigation requires them.
 7. Identify moves or renames that require reference updates and avoid churn without ownership benefit.
+8. For `pi-harness` planned-admission material, one Work directory may hold multiple direct Plan/Tasks pairs, but each admission selects one explicit Work+Plan+Tasks tuple. Preserve the owning Specification's grammar when it applies; do not create a manifest, status machine, or inferred-current-slice convention.
+9. Skills, headings, links, and Markdown status are documentation guidance only. They do not establish machine-verifiable document kind, receipt provenance, or user acceptance.
 
 ## Output
 
