@@ -1,7 +1,7 @@
 # Explicit Spawn Model Validation Implementation Plan
 
 - **Task:** `#29`
-- **Status:** #29 implementation and supported current verification are complete in the uncommitted working tree. The corrected-path final review found runtime/tests P0-P3 zero; stale six-document status was its only NO-GO, repaired here. Final same-byte truthfulness/identity check pending; no commit performed.
+- **Status:** #29 implementation, recorded historical validation, final independent review, ownership release, and the isolated eight-path commit are complete. Commit `8ff926068a45a2590f05c9f136da05b5155bd1ff` (`fix(herdr): validate explicit spawn models`) contains the six #29 documents, `src/index.ts`, and `tests/runtime.test.ts`; this separate reconciliation changes only the six documents.
 - **Work:** [work.md](work.md)
 - **Authority:** [Specification](../../spec/explicit-spawn-model-validation.md); [ADR](../../adr/exact-explicit-spawn-model-reference.md)
 - **Context:** [context.md](context.md)
@@ -9,7 +9,7 @@
 
 ## Objective
 
-The previously authorized #29 implementation applies the smallest runtime-first validator at `SubagentRuntime.spawn(input, registry?)` using Pi `0.84.2`'s catalog/auth snapshot; it passes the invocation-local `ctx.modelRegistry` from the production fifth-context adapter as the exact second argument; rejects via one typed `ExplicitSpawnModelError` with exact `code`, `detail`, and optional closed `operation`; emits separate generation-1 flags; and preserves omitted-model, thinking stages, and legacy generation-2 resume. Broken registry wiring has one stable non-catalog error contract and fails before all lifecycle effects. Implementation and verification are complete as supported; final same-byte truthfulness/identity check pending; no commit performed.
+The previously authorized #29 implementation is complete in commit `8ff926068a45a2590f05c9f136da05b5155bd1ff`: it applies the smallest runtime-first validator at `SubagentRuntime.spawn(input, registry?)` using Pi `0.84.2`'s catalog/auth snapshot; passes the invocation-local `ctx.modelRegistry` from the production fifth-context adapter as the exact second argument; rejects via one typed `ExplicitSpawnModelError` with exact `code`, `detail`, and optional closed `operation`; emits separate generation-1 flags; and preserves omitted-model, thinking stages, and legacy generation-2 resume. Broken registry wiring has one stable non-catalog error contract and fails before all lifecycle effects. Recorded historical verification and final independent review are complete; this factual reconciliation changes no behavior.
 
 ## Scope
 
@@ -24,7 +24,7 @@ No scoped/enabled-model admission; resume validation/override/migration; refresh
 
 ## Reconciled Completion Boundary
 
-The exact hunk mapping, eight-path overlay isolation, excluded-path hash stability, and the user's instruction to commit all work unrelated to `#40` satisfy the prior shared-owner release/isolated-commit gate for this #29 candidate. The seven `#40` paths and residual Herdr docs remain excluded. The corrected-path final review found runtime/tests P0-P3 zero and only stale document status as its NO-GO; it did not review this reconciliation's new hashes. Current focused, typecheck, import-smoke, candidate/full-baseline suite evidence is recorded below. Historical real-Pi fifth-context material is unavailable/non-current and is not recreated or claimed. Only the final same-byte truthfulness/identity check remains pending; no commit has been performed.
+The exact hunk mapping, eight-path overlay isolation, excluded-path hash stability, and the user's instruction to commit all work unrelated to `#40` completed the shared-owner release/isolated-commit gate for #29. Commit `8ff926068a45a2590f05c9f136da05b5155bd1ff` is the resulting isolated eight-path commit; the seven `#40` paths and residual Herdr docs remain excluded. The final independent review found runtime/tests P0-P3 zero and only stale document status as its P1 finding. Recorded historical focused, typecheck, import-smoke, and candidate/full-baseline suite evidence is stated below. Historical real-Pi fifth-context material is unavailable/non-current and is not recreated or claimed as fresh evidence. This six-document update requires its own identity and boundary check before an optional documentation-only commit.
 
 ## Minimum Implementation Strategy
 
@@ -157,19 +157,20 @@ Fixture contract:
 
 After behavior exists, reconcile README and status/evidence only to the actual stage. Keep snapshot-not-health, scoped exclusion, thinking stages, and resume legacy compatibility explicit.
 
-## Reconciled Delivery State
+## Completed Delivery State
 
 ```text
 previously authorized implementation
   -> runtime, adapter, launch seams, and deterministic coverage complete
-  -> focused/typecheck/import/suite evidence complete as recorded
-  -> corrected-path final review: runtime/tests P0-P3 zero
-  -> six-document truthfulness repair
-  -> final same-byte truthfulness/identity check pending
-  -> commit not yet performed
+  -> recorded historical focused/typecheck/import/suite evidence complete
+  -> final independent review: runtime/tests P0-P3 zero; P1 stale status identified
+  -> ownership release and isolated eight-path implementation commit complete
+  -> six-document factual reconciliation
+  -> post-edit document identity and boundary check passed
+  -> GO: isolated six-document documentation commit
 ```
 
-The historical real-Pi fifth-context report remains unavailable/non-current because its temporary artifacts were deleted. It is not recreated or used as current evidence.
+The historical real-Pi fifth-context report remains unavailable/non-current because its temporary artifacts were deleted. It is not recreated or used as fresh evidence. Current fresh execution is unavailable without workspace mutation because local `tsc` is absent; this is an environment evidence limitation, not a behavioral failure.
 
 ## Verification Gates
 
@@ -211,9 +212,9 @@ Also run a deterministic Markdown script checking all six local links resolve, r
 - zero `transport.run`, no launch/bootstrap/runtime artifacts, hence no child;
 - no user Herdr state touched.
 
-### Final same-byte identity gate
+### Reconciliation identity gate
 
-The corrected-path final review found runtime/tests P0-P3 zero and only stale document status as its NO-GO. Its scope did not include these reconciled document hashes. Recompute and compare the six document hashes, source/test immutable hashes, required wording, links, path scope, trailing whitespace, and `git diff --check`; no commit is performed by this reconciliation.
+The final independent review and pre-reconciliation eight-path identity review are complete. The factual six-document update has passed its SHA-256 identity, link, source/test-stability, path-scope, trailing-whitespace, and `git diff --check` verification; it is GO for an isolated documentation-only commit.
 
 ## Risks And Mitigations
 
@@ -237,9 +238,9 @@ No migration/durable rejected state is introduced. Before commit, revert only ow
 
 Stop if Pi APIs, current launch/resume flow, or review evidence contradict this package. Any change to grammar, errors, availability/scope, thinking, omitted/default, resume, no-effect, or real-fixture criteria requires a fresh authority amendment and user acceptance.
 
-## Reconciled Execution Evidence (2026-08-21)
+## Recorded Execution Evidence (2026-08-21)
 
-- Focused tests: `20 pass`, `0 fail`, `673 assertions`; typecheck zero diagnostics; import smoke passed.
-- Candidate full suite: `134 pass`, `1 fail`, `1347 assertions`. Exact HEAD baseline: `114 pass`, `1 fail`, `671 assertions`, reproducing the same sole spawn-description failure. The full suite is not globally green.
-- Corrected-path final review: runtime/tests P0-P3 zero; only NO-GO was stale document status. It did not review the document hashes produced here.
-- Historical Pi `0.84.2` fifth-context evidence is unavailable/non-current because its collector, raw record, command output, and inventories were deleted. Do not recreate or claim it. Implementation and verification are complete as supported; final same-byte truthfulness/identity check pending; no commit performed.
+- Historical focused tests: `20 pass`, `0 fail`, `673 assertions`; typecheck zero diagnostics; import smoke passed.
+- Historical candidate full suite: `134 pass`, `1 fail`, `1347 assertions`. Exact HEAD baseline: `114 pass`, `1 fail`, `671 assertions`, reproducing the same sole spawn-description failure. The suite is not globally green.
+- Final independent review: runtime/tests P0-P3 zero; its P1 finding was stale six-document completion wording. Ownership release and isolated commit `8ff926068a45a2590f05c9f136da05b5155bd1ff` are complete.
+- These tests were not freshly rerun for this reconciliation because the unmodified workspace lacks local `tsc`; this is an environment evidence limitation, not a behavioral failure. Historical Pi `0.84.2` fifth-context evidence remains unavailable/non-current and is not recreated or claimed as fresh evidence.

@@ -1,6 +1,6 @@
 # ADR: Exact Explicit Spawn Model References
 
-- **Status:** #29 implementation and current verification are complete as supported by the recorded evidence. The final same-byte truthfulness/identity check is pending; no commit has been performed. This reconciliation changes documentation only and grants no new behavior scope.
+- **Status:** #29 implementation, recorded historical validation, final independent review, ownership release, and the isolated eight-path commit are complete. Commit `8ff926068a45a2590f05c9f136da05b5155bd1ff` (`fix(herdr): validate explicit spawn models`) contains this ADR, the five companion authority/Work documents, `src/index.ts`, and `tests/runtime.test.ts`. This separate six-document factual reconciliation grants no new behavior scope.
 - **Date:** 2026-08-21
 - **Scope:** `packages/pi-herdr-subagents`, explicit initial spawn model admission and generation-1 child launch flags
 - **Authority:** [Explicit `subagent_spawn` model validation specification](../spec/explicit-spawn-model-validation.md)
@@ -107,7 +107,7 @@ resumed generation 2:  ["--model", "acme/family/model:high"]
                          and no --thinking token
 ```
 
-Task `#37` Phase B currently owns shared `src/index.ts` and runtime-test launch/lifecycle seams. Tasks `#18`, `#36`, and `#3` also have unresolved shared-file ownership. They remain excluded behavior, but the exact hunk mapping, eight-path overlay isolation, excluded-path hash stability, and the user's instruction to commit all work unrelated to `#40` satisfy the previous shared-owner release/isolated-commit gate for this candidate. The seven `#40` paths and residual Herdr docs remain excluded.
+Task `#37` Phase B currently owns shared `src/index.ts` and runtime-test launch/lifecycle seams. Tasks `#18`, `#36`, and `#3` also have unresolved shared-file ownership. They remain excluded behavior. Exact hunk mapping, eight-path overlay isolation, excluded-path hash stability, and the user's instruction to commit all work unrelated to `#40` completed the ownership-release/isolated-commit gate for #29; the seven `#40` paths and residual Herdr docs remain excluded.
 
 ## Revisit And Supersession
 
@@ -115,9 +115,8 @@ Revisit if Pi exposes a stable public canonical resolver, available/scoped seman
 
 A later ADR must supersede this one for fuzzy/custom resolution, scoped/enabled admission, live provider checks, or resume normalization.
 
-This ADR governed the previously authorized underlying implementation. The historical Pi `0.84.2` fifth-context run is provenance only because its temporary collector, raw record, command output, and inventories were deleted; it remains unavailable and non-current, and is neither recreated nor claimed as current evidence. Current focused, typecheck, import-smoke, candidate-full-suite, exact-HEAD-baseline, and corrected-path review evidence is recorded below. The final same-byte truthfulness/identity check is pending; no commit has been performed.
+This ADR governed the previously authorized underlying implementation. Isolated commit `8ff926068a45a2590f05c9f136da05b5155bd1ff` completed the eight-path #29 delivery; before this reconciliation, all eight committed blobs matched `HEAD` byte-for-byte. The historical Pi `0.84.2` fifth-context run remains provenance only because its temporary collector, raw record, command output, and inventories were deleted; it is unavailable/non-current and is neither recreated nor claimed as fresh evidence.
 
+Recorded historical validation was focused tests `20 pass`, `0 fail`, `673 assertions`; typecheck zero diagnostics; import smoke passed; candidate full suite `134 pass`, `1 fail`, `1347 assertions`; and exact-HEAD baseline `114 pass`, `1 fail`, `671 assertions` with the same sole spawn-description failure. The full suite is therefore not globally green. These results were not freshly rerun for this reconciliation because the unmodified workspace lacks local `tsc`, an environment evidence limitation rather than a behavioral failure.
 
-The corrected-path final review reported runtime/tests P0-P3 zero; its only NO-GO was stale document status, repaired by this reconciliation, and it did not review these new document hashes. Current #29 verification is: focused tests `20 pass`, `0 fail`, `673 assertions`; typecheck zero diagnostics; import smoke passed; candidate full suite `134 pass`, `1 fail`, `1347 assertions`; and the exact HEAD baseline reproduced the same sole spawn-description failure with `114 pass`, `1 fail`, `671 assertions`. The full suite is therefore not globally green. Exact hunk mapping, eight-path overlay isolation, excluded-path hash stability, and the user's instruction to commit all work unrelated to `#40` satisfy the previous shared-owner release/isolated-commit gate for this candidate. Historical real-Pi fifth-context evidence remains unavailable/non-current because its collector, raw record, command output, and inventories were deleted; it is not recreated or claimed. Implementation and verification are complete as supported; final same-byte truthfulness/identity check pending; no commit performed.
-
-The current evidence supersedes the earlier isolated-copy-only status: typecheck has zero diagnostics and import smoke passed; the candidate and exact-HEAD suite results are stated above and neither is globally green. This ADR's final same-byte truthfulness/identity check is pending before any commit; no commit was performed by this reconciliation.
+The final independent review found runtime/tests P0-P3 zero; its P1 finding was stale six-document completion state, which this factual reconciliation corrected. Ownership release and the isolated implementation commit are complete. Post-reconciliation document identities, links, and the six-file boundary have been verified; this reconciliation is GO for one isolated six-document documentation commit.

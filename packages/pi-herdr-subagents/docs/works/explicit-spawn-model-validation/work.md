@@ -1,7 +1,7 @@
 # Explicit Spawn Model Validation Work
 
 - **Task:** `#29`
-- **Status:** #29 implementation and supported current verification are complete in the uncommitted working tree. The corrected-path final review found runtime/tests P0-P3 zero; stale six-document status was its only NO-GO, repaired here. Final same-byte truthfulness/identity check pending; no commit performed.
+- **Status:** #29 implementation, recorded historical validation, final independent review, ownership release, and the isolated eight-path commit are complete. Commit `8ff926068a45a2590f05c9f136da05b5155bd1ff` (`fix(herdr): validate explicit spawn models`) contains the six #29 documents, `src/index.ts`, and `tests/runtime.test.ts`; this separate reconciliation changes only the six documents.
 - **Goal:** Reject invalid explicit initial-spawn models and broken registry integration from Pi `0.84.2`'s catalog/auth available snapshot before any allocation/effect. Explicit references use the exact slash-delimited `${provider}/${modelId}` grammar: Unicode is preserved without normalization, provider and model ID are non-empty, provider excludes `/`, the first `/` is the separator, later `/` remains in model ID, ASCII controls U+0000-U+001F/U+007F are rejected, and UTF-8 length is at most 256 bytes before registry access. Shape/control/length failures use `invalid_model_reference` with one bounded escaped detail and no registry access. Generation-1 uses separate model/thinking flags while legacy generation-2 resume launch is preserved.
 - **Authority:** [Specification](../../spec/explicit-spawn-model-validation.md); [ADR](../../adr/exact-explicit-spawn-model-reference.md).
 - **Derived coordination:** [Context](context.md); [Plan](plan.md); [Tasks](tasks.md).
@@ -14,7 +14,7 @@ Availability is exact `ModelRegistry.getAvailable()` catalog/auth snapshot membe
 
 Thinking behavior is upstream-aligned: empty string emits no flag; invalid non-empty syntax follows Pi CLI warning/default; valid capability-unsupported values follow AgentSession clamping. Resume is not validated or normalized: a persisted generation-1 model+thinking must relaunch generation 2 as one legacy `--model model:thinking` value.
 
-Task `#37` Phase B, `#18`, `#36`, `#3`, and unrelated lifecycle/tool work remain excluded. For this #29 candidate, exact hunk mapping, eight-path overlay isolation, excluded-path hash stability, and the user's instruction to commit all work unrelated to `#40` satisfy the prior shared-owner release/isolated-commit gate. The seven `#40` paths and residual Herdr docs remain excluded from this reconciliation.
+Task `#37` Phase B, `#18`, `#36`, `#3`, and unrelated lifecycle/tool work remain excluded. Exact hunk mapping, eight-path overlay isolation, excluded-path hash stability, and the user's instruction to commit all work unrelated to `#40` completed the ownership-release/isolated-commit gate for #29. The seven `#40` paths and residual Herdr docs remain excluded from this reconciliation.
 
 ## Current Stage
 
@@ -25,19 +25,22 @@ settled decisions + previously authorized implementation
 runtime + adapter + launch implementation and deterministic coverage complete
                           |
                           v
-focused/typecheck/import/suite evidence complete as recorded
+recorded historical focused/typecheck/import/suite evidence complete
                           |
                           v
-corrected-path final review: runtime/tests P0-P3 zero; only NO-GO stale status
+final independent review: runtime/tests P0-P3 zero; P1 stale status identified
                           |
                           v
-six-document truthfulness reconciliation
+ownership release + isolated eight-path implementation commit complete
                           |
                           v
-final same-byte truthfulness/identity check pending
+six-document factual reconciliation
                           |
                           v
-commit not yet performed
+post-edit document identity and boundary check passed
+                          |
+                          v
+GO: isolated six-document documentation commit
 ```
 
 The revision closes the fresh review's authority/status contradiction without changing the settled underlying behavior. Across the six #29 authority/coordination documents it records:
@@ -53,9 +56,9 @@ The revision closes the fresh review's authority/status contradiction without ch
 9. non-absent malformed or mismatched `find` identities and malformed `getAvailable` entries fail as registry integration errors, while only absent `find` and a fully valid snapshot without the exact pair retain `model_not_found` and `model_unavailable`;
 10. exact unknown-provider derivation plus active Task `#37` Phase B/shared-owner pre-commit gates.
 
-The underlying implementation and supported verification are complete in the uncommitted working tree. The corrected-path final review found runtime/tests P0-P3 zero and only stale document status as its NO-GO. It did not review the hashes created by this reconciliation, leaving only the final same-byte truthfulness/identity check pending. This Work is coordination state, not a new acceptance receipt, and no commit has been performed.
+The revision closes the final review's authority/status contradiction without changing settled underlying behavior. The final independent review, ownership release, isolated implementation commit, and this six-document reconciliation's post-edit identity and boundary verification are complete. This Work is coordination state, not a new acceptance receipt; the reconciliation is GO for a separate documentation-only commit.
 
 - **Implemented, verified as supported:** runtime-first `unknown` model validation, typed error transport, invocation-local registry handoff, fifth-context adapter mapping, separate generation-1 launch flags, preserved generation-2 resume flags, and focused zero-effect/argv coverage.
-- **Current evidence:** focused tests `20 pass`, `0 fail`, `673 assertions`; typecheck zero diagnostics; import smoke passed; candidate full suite `134 pass`, `1 fail`, `1347 assertions`; exact HEAD baseline `114 pass`, `1 fail`, `671 assertions`, reproducing the same sole spawn-description failure. The suite is not globally green.
-- **Historical provenance only:** Pi `0.84.2` fifth-context collector material was deleted and is unavailable/non-current. It is not recreated or claimed as current completion evidence.
-- **Remaining:** final same-byte truthfulness/identity check only. Exact hunk mapping, eight-path overlay isolation, excluded-path hash stability, and the user's #40-excluding commit instruction satisfy the prior candidate gate; no commit has been performed.
+- **Recorded historical evidence:** focused tests `20 pass`, `0 fail`, `673 assertions`; typecheck zero diagnostics; import smoke passed; candidate full suite `134 pass`, `1 fail`, `1347 assertions`; exact HEAD baseline `114 pass`, `1 fail`, `671 assertions`, reproducing the same sole spawn-description failure. The suite is not globally green. Fresh execution was not performed for this reconciliation because the unmodified workspace lacks local `tsc`; this is an environment evidence limitation, not a behavioral failure.
+- **Historical provenance only:** Pi `0.84.2` fifth-context collector material was deleted and is unavailable/non-current. It is not recreated or claimed as fresh evidence.
+- **Completion:** the final independent review, ownership release, isolated implementation commit, and post-edit six-document identity/boundary verification are complete. This reconciliation changes neither source nor test identity and is GO for a separate documentation-only commit.

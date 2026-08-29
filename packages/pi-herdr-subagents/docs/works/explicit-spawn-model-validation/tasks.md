@@ -1,13 +1,13 @@
 # Explicit Spawn Model Validation Tasks
 
 - **Task:** `#29`
-- **Status:** #29 implementation and supported current verification are complete in the uncommitted working tree. The corrected-path final review found runtime/tests P0-P3 zero; stale six-document status was its only NO-GO, repaired here. Final same-byte truthfulness/identity check pending; no commit performed.
+- **Status:** #29 implementation, recorded historical validation, final independent review, ownership release, and the isolated eight-path commit are complete. Commit `8ff926068a45a2590f05c9f136da05b5155bd1ff` (`fix(herdr): validate explicit spawn models`) contains the six #29 documents, `src/index.ts`, and `tests/runtime.test.ts`; this separate reconciliation changes only the six documents.
 - **Work:** [work.md](work.md)
 - **Plan:** [plan.md](plan.md)
 - **Authority:** [Specification](../../spec/explicit-spawn-model-validation.md)
 - **ADR:** [Exact explicit spawn model references](../../adr/exact-explicit-spawn-model-reference.md)
 
-These Tasks remain the derived decomposition for the underlying #29 implementation. The implementation and its supported verification are complete; the only remaining task is the final same-byte truthfulness/identity check for this reconciliation. No commit has been performed.
+These Tasks remain the derived decomposition for the completed #29 implementation. Final independent review, ownership release, isolated implementation commit `8ff926068a45a2590f05c9f136da05b5155bd1ff`, and this reconciliation's post-edit six-document identity and boundary verification are complete. This reconciliation is GO for a separate documentation-only commit.
 
 ## Task 1: Fresh Authority, Evidence, And Ownership Review
 
@@ -25,7 +25,7 @@ These Tasks remain the derived decomposition for the underlying #29 implementati
   - empty, invalid-syntax, and capability-unsupported thinking stages;
   - active Task `#37` Phase B and Task `#18/#36/#3` file/hunk ownership.
 - **Completion evidence:** Corrected-path final review found no runtime/test P0-P3 findings. Exact hunk mapping, eight-path overlay isolation, excluded-path hash stability, and the user's instruction to commit all work unrelated to `#40` satisfy the prior ownership-isolation gate for the candidate; seven `#40` paths and residual Herdr docs remain excluded.
-- **Commit:** Not performed by this reconciliation.
+- **Commit:** Completed in isolated implementation commit `8ff926068a45a2590f05c9f136da05b5155bd1ff`.
 
 ## Task 2: Red Baseline And Complete Side-Effect Ledger
 
@@ -41,7 +41,7 @@ These Tasks remain the derived decomposition for the underlying #29 implementati
   - intended model failure should precede invalid slug/Agent.
 - **Ledger:** IDs/reservations/suffixes, root entries/files, task map/scope, updates/widgets, monitors/timers, notifiers/messages, every transport method, launch/bootstrap files.
 - **Completion evidence:** Historical red baseline evidence established the defect before production changes; current supported verification is recorded in Tasks 5 and 7. No red state was committed.
-- **Commit:** Not performed by this reconciliation.
+- **Commit:** Completed in isolated implementation commit `8ff926068a45a2590f05c9f136da05b5155bd1ff`.
 
 ## Task 3: Runtime-First Unknown-Input Validator
 
@@ -57,12 +57,12 @@ These Tasks remain the derived decomposition for the underlying #29 implementati
   - unknown provider only when `getProvider(provider) === undefined`;
   - no scoped/enabled read, refresh, auth-secret, network, private resolver, cache, fallback, or retry;
   - invalid model dominates all later validation/effects.
-- **Completion evidence:** Current focused verification is `20 pass`, `0 fail`, `673 assertions`; typecheck has zero diagnostics and import smoke passed. Historical real-Pi evidence remains unavailable/non-current.
-- **Commit:** Not performed by this reconciliation.
+- **Completion evidence:** Historical focused verification is `20 pass`, `0 fail`, `673 assertions`; historical typecheck had zero diagnostics and import smoke passed. Historical real-Pi evidence remains unavailable/non-current. Fresh execution was not performed for this reconciliation because the unmodified workspace lacks local `tsc`; this is an environment evidence limitation, not a behavioral failure.
+- **Commit:** Completed in isolated implementation commit `8ff926068a45a2590f05c9f136da05b5155bd1ff`.
 
 ## Task 4: Fifth-Context Adapter And Separate Launch Seams
 
-- **Status:** Implemented; current focused/typecheck/import evidence supports the runtime and launch seams. Historical real-Pi fifth-context material remains unavailable/non-current.
+- **Status:** Implemented; historical focused/typecheck/import evidence supports the runtime and launch seams. Historical real-Pi fifth-context material remains unavailable/non-current.
 - **Dependency:** Task 3.
 - **Objective:** Connect Pi's invocation registry and split generation-1 policy from resume compatibility.
   - tool helper accepts actual fifth `ExtensionContext`;
@@ -82,12 +82,12 @@ generation 1 model+"":   ["--model", "provider/modelId"]
 generation 2 persisted:  ["--model", "provider/modelId:high"] and no --thinking
 ```
 
-- **Completion evidence:** Current focused verification supports the direct/tool and bootstrap-argv path; historical real-Pi evidence is not current completion evidence.
-- **Commit:** Not performed by this reconciliation.
+- **Completion evidence:** Historical focused verification supports the direct/tool and bootstrap-argv path; historical real-Pi evidence is not fresh completion evidence. Fresh execution was not performed for this reconciliation because the unmodified workspace lacks local `tsc`; this is an environment evidence limitation, not a behavioral failure.
+- **Commit:** Completed in isolated implementation commit `8ff926068a45a2590f05c9f136da05b5155bd1ff`.
 
 ## Task 5: Deterministic Error, Scope, Thinking, And Resume Matrices
 
-- **Status:** Deterministic matrix implementation is complete and supported by current focused verification. The corrected-path final review found runtime/tests P0-P3 zero; no behavioral finding remains.
+- **Status:** Deterministic matrix implementation is complete and supported by recorded historical focused verification. The final independent review found runtime/tests P0-P3 zero; no behavioral finding remains.
 - **Dependency:** Task 4.
 - **Objective:** Complete all deterministic fake coverage with existing seams.
 - **Required input/error scenarios:** absent/`undefined`; non-string classes; malformed shape, empty sides, ASCII controls U+0000-U+001F/U+007F, UTF-8 lengths of 256 and 257 bytes; missing/invalid registry; missing/non-callable/throwing `getProvider`, auth, `find`, and `getAvailable`; unknown provider; unconfigured auth with known/missing model; configured missing model; exact catalog model unavailable; exact available; case mismatch; later `/`; changed snapshots/no cache; invalid model plus invalid slug/Agent; direct and tool paths.
@@ -102,8 +102,8 @@ generation 2 persisted:  ["--model", "provider/modelId:high"] and no --thinking
 - **Required resume scenario:** seed/recover completed persisted generation 1 with model+thinking; generation-2 PowerShell/bootstrap argv contains one exact combined value and no `--thinking`; no registry read/revalidation. Also cover no non-empty persisted thinking.
 - **No-effect requirement:** full Task-2 ledger zero for every rejection; existing tasks/scope unchanged; no process abstraction added.
 - **Regression boundary:** omitted/default, lifecycle, recovery, notifications, join/remove/cleanup/steer/widget, Agent resolution, workspace targeting, Windows bootstrap.
-- **Completion evidence:** Focused tests reported `20 pass`, `0 fail`, and `673 assertions`; typecheck has zero diagnostics and import smoke passed. Candidate full suite reported `134 pass`, `1 fail`, `1347 assertions`; exact HEAD baseline reproduced the same sole spawn-description failure with `114 pass`, `1 fail`, `671 assertions`. The suite is not globally green.
-- **Commit:** Not performed by this reconciliation.
+- **Completion evidence:** Historical focused tests reported `20 pass`, `0 fail`, and `673 assertions`; historical typecheck had zero diagnostics and import smoke passed. Historical candidate full suite reported `134 pass`, `1 fail`, `1347 assertions`; exact HEAD baseline reproduced the same sole spawn-description failure with `114 pass`, `1 fail`, `671 assertions`. The suite is not globally green. Fresh execution was not performed for this reconciliation because the unmodified workspace lacks local `tsc`; this is an environment evidence limitation, not a behavioral failure.
+- **Commit:** Completed in isolated implementation commit `8ff926068a45a2590f05c9f136da05b5155bd1ff`.
 
 ## Task 6: Real Pi Fifth-Context Production-Adapter Acceptance
 
@@ -125,11 +125,11 @@ generation 2 persisted:  ["--model", "provider/modelId:high"] and no --thinking
   - use zero `transport.run` plus absent launch/bootstrap as transitive no-wrapper/bootstrap/child proof; add no process seam;
   - require exactly one parseable fd-1 record, successful cleanup, and exit `0` only after evidence succeeds. Never silently pass failed preflight, missing command entry, extra/malformed output, inventory mismatch, or cleanup failure.
 - **Completion evidence:** Historical only and unavailable/non-current; current focused/typecheck/import/full-suite evidence is separate and does not recreate this fixture.
-- **Commit:** Not performed by this reconciliation.
+- **Commit:** Completed in isolated implementation commit `8ff926068a45a2590f05c9f136da05b5155bd1ff`.
 
 ## Task 7: Documentation Reconciliation And Package Verification
 
-- **Status:** Documentation reconciliation and package verification evidence are complete as recorded: focused tests `20 pass`/`0 fail`/`673 assertions`, typecheck zero diagnostics, import smoke passed, candidate full suite `134 pass`/`1 fail`/`1347 assertions`, and exact HEAD baseline `114 pass`/`1 fail`/`671 assertions` with the same sole spawn-description failure. No all-green claim is made.
+- **Status:** Documentation reconciliation and package verification evidence are recorded historical evidence: focused tests `20 pass`/`0 fail`/`673 assertions`, typecheck zero diagnostics, import smoke passed, candidate full suite `134 pass`/`1 fail`/`1347 assertions`, and exact HEAD baseline `114 pass`/`1 fail`/`671 assertions` with the same sole spawn-description failure. No all-green claim is made. Fresh execution was not performed for this reconciliation because the unmodified workspace lacks local `tsc`; this is an environment evidence limitation rather than a behavioral failure.
 - **Dependency:** Implemented behavior and recorded current evidence; unavailable historical real-Pi material is not a current gating dependency.
 - **Objective:** Reconcile public docs only after behavior exists and run deterministic gates.
 - **Documentation:** README exact syntax/failure timing; catalog/auth-not-health; scoped exclusion/consequence; generation-1 separate flags; empty/invalid/capability thinking stages; generation-2 legacy resume; truthful statuses/evidence.
@@ -142,17 +142,17 @@ git diff --check -- packages/pi-herdr-subagents
 ```
 
 - **Markdown check:** all six local links resolve; completed-status and evidence wording agree; forbidden deprecated availability wording is absent; required scoped exclusion and generation-2 token text are present; no trailing whitespace.
-- **Completion evidence:** The listed current evidence is recorded above; the full suite is explicitly not globally green. The corrected-path final review found runtime/tests P0-P3 zero and only stale document status as its NO-GO.
-- **Commit:** Not performed by this reconciliation.
+- **Completion evidence:** The listed historical evidence is recorded above; the full suite is explicitly not globally green. The final independent review found runtime/tests P0-P3 zero and only stale document status as its P1 finding.
+- **Commit:** Completed in isolated implementation commit `8ff926068a45a2590f05c9f136da05b5155bd1ff`; this reconciliation requires a separate documentation-only commit decision.
 
 ## Task 8: Final Independent Reviews And Isolated Commit Gate
 
-- **Status:** Corrected-path final review completed with runtime/tests P0-P3 zero. Its only NO-GO was stale document status; this repair does not claim review of the new document hashes. Final same-byte truthfulness/identity check pending; no commit performed.
+- **Status:** Final independent review completed with runtime/tests P0-P3 zero. Its only P1 finding was stale six-document status; ownership release, isolated implementation commit, and this factual update's post-edit six-document identity and boundary checks are complete. This reconciliation is GO for a separate documentation-only commit.
 - **Dependency:** Task 7 reconciliation complete.
 - **Objective:** Reconcile behavior/evidence and decide commit readiness.
 - **Review questions:** literal first operation; exact unknown input/error details; stable integration code and closed safe operation labels; complete missing/throwing no-effect matrix; no catalog-code fallback; catalog/auth-only semantics; no scoped read; actual fifth context; deterministic startup preflight; raw fd-1 single record; explicit failure exit; unique run-root inventories/cleanup; thinking stage separation; generation-1 tokens; generation-2 persisted compatibility; zero-run transitive evidence; no Task `#37` Phase B or `#18/#36/#3` hunk.
-- **Completion evidence:** Current source/tests and recorded verification agree; exact hunk mapping, eight-path overlay isolation, excluded-path hash stability, and the user's #40-excluding commit instruction satisfy the prior candidate ownership gate. Final same-byte truthfulness/identity comparison remains pending; historical real-Pi evidence remains unavailable/non-current.
-- **Commit gate:** This reconciliation performs no commit.
+- **Completion evidence:** Source/tests matched the isolated commit before this reconciliation; exact hunk mapping, eight-path overlay isolation, excluded-path hash stability, and the user's #40-excluding commit instruction completed the ownership gate. Historical real-Pi evidence remains unavailable/non-current. The final independent review and pre-reconciliation byte-identity review are complete.
+- **Commit gate:** Decide a separate documentation-only commit from this reconciliation's post-edit identity and boundary evidence.
 
 ## Historical Execution Order
 
@@ -167,16 +167,16 @@ T1 review + ownership
  -> T8 independent reviews/commit decision
 ```
 
-This is the underlying implementation sequence. The corrected-path review is complete; only the final same-byte truthfulness/identity check for this reconciliation remains pending.
+This is the completed underlying implementation sequence. The final independent review, ownership release, isolated implementation commit, and separate six-document reconciliation identity/boundary verification are complete.
 
 ## Coverage Check
 
 Every Plan commitment maps once: authority/ownership (T1), red ledger (T2), runtime validator (T3), fifth context and launch seams (T4), fake scope/thinking/resume evidence (T5), real fixture (T6), docs/package checks (T7), final reviews/commit isolation (T8). No task implements scoped/enabled admission, resume validation, live health, fuzzy/custom resolution, package thinking policy, Task `#37` Phase B, `#18`, `#36`, or `#3`.
 
 
-## Reconciled Status (2026-08-21)
+## Completion Status (2026-08-21)
 
-- Implementation and supported verification are complete. Focused tests: `20 pass`, `0 fail`, `673 assertions`; typecheck: zero diagnostics; import smoke: passed.
-- Candidate full suite: `134 pass`, `1 fail`, `1347 assertions`; exact HEAD baseline: `114 pass`, `1 fail`, `671 assertions`, with the same sole spawn-description failure. The suite is not globally green.
-- Corrected-path final review found runtime/tests P0-P3 zero and only stale document status as its NO-GO; it did not review this reconciliation's document hashes. Historical Pi fifth-context evidence is unavailable/non-current and is not recreated or claimed.
-- Final same-byte truthfulness/identity check pending; no commit performed.
+- Implementation, historical validation, final independent review, ownership release, and isolated commit `8ff926068a45a2590f05c9f136da05b5155bd1ff` are complete. Historical focused tests: `20 pass`, `0 fail`, `673 assertions`; typecheck: zero diagnostics; import smoke: passed.
+- Historical candidate full suite: `134 pass`, `1 fail`, `1347 assertions`; exact HEAD baseline: `114 pass`, `1 fail`, `671 assertions`, with the same sole spawn-description failure. The suite is not globally green.
+- The final independent review found runtime/tests P0-P3 zero and only stale six-document completion wording as P1. Historical Pi fifth-context evidence remains unavailable/non-current and is not recreated or claimed as fresh evidence.
+- Fresh execution was not performed for this reconciliation because the unmodified workspace lacks local `tsc`; this is an environment evidence limitation, not a behavioral failure. Post-edit document identities and the six-file worktree boundary passed; this reconciliation is GO for the separate documentation-only commit.
