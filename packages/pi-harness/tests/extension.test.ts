@@ -120,11 +120,48 @@ describe("Pi Harness Extension", () => {
     expect(first.systemPrompt).toStartWith("You are the Pi Harness Router.");
     expect(first.systemPrompt).not.toContain("default Pi prompt");
     expect(first.systemPrompt).toContain("research");
-    expect(first.systemPrompt).toContain("When calling subagent_spawn, always pass agent: \"handler\"");
+    expect(first.systemPrompt).toContain("when calling subagent_spawn, always pass agent: \"handler\"");
     expect(first.systemPrompt).toContain("derive one concise canonical ASCII taskSlug");
     expect(first.systemPrompt).toContain("taskSlug is an invocation field, not a Handoff or Resolver field");
     expect(first.systemPrompt).toContain("separate human-readable label");
     expect(first.systemPrompt).not.toContain("hidden method");
+    expect(first.systemPrompt).toContain("create the complete main-session coordination set immediately");
+    expect(first.systemPrompt).toContain("disclose the exact selected Work/Plan/Tasks tuple and obtain one current-user confirmation before the first planned resolve");
+    expect(first.systemPrompt).toContain("Later resolves may continue without repeated confirmation while that exact plan remains unchanged");
+    expect(first.systemPrompt).toContain("Any substantive deviation requires redisclosure of the exact tuple and renewed current-user confirmation");
+    expect(first.systemPrompt).toContain("do not require confirmation before every resolve");
+    const order = [
+      "create the complete main-session coordination set immediately",
+      "Before every coordination action, project its Todo item as in_progress",
+      "resolve_delegation and the required subagent_spawn call",
+      "After every terminal Handler Result notification, immediately project its status truthfully",
+      "Release dependencies only after that terminal projection, then schedule newly unblocked outcomes",
+      "The current capability is ambiguous, stale, incompatible, unknown, or nonpositive unless proven otherwise",
+      "use serial fallback",
+    ].map((phrase) => first.systemPrompt.indexOf(phrase));
+    expect(order.every((index) => index >= 0)).toBeTrue();
+    expect(order).toEqual([...order].sort((a, b) => a - b));
+    expect(first.systemPrompt).toContain("Before every coordination action, project its Todo item as in_progress");
+    expect(first.systemPrompt).toContain("After every terminal Handler Result notification, immediately project its status truthfully as completed, partial, failed, or blocked");
+    expect(first.systemPrompt).toContain("If resolve_delegation, environment adaptation, or the required subagent_spawn fails before Handler start");
+    expect(first.systemPrompt).toContain("preserve the failure details through the existing descriptive/message surfaces");
+    expect(first.systemPrompt).toContain("do not release dependencies as completed");
+    expect(first.systemPrompt).toContain("Release dependencies only after that terminal projection, then schedule newly unblocked outcomes");
+    expect(first.systemPrompt).toContain("An identifiable equivalent duplicate or resend is idempotent");
+    expect(first.systemPrompt).toContain("Malformed, structurally different, or conflicting input fails closed");
+    expect(first.systemPrompt).toContain("clean up only a Todo proven stale");
+    expect(first.systemPrompt).toContain("use serial fallback");
+    expect(first.systemPrompt).toContain("Dependencies, shared files, ownership, authority, and behavioral conflicts always serialize");
+    for (const status of ["completed", "partial", "failed", "blocked"]) {
+      expect(first.systemPrompt).toContain(status);
+    }
+    for (const retained of ["false", "missing", "unknown", "contradictory"]) {
+      expect(first.systemPrompt).toContain(retained);
+    }
+    expect(first.systemPrompt).toContain("Never delete pending, in_progress, active, current, or unresolved work");
+    expect(first.systemPrompt).toContain("Serialize actions that touch any shared Router Todo, correlation, or notification state");
+    expect(first.systemPrompt).toContain("Never mutate Git or its index during parallel scheduling");
+    expect(first.systemPrompt).toContain("call subagent_remove, or delete or modify Results, sessions, manifests, or produced artifacts");
     expect(active).toEqual(["read", "resolve_delegation"]);
 
     const resolver = tools.get("resolve_delegation");
