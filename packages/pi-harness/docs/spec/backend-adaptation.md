@@ -16,6 +16,11 @@ thinking: configured-thinking-level
 
 The Handler is the fixed Agent named `handler`. The Resolver does not discover, select, or call a delegate tool and returns no Handler path or body.
 
+### #42 Accepted Resolved-Selection Source
+
+Under the accepted #42 amendment, `resolved.model` is `provider + '/' + modelId` from the Resolver's exact separate provider/model Registry match, and `resolved.thinking` is the exact selected thinking string. The Resolver selects once from the resolve-time Registry snapshot using both capability dimensions and deterministic surplus ordering. Fresh T5 and independent T6 returned GO with P0-P3 zero. T5 command attribution is config-command `13/22`, config `21/22`, settings-store `19/37`, Extension `6/95`, affected `46/154`, distinct subset `53/81`, focused `94/250`, and full `136/538`; typecheck, import, activation, and execute passed. The canonical 1085-byte LF manifest retains aggregate `a6c92e4fc2720f31ca9b34fb60561a7c8174dc8176cb1a9a62ceba7e51541850`, while rejected 1095-byte literal-backslash-n aggregate is `3fd52e65a90f2d7eaee47b587e50d467abd2960fdb7ead118131bcfb0ce70525`. Exact selective-commit review is GO; staging and commit remain pending. The backend does not parse the display form, repeat selection, rewrite either field, substitute a candidate, or fall back. This amendment changes no backend source or ownership and makes no live-backend, reload, settings/runtime, Herdr, Pi-core, push, or deployment claim. The unrelated Herdr failure remains outside #42.
+
+
 ## 2. Compatibility Ownership
 
 The Pi host effective-inventory module owns host-observed effective-tool preparation, active winner selection, exact provider-turn `context.tools` snapshots, compatibility-profile evaluation, runtime-generation validity, and dispatch pinning.

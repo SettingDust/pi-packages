@@ -1,16 +1,17 @@
 import type { ExtensionCommandContext } from "@earendil-works/pi-coding-agent";
 import { supportedThinkingLevels, type ModelLike } from "./config.js";
 import {
-  configuredRoles,
+  candidateEntries,
+  configuredCandidates,
+  DuplicateJsonKeyError,
   FileHarnessSettingsRepository,
-  type ConfiguredRole,
-  type ConfiguredRoles,
+  type ConfiguredCandidateCapabilities,
+  type ConfiguredCandidates,
   type HarnessSettingsRepository,
   type HarnessSettingsScope,
 } from "./settings-store.js";
 
-const ADD_ROLE = "Add role";
-const INITIALIZE_TEMPLATES = "Initialize basic, standard, and advanced templates";
+const ADD_CANDIDATE = "Add candidate";
 const RESET_PROJECT = "Reset project override (inherit Global)";
 const SAVE = "Save";
 const CANCEL = "Cancel";
@@ -21,9 +22,10 @@ interface ConfigContext extends Pick<
   "cwd" | "hasUI" | "isProjectTrusted" | "modelRegistry" | "ui"
 > {}
 
-interface ScopedRoles {
-  roles?: ConfiguredRoles;
+interface ScopedCandidates {
+  candidates?: ConfiguredCandidates;
   invalid?: string;
+  duplicateKeyRecovery?: boolean;
 }
 
 export async function runHarnessConfig(
@@ -55,155 +57,148 @@ async function editScope(
   const global = loadScope(repository, "global");
   const selected = scope === "global" ? global : loadScope(repository, "project");
 
-  let override = scope === "global" || selected.roles !== undefined;
-  let roles = structuredClone(selected.roles ?? global.roles ?? {});
+  let override = scope === "global" || selected.candidates !== undefined;
+  let candidates = structuredClone(selected.candidates ?? global.candidates ?? {});
+  let duplicateKeyRecovery = false;
   if (selected.invalid) {
     const replace = await ctx.ui.confirm(
       `Invalid ${scope} harness configuration`,
       `${selected.invalid}\n\nReplace this scope's harness configuration?`,
     );
     if (!replace) return;
-    roles = structuredClone(scope === "project" ? global.roles ?? {} : {});
+    candidates = structuredClone(scope === "project" ? global.candidates ?? {} : {});
     override = true;
-  } else if (scope === "project" && global.invalid && selected.roles === undefined) {
+    duplicateKeyRecovery = selected.duplicateKeyRecovery === true;
+  } else if (scope === "project" && global.invalid && selected.candidates === undefined) {
     const replace = await ctx.ui.confirm(
       "Invalid inherited harness configuration",
       `${global.invalid}\n\nCreate an empty Project override?`,
     );
     if (!replace) return;
-    roles = {};
+    candidates = {};
     override = true;
   }
 
   while (true) {
-    const roleOptions = Object.entries(roles)
-      .sort(([a], [b]) => a.localeCompare(b))
-      .map(([name, role]) => roleLabel(name, role));
-    const actions = [ADD_ROLE];
-    if (Object.keys(roles).length === 0) actions.push(INITIALIZE_TEMPLATES);
+    const candidateOptions = candidateEntries(candidates)
+      .sort((a, b) => candidateIdentity(a).localeCompare(candidateIdentity(b)))
+      .map(candidateIdentity);
+    const actions = [ADD_CANDIDATE];
     if (scope === "project" && override) actions.push(RESET_PROJECT);
     actions.push(SAVE, CANCEL);
 
     const choice = await ctx.ui.select(
-      `Harness Roles - ${scope === "global" ? "Global" : override ? "Project override" : "Project (inheriting Global)"}`,
-      [...roleOptions, ...actions],
+      `Harness candidates - ${scope === "global" ? "Global" : override ? "Project override" : "Project (inheriting Global)"}`,
+      [...candidateOptions, ...actions],
     );
     if (!choice || choice === CANCEL) return;
     if (choice === SAVE) {
-      repository.writeRoles(scope, scope === "project" && !override ? undefined : roles);
-      ctx.ui.notify(`Saved ${scope} harness Roles`, "info");
+      const saved = scope === "project" && !override ? undefined : candidates;
+      if (duplicateKeyRecovery) repository.replaceCandidatesAfterDuplicateKeyConfirmation(scope, saved);
+      else repository.writeCandidates(scope, saved);
+      ctx.ui.notify(`Saved ${scope} harness candidates`, "info");
       return;
     }
     if (choice === RESET_PROJECT) {
       override = false;
-      roles = structuredClone(global.roles ?? {});
+      candidates = structuredClone(global.candidates ?? {});
       continue;
     }
-    if (choice === INITIALIZE_TEMPLATES) {
-      const templates = await createTemplates(ctx);
-      if (templates) {
-        roles = templates;
-        override = true;
-      }
-      continue;
-    }
-    if (choice === ADD_ROLE) {
-      const added = await createRole(ctx, roles);
+    if (choice === ADD_CANDIDATE) {
+      const added = await createCandidate(ctx, candidates);
       if (added) {
-        roles[added.name] = added.role;
+        candidates[added.providerModelKey] ??= {};
+        candidates[added.providerModelKey][added.thinking] = added.capabilities;
         override = true;
       }
       continue;
     }
 
-    const name = Object.keys(roles).find((candidate) => roleLabel(candidate, roles[candidate]!) === choice);
-    if (name && await editRoleMenu(ctx, roles, name)) override = true;
+    const entry = candidateEntries(candidates).find((item) => candidateIdentity(item) === choice);
+    if (entry && await editCandidateMenu(ctx, candidates, entry)) override = true;
   }
 }
 
-async function editRoleMenu(ctx: ConfigContext, roles: ConfiguredRoles, name: string): Promise<boolean> {
+async function editCandidateMenu(
+  ctx: ConfigContext,
+  candidates: ConfiguredCandidates,
+  entry: ReturnType<typeof candidateEntries>[number],
+): Promise<boolean> {
   while (true) {
-    const action = await ctx.ui.select(`Role: ${name}`, ["Edit", "Rename", "Delete", BACK]);
+    const action = await ctx.ui.select(candidateLabel(entry), ["Edit", "Delete", BACK]);
     if (!action || action === BACK) return false;
+    const key = `${entry.provider}/${entry.modelId}`;
     if (action === "Delete") {
-      if (await ctx.ui.confirm("Delete Role", `Delete ${name}?`)) {
-        delete roles[name];
+      if (await ctx.ui.confirm("Delete candidate", `Delete ${key} (${entry.thinking})?`)) {
+        delete candidates[key]?.[entry.thinking];
+        if (candidates[key] && Object.keys(candidates[key]).length === 0) delete candidates[key];
         return true;
       }
       continue;
-    }
-    if (action === "Rename") {
-      const next = (await ctx.ui.input(`Rename ${name}`, "New Role name"))?.trim();
-      if (!next) continue;
-      if (roles[next] && next !== name) {
-        ctx.ui.notify(`Role ${next} already exists`, "error");
-        continue;
-      }
-      if (next === name) return false;
-      roles[next] = roles[name]!;
-      delete roles[name];
-      return true;
     }
     if (action === "Edit") {
-      const edited = await editRole(ctx, roles[name]!);
-      if (edited) {
-        roles[name] = edited;
-        return true;
-      }
+      const edited = await editCandidate(ctx, entry);
+      if (!edited) continue;
+      const nextKey = edited.providerModelKey;
+      const collides = (nextKey !== key || edited.thinking !== entry.thinking) && candidates[nextKey]?.[edited.thinking] !== undefined;
+      if (collides && !await ctx.ui.confirm(
+        "Replace candidate",
+        `Replace existing ${nextKey} (${edited.thinking})?`,
+      )) continue;
+      delete candidates[key]?.[entry.thinking];
+      if (candidates[key] && Object.keys(candidates[key]).length === 0) delete candidates[key];
+      candidates[nextKey] ??= {};
+      candidates[nextKey][edited.thinking] = edited.capabilities;
+      return true;
     }
   }
 }
 
-async function createRole(
+async function createCandidate(
   ctx: ConfigContext,
-  roles: ConfiguredRoles,
-): Promise<{ name: string; role: ConfiguredRole } | undefined> {
-  const name = (await ctx.ui.input("Add Harness Role", "Role name"))?.trim();
-  if (!name) return undefined;
-  if (roles[name]) {
-    ctx.ui.notify(`Role ${name} already exists`, "error");
-    return undefined;
-  }
-  const role = await editRole(ctx);
-  return role ? { name, role } : undefined;
-}
-
-async function editRole(ctx: ConfigContext, current?: ConfiguredRole): Promise<ConfiguredRole | undefined> {
-  const description = (await ctx.ui.editor("Role description", current?.description ?? ""))?.trim();
-  if (!description) return undefined;
-  const selected = await selectModel(ctx, current?.model);
-  if (!selected) return undefined;
-  const thinking = await selectThinking(ctx, selected.model, current?.thinking);
-  return thinking ? { description, model: selected.id, thinking } : undefined;
-}
-
-async function createTemplates(ctx: ConfigContext): Promise<ConfiguredRoles | undefined> {
+  candidates: ConfiguredCandidates,
+): Promise<{ providerModelKey: string; thinking: string; capabilities: ConfiguredCandidateCapabilities } | undefined> {
   const selected = await selectModel(ctx);
   if (!selected) return undefined;
-  const levels = supportedThinkingLevels(selected.model);
-  return {
-    basic: {
-      description: "Narrow, low-risk work.",
-      model: selected.id,
-      thinking: closestLevel(levels, ["low", "minimal", "off"]),
-    },
-    standard: {
-      description: "Normal multi-step work.",
-      model: selected.id,
-      thinking: closestLevel(levels, ["medium", "high", "low", "off"]),
-    },
-    advanced: {
-      description: "High-ambiguity, high-risk, or complex reasoning.",
-      model: selected.id,
-      thinking: closestLevel(levels, ["high", "xhigh", "medium", "low", "off"]),
-    },
-  };
+  const thinking = await selectThinking(ctx, selected.model);
+  const capabilities = thinking ? await inputCapabilities(ctx) : undefined;
+  if (!thinking || !capabilities) return undefined;
+  const providerModelKey = `${selected.model.provider}/${selected.model.id}`;
+  if (candidates[providerModelKey]?.[thinking]) {
+    ctx.ui.notify("Candidate already exists", "error");
+    return undefined;
+  }
+  return { providerModelKey, thinking, capabilities };
+}
+
+async function editCandidate(
+  ctx: ConfigContext,
+  current: ReturnType<typeof candidateEntries>[number],
+): Promise<{ providerModelKey: string; thinking: string; capabilities: ConfiguredCandidateCapabilities } | undefined> {
+  const selected = await selectModel(ctx, `${current.provider}/${current.modelId}`);
+  if (!selected) return undefined;
+  const thinking = await selectThinking(ctx, selected.model, current.thinking);
+  const capabilities = thinking ? await inputCapabilities(ctx, current) : undefined;
+  return thinking && capabilities
+    ? { providerModelKey: `${selected.model.provider}/${selected.model.id}`, thinking, capabilities }
+    : undefined;
+}
+
+async function inputCapabilities(
+  ctx: ConfigContext,
+  current?: ConfiguredCandidateCapabilities,
+): Promise<ConfiguredCandidateCapabilities | undefined> {
+  const reasoning = await ctx.ui.input("Reasoning capability", current ? String(current.reasoning) : "0");
+  const impact = await ctx.ui.input("Impact capability", current ? String(current.impact) : "0");
+  if (reasoning === undefined || impact === undefined) return undefined;
+  const values = { reasoning: Number(reasoning), impact: Number(impact) };
+  return Object.values(values).every((value) => Number.isFinite(value) && Number.isInteger(value) && value >= 0) ? values : undefined;
 }
 
 async function selectModel(
   ctx: ConfigContext,
   current?: string,
-): Promise<{ id: string; model: ModelLike } | undefined> {
+): Promise<{ model: ModelLike } | undefined> {
   const models = ctx.modelRegistry.getAvailable();
   if (models.length === 0) {
     ctx.ui.notify("No authenticated model is available", "error");
@@ -215,9 +210,9 @@ async function selectModel(
     options.splice(options.indexOf(current), 1);
     options.unshift(current);
   }
-  const id = await ctx.ui.select("Role model", options);
+  const id = await ctx.ui.select("Candidate provider/model", options);
   const model = id ? byId.get(id) : undefined;
-  return id && model ? { id, model } : undefined;
+  return model ? { model } : undefined;
 }
 
 async function selectThinking(ctx: ConfigContext, model: ModelLike, current?: string): Promise<string | undefined> {
@@ -229,19 +224,22 @@ async function selectThinking(ctx: ConfigContext, model: ModelLike, current?: st
   return ctx.ui.select("Thinking level", levels);
 }
 
-function closestLevel(available: string[], preferred: string[]): string {
-  return preferred.find((level) => available.includes(level)) ?? available[0] ?? "off";
-}
-
-function loadScope(repository: HarnessSettingsRepository, scope: HarnessSettingsScope): ScopedRoles {
-  const settings = repository.read(scope);
+function loadScope(repository: HarnessSettingsRepository, scope: HarnessSettingsScope): ScopedCandidates {
   try {
-    return { roles: configuredRoles(settings) };
+    const settings = repository.read(scope);
+    return { candidates: configuredCandidates(settings) };
   } catch (error) {
-    return { invalid: error instanceof Error ? error.message : "Invalid harness configuration" };
+    return {
+      invalid: error instanceof Error ? error.message : "Invalid harness configuration; manual replacement required",
+      duplicateKeyRecovery: error instanceof DuplicateJsonKeyError,
+    };
   }
 }
 
-function roleLabel(name: string, role: ConfiguredRole): string {
-  return `Role: ${name} (${role.model}, ${role.thinking})`;
+function candidateIdentity(candidate: ReturnType<typeof candidateEntries>[number]): string {
+  return JSON.stringify([candidate.provider, candidate.modelId, candidate.thinking]);
+}
+
+function candidateLabel(candidate: ReturnType<typeof candidateEntries>[number]): string {
+  return `Candidate: ${candidate.provider}/${candidate.modelId} (${candidate.thinking}, reasoning ${candidate.reasoning}, impact ${candidate.impact})`;
 }

@@ -1,4 +1,4 @@
-import { StringEnum, Type } from "@earendil-works/pi-ai";
+import { Type } from "@earendil-works/pi-ai";
 import {
   defineTool,
   formatSkillsForPrompt,
@@ -7,22 +7,22 @@ import {
   type ExtensionContext,
 } from "@earendil-works/pi-coding-agent";
 import { Text } from "@earendil-works/pi-tui";
-import { loadHarnessRoles } from "../src/config.js";
+import { loadHarnessCandidates, type HarnessCandidates } from "../src/config.js";
 import { runHarnessConfig } from "../src/config-command.js";
-import { resolveDelegation, type HarnessRoles, type ModelRole, type Resolution, type SkillSummary } from "../src/index.js";
+import { resolveDelegation, type Resolution, type SkillSummary } from "../src/index.js";
 
 const resolverName = "resolve_delegation";
 
-type RoleLoader = typeof loadHarnessRoles;
+type CandidateLoader = typeof loadHarnessCandidates;
 type ConfigRunner = typeof runHarnessConfig;
 
 export default function activateHarness(
   pi: ExtensionAPI,
-  loadRoles: RoleLoader = loadHarnessRoles,
+  loadCandidates: CandidateLoader = loadHarnessCandidates,
   configure: ConfigRunner = runHarnessConfig,
 ): void {
   pi.registerCommand("harness", {
-    description: "Configure Pi Harness Model Roles",
+    description: "Configure Pi Harness Candidates",
     handler: async (args, ctx) => {
       if (args.trim() && args.trim() !== "config") {
         ctx.ui.notify("Usage: /harness config", "error");
@@ -39,39 +39,40 @@ export default function activateHarness(
     }
 
     const skills = visibleSkills(event);
-    const roles = currentRoles(ctx, loadRoles);
-    refreshResolver(pi, skills, roles, loadRoles);
+    const candidates = currentCandidates(ctx, loadCandidates);
+    refreshResolver(pi, skills, candidates, loadCandidates);
 
-    return { systemPrompt: routerPrompt(event, roles) };
+    return { systemPrompt: routerPrompt(event, candidates) };
   });
 }
 
 function refreshResolver(
   pi: ExtensionAPI,
   skills: SkillSummary[],
-  roles: HarnessRoles,
-  loadRoles: RoleLoader,
+  candidates: HarnessCandidates,
+  loadCandidates: CandidateLoader,
 ): void {
-  const availableRoles = roles.status === "ready" ? roles.roles.filter(({ available }) => available) : [];
   const active = pi.getActiveTools().filter((name) => name !== resolverName);
-  if (skills.length === 0 || availableRoles.length === 0) {
+  if (skills.length === 0 || candidates.status !== "ready" || candidates.candidates.length === 0) {
     pi.setActiveTools(active);
     return;
   }
 
-  pi.registerTool(createResolverTool(skills, availableRoles, loadRoles));
+  pi.registerTool(createResolverTool(skills, loadCandidates));
   pi.setActiveTools([...active, resolverName]);
 }
 
-function createResolverTool(skills: SkillSummary[], roles: ModelRole[], loadRoles: RoleLoader) {
-  const skillName = StringEnum(skills.map(({ name }) => name));
-  const roleName = StringEnum(roles.map(({ name }) => name));
-  const roleDescriptions = roles.map(({ name, description }) => `${name}: ${description}`).join("\n");
+function createResolverTool(skills: SkillSummary[], loadCandidates: CandidateLoader) {
+  const skillName = skills.length ? Type.Union(skills.map(({ name }) => Type.Literal(name))) : Type.String();
+  const capability = (name: string) => Type.Integer({
+    minimum: 0,
+    description: `Minimum ${name} capability required for this delegation (0-3 is Router guidance).`,
+  });
 
   return defineTool({
     name: resolverName,
     label: "Resolve delegation",
-    description: `Validate a Handler Handoff and resolve its invocation metadata. Available Model Roles:\n${roleDescriptions}`,
+    description: "Validate a Handler Handoff and resolve its invocation metadata using semantic reasoning and impact requirements.",
     parameters: Type.Object({
       handoff: Type.Object({
         objective: Type.String({ minLength: 1 }),
@@ -101,14 +102,19 @@ function createResolverTool(skills: SkillSummary[], roles: ModelRole[], loadRole
           }, { additionalProperties: false }),
         }, { additionalProperties: false }),
       ]),
-      modelRole: roleName,
+      reasoning: capability("reasoning"),
+      impact: capability("impact"),
     }, { additionalProperties: false }),
     renderCall(args, theme, context) {
       const text = (context.lastComponent as Text | undefined) ?? new Text("", 0, 0);
       const handoff = args.handoff as { objective?: string; primarySkill?: string; companionSkills?: string[] } | undefined;
       const selectedSkills = [handoff?.primarySkill, ...(handoff?.companionSkills ?? [])].filter((name): name is string => Boolean(name));
+      const requirements = [
+        typeof args.reasoning === "number" ? `reasoning ${args.reasoning}` : "",
+        typeof args.impact === "number" ? `impact ${args.impact}` : "",
+      ].filter(Boolean).join(", ");
       const lines = [
-        `${theme.fg("toolTitle", theme.bold(resolverName))}${args.modelRole ? theme.fg("muted", `  ${args.modelRole}`) : ""}`,
+        `${theme.fg("toolTitle", theme.bold(resolverName))}${requirements ? theme.fg("muted", `  ${requirements}`) : ""}`,
         ...(handoff?.objective ? [theme.fg("dim", `  ${handoff.objective}`)] : []),
         ...(selectedSkills.length ? [theme.fg("muted", `  ${selectedSkills.join(" + ")}`)] : []),
       ];
@@ -116,12 +122,13 @@ function createResolverTool(skills: SkillSummary[], roles: ModelRole[], loadRole
       return text;
     },
     async execute(_toolCallId, params, _signal, _onUpdate, ctx) {
-      const current = currentRoles(ctx, loadRoles);
+      const current = currentCandidates(ctx, loadCandidates);
       const result: Resolution = current.status === "blocked"
-        ? { status: "blocked", code: "invalid_config", message: current.message }
+        ? { status: "blocked", code: current.code, message: current.message }
         : await resolveDelegation(params, {
             skills,
-            roles: current.roles,
+            candidates: current.candidates,
+            modelRegistry: ctx.modelRegistry,
             cwd: ctx.cwd,
           });
       return { content: [{ type: "text", text: Bun.YAML.stringify(result) }], details: result };
@@ -135,24 +142,24 @@ function visibleSkills(event: BeforeAgentStartEvent): SkillSummary[] {
     .map(({ name, description }) => ({ name, description }));
 }
 
-function currentRoles(
-  ctx: Pick<ExtensionContext, "cwd" | "isProjectTrusted" | "modelRegistry">,
-  loadRoles: RoleLoader,
-): HarnessRoles {
-  return loadRoles(ctx.cwd, ctx.isProjectTrusted(), ctx.modelRegistry.getAvailable());
+function currentCandidates(
+  ctx: Pick<ExtensionContext, "cwd" | "isProjectTrusted">,
+  loadCandidates: CandidateLoader,
+): HarnessCandidates {
+  return loadCandidates(ctx.cwd, ctx.isProjectTrusted());
 }
 
-function routerPrompt(event: BeforeAgentStartEvent, roles: HarnessRoles): string {
+function routerPrompt(event: BeforeAgentStartEvent, candidates: HarnessCandidates): string {
   const loadedSkills = (event.systemPromptOptions.skills ?? []).filter((skill) => !skill.disableModelInvocation);
-  const roleStatus = roles.status === "blocked"
-    ? `Pi Harness configuration error: ${roles.message}`
-    : roles.roles.some(({ available }) => available)
-      ? "Use resolve_delegation whenever substantive project-domain work is required. Select atomic admission only with bounded basis and focused verification; select planned admission with exactly one Work/Plan/Tasks tuple bound to Handoff context."
-      : "No usable Model Role is configured under Pi settings key harness.roles. Explain the block instead of doing project-domain work.";
+  const candidateStatus = candidates.status === "blocked"
+    ? `Pi Harness configuration error: ${candidates.message}`
+    : candidates.candidates.length > 0
+      ? "Use resolve_delegation whenever substantive project-domain work is required. Request semantic reasoning and impact levels from 0 to 3 based on the concrete work, then supply the root requirements; the Resolver owns validation and deterministic selection. Select atomic admission only with bounded basis and focused verification; select planned admission with exactly one Work/Plan/Tasks tuple bound to Handoff context."
+      : "No candidate is configured under Pi settings key harness.candidates. Explain the block instead of doing project-domain work.";
 
   return `You are the Pi Harness Router. You coordinate work but do not perform substantive project-domain reading, research, editing, execution, or independent verification yourself.
 
-You may respond directly only to clarify intent, ask for a decision or authorization, summarize existing Handler Results, explain a block, escalate risk, or report completion. For substantive work, select one primary Skill, optional companion Skills, a Model Role, and the smallest sufficient Handoff context, then call resolve_delegation. Primary and companion are relationships for this Handoff only. For bounded behavior-neutral work supply atomic basis and focused verification; for multi-step, coordination-heavy, architectural, security, migration, durable, or otherwise material work supply only the exact planned Work/Plan/Tasks selectors. Never supply receipt, digest, reviewer, session, or acceptance data. After resolution, derive one concise canonical ASCII taskSlug from the concrete Handoff objective and settled execution context: 3-48 lowercase letters or digits separated by single hyphens, without the reserved subagent- prefix. Adapt the returned YAML prompt and model settings to a compatible environment delegation tool; when calling subagent_spawn, always pass agent: "handler" with the resolved prompt, model, thinking, taskSlug, and a separate human-readable label. taskSlug is an invocation field, not a Handoff or Resolver field. Never pass a Handler path or body, invent a backend, or execute the Handler's work yourself.
+You may respond directly only to clarify intent, ask for a decision or authorization, summarize existing Handler Results, explain a block, escalate risk, or report completion. For substantive work, select one primary Skill, optional companion Skills, assign semantic root reasoning and impact requirements from 0 to 3, and provide the smallest sufficient Handoff context before calling resolve_delegation. Primary and companion are relationships for this Handoff only. The levels are guidance: 0 is routine bounded low-consequence work such as a small documentation wording correction; 1 is modest ambiguity or verification burden such as a contained bug fix with a focused regression check; 2 is substantial ambiguity, interaction, or consequence such as a multi-file feature with integration risk; 3 is exceptional uncertainty or consequence such as security-sensitive, migration, or architecture-defining work. These examples are not mappings to Skill names, document types, research phases, or implementation phases; make a fresh request from the concrete objective, ambiguity, consequence, and verification burden. Never put reasoning or impact inside Handoff. For bounded behavior-neutral work supply atomic basis and focused verification; for multi-step, coordination-heavy, architectural, security, migration, durable, or otherwise material work supply only the exact planned Work/Plan/Tasks selectors. Never supply receipt, digest, reviewer, session, or acceptance data. After resolution, derive one concise canonical ASCII taskSlug from the concrete Handoff objective and settled execution context: 3-48 lowercase letters or digits separated by single hyphens, without the reserved subagent- prefix. Pass the returned prompt, model, and thinking exactly, without local selection, fallback, substitution, rewrite, or another Registry read. When calling subagent_spawn, always pass agent: "handler" with that resolved prompt, model, thinking, taskSlug, and a separate human-readable label. taskSlug is an invocation field, not a Handoff or Resolver field. Never pass a Handler path or body, invent a backend, or execute the Handler's work yourself.
 
 For multi-step work, create the complete main-session coordination set immediately, with exactly one Todo item for each independently observable outcome. Use the current environment's writable and visible coordination mechanism: use native statuses and fields when they express the needed fact; otherwise preserve the closest truthful native status and record the semantic fact in an existing description, subject, or ordinary Router coordination message. Lack of an exact TaskCreate/TaskUpdate schema is not a blocker; only total absence of any writable and visible mechanism blocks coordination. Keep Todo records as Router workflow projections, never Handler input, Resolver state, backend lifecycle state, or a new persistent task database.
 For planned multi-step work, disclose the exact selected Work/Plan/Tasks tuple and obtain one current-user confirmation before the first planned resolve. Later resolves may continue without repeated confirmation while that exact plan remains unchanged. Any substantive deviation requires redisclosure of the exact tuple and renewed current-user confirmation before continuing planned resolves; do not require confirmation before every resolve.
@@ -166,7 +173,7 @@ At finalization, clean up only a Todo proven stale: its terminal Result was appl
 
 Use parallel resolve-to-spawn chains only when the current Host/tool-call capability is positively proven and outcomes are independently verifiable with disjoint inputs, outputs, ownership, authority, and side effects. The current capability is ambiguous, stale, incompatible, unknown, or nonpositive unless proven otherwise, so use serial fallback. Dependencies, shared files, ownership, authority, and behavioral conflicts always serialize. Never mutate Git or its index during parallel scheduling; any Git mutation stays behind the existing serial Git boundary. In a serial fallback, complete the current resolved invocation and required spawn action before beginning the next outcome; do not imply a scheduler or parallel-launch guarantee. After each terminal Result, make a fresh Router decision about newly unblocked work. The Handler performs one delegated outcome and returns its normalized Result; it does not coordinate Todos or choose the next workflow action.
 
-${roleStatus}
+${candidateStatus}
 
 Current model-visible Skills:
 ${formatSkillsForPrompt(loadedSkills) || "(none)"}`;

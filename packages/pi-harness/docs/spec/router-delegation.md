@@ -21,6 +21,14 @@ The Router owns subsequent workflow decisions after Handler Results return. The 
 
 The Resolver validates and resolves; it must not interact, disclose, activate a Plan, issue a receipt, launch a Handler, or manage Router Todos. The Harness Extension owns prompt/tool registration and resolver execution.
 
+
+## #42 Accepted Capability-Selection Amendment
+
+The #42 amendment is accepted and current; its canonical frozen package candidate completed T4 and the P1 repair, fresh T5 verification, and independent T6 review. T5 and T6 each returned GO with P0-P3 zero. The Router supplies root finite non-negative integer `reasoning` and `impact` requests; 0..3 is semantic guidance with examples, not a phase taxonomy. The Handoff contains no model or capability fields. The Resolver selects from `harness.candidates[providerModelKey][thinking]`, where the key is split at the first slash only: provider and model ID are non-empty exact strings without control characters, provider cannot contain a slash, and model ID may contain slashes and dots. Registry lookup uses separate exact fields; display `provider/model.thinking` is diagnostic-only and never parsed. Candidates qualify on both dimensions and sort by impact surplus, reasoning surplus, then `JSON.stringify([provider, model, thinking])`. Dynamic resolver schema generation does not read the Registry, filter configured candidates by availability, or attest configured candidate availability; it exposes only the closed root request shape and relevant static descriptions. During resolve execution, after structural and numeric validation and before qualification and selection, one Registry snapshot is read exactly once and is the only authoritative availability snapshot. Legacy Roles/modelRole, unknown fields, raw duplicate JSON keys before normalization, duplicate canonical `(provider, modelId, thinking)` tuples, malformed candidates, unavailable candidates, and no qualified candidate fail closed with explicit manual replacement required. Unknown fields or invalid configuration shapes, including mixed unknown-plus-legacy input, retain `invalid_configuration` before pure recognized `roles`/`modelRole` returns `legacy_configuration`. Canonical tuples use the exact first-slash parse and exact thinking string, with no trim, case folding, aliasing, dot parsing, last-slash parsing, display parsing, or other normalization. Exact selective-commit review is GO; staging and commit remain pending. No live backend, reload, settings/runtime, Herdr, Pi-core, push, or deployment behavior is claimed.
+
+**#42 final lifecycle evidence:** Fresh T5 and independent T6 each returned GO with P0-P3 zero. T5 command attribution is config-command `13/22`, config `21/22`, settings-store `19/37`, Extension `6/95`, affected `46/154`, distinct subset `53/81`, focused `94/250`, and full `136/538`; typecheck, import, activation, and execute passed. The canonical 1085-byte LF manifest aggregate is `a6c92e4fc2720f31ca9b34fb60561a7c8174dc8176cb1a9a62ceba7e51541850`; rejected 1095-byte literal-backslash-n aggregate is `3fd52e65a90f2d7eaee47b587e50d467abd2960fdb7ead118131bcfb0ce70525`. The unrelated Herdr failure remains outside #42.
+
+
 ## 2. Handoff and admission input
 
 A Handoff contains `objective`, `primarySkill`, optional `companionSkills`, `context`, optional `constraints`, and optional `deliverables`. Each context item must contain exactly one non-empty readable `ref` or one non-empty `inline` value plus a non-empty `purpose`.
@@ -33,7 +41,7 @@ Model input must not supply receipt, acceptance, reviewer, session, activation, 
 
 For planned admission, the Resolver must:
 
-1. validate the ordinary Handoff, Skills, Role, model, thinking, references, and admission shape;
+1. validate the ordinary Handoff, Skills, root capability request, references, and admission shape;
 2. canonicalize and validate the selected Work/Plan/Tasks tuple;
 3. read the selected authority as required for current-call validation and derive canonical paths, bytes, and normalized Handoff identities;
 4. run the configured final current-call/JIT recomputation immediately before returning a resolved invocation; and
@@ -59,7 +67,7 @@ No compatibility shim accepts, ignores, or translates the old activation payload
 
 ## 5. Failure and session semantics
 
-Malformed Handoffs, invalid Skills, unavailable or malformed Roles, unreadable references, invalid admission shapes, tuple mismatch, forbidden model fields, and canonicalization failures retain precise structural/reference errors. Current-call authority or Plan drift fails closed. No failure mutates authorization state because no such state exists.
+Malformed Handoffs, invalid Skills, unavailable or malformed candidates, legacy Role/modelRole configuration, unreadable references, invalid admission shapes, tuple mismatch, forbidden model or capability fields in the Handoff, and canonicalization failures retain precise structural/reference errors. Current-call authority or Plan drift fails closed. No failure mutates authorization state because no such state exists.
 
 Reload, new session, resume, fork, shutdown, and session-generation changes do not clear or restore Harness authorization; there is nothing to clear or restore. No replacement marker, flag, audit event, confirmation token, persistence, or Host seam may be introduced.
 
