@@ -7,7 +7,7 @@
 
 ## Context
 
-`pi-harness` validates and delegates Handoffs from a Pi main-session Router. A Handoff requests work; it never proves that the user accepted a Plan. The workflow owner, not the Harness admission boundary, must complete the Plan and Tasks, disclose the decision-relevant material in an ordinary message, obtain one user confirmation, and then invoke delegation.
+`@settingdust/pi-harness` validates and delegates Handoffs from a Pi main-session Router. A Handoff requests work; it never proves that the user accepted a Plan. The workflow owner, not the Harness admission boundary, must complete the Plan and Tasks, disclose the decision-relevant material in an ordinary message, obtain one user confirmation, and then invoke delegation.
 
 The pre-change implementation contained an Extension-private `PlanAuthorizationRegistry`, a `PlanAuthorizationReceipt`, the `pi-harness:plan-activation-v1` EventBus channel, activation decision/context/outcome types, replay IDs and timestamps, session/generation authorization state, receipt integrity checks, and receipt-driven `acceptance_required` responses. That state machine duplicated workflow responsibility, could not prove what the user saw or accepted, and created a second confirmation protocol inside Harness.
 
@@ -15,7 +15,7 @@ The cancelled predecessor draft removed only a decision discriminator. Its parti
 
 ## Decision - accepted; implementation repairs, narrow Role validation, full technical validation, and fresh final independent correctness/security/evidence review complete
 
-Remove the entire Harness Plan authorization/activation state machine. `pi-harness` must not use or expose `pi-harness:plan-activation-v1`, activation context/outcome/decision/disclosure transport owned by Harness, `PlanAuthorizationRegistry`, `PlanAuthorizationReceipt`, authorization replay identifiers or timestamps, receipt integrity checks, or receipt-based acceptance state.
+Remove the entire Harness Plan authorization/activation state machine. `@settingdust/pi-harness` must not use or expose `pi-harness:plan-activation-v1`, activation context/outcome/decision/disclosure transport owned by Harness, `PlanAuthorizationRegistry`, `PlanAuthorizationReceipt`, authorization replay identifiers or timestamps, receipt integrity checks, or receipt-based acceptance state.
 
 The Router/coordinator remains normatively responsible for completing and reviewing Plan/Tasks, ordinary-message disclosure, one confirmation, and delegation invocation. Handoff acceptance is never inferred by Harness, and Harness does not persist, replay-protect, clear, restore, issue, or audit confirmation state. Session reload, resume, fork, and shutdown therefore have no authorization state to clear or restore.
 

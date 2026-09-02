@@ -2,7 +2,7 @@
 
 ## 1. Scope
 
-This specification defines task-derived `subagentId` allocation and allocation-failure observability for the `pi-herdr-subagents` parent runtime and the Router-to-runtime interface that supplies it.
+This specification defines task-derived `subagentId` allocation and allocation-failure observability for the `@settingdust/pi-herdr-subagents` parent runtime and the Router-to-runtime interface that supplies it.
 
 A Router derives a concise ASCII `taskSlug` from the concrete Handoff execution, supplies it to `subagent_spawn`, and supplies the independent human-readable `label`. For example:
 

@@ -14,7 +14,7 @@
       },
     },
     "packages/pi-harness": {
-      "name": "pi-harness",
+      "name": "@settingdust/pi-harness",
       "version": "0.1.0",
       "dependencies": {
         "proper-lockfile": "4.1.2",
@@ -26,14 +26,14 @@
       },
     },
     "packages/pi-herdr": {
-      "name": "pi-herdr",
+      "name": "@settingdust/pi-herdr",
       "version": "0.1.0",
     },
     "packages/pi-herdr-subagents": {
-      "name": "pi-herdr-subagents",
+      "name": "@settingdust/pi-herdr-subagents",
       "version": "0.1.0",
       "dependencies": {
-        "pi-herdr": "workspace:*",
+        "@settingdust/pi-herdr": "workspace:*",
       },
       "peerDependencies": {
         "@earendil-works/pi-ai": "*",
@@ -42,7 +42,7 @@
       },
     },
     "packages/todo": {
-      "name": "@pi9/todo",
+      "name": "@settingdust/pi-todo",
       "version": "0.3.7",
       "dependencies": {
         "typebox": "1.3.7",
@@ -154,8 +154,6 @@
 
     "@oxc-project/types": ["@oxc-project/types@0.147.0", "", {}, "sha512-IJ3s6ltHLp45S0bh7phkX+gJO7A1Wuz2EaqpAhb8WjqDwbzMiWKHhyyT42tskaWjEYXtHtVCPpnBJVT9+dcRLg=="],
 
-    "@pi9/todo": ["@pi9/todo@workspace:packages/todo"],
-
     "@protobufjs/aspromise": ["@protobufjs/aspromise@1.1.2", "", {}, "sha512-j+gKExEuLmKwvz3OgROXtrJ2UG2x8Ch2YZUxahh+s1F2HZ+wAceUNLkvy6zKCPVRkU++ZWQrdxsUeQXmcg4uoQ=="],
 
     "@protobufjs/base64": ["@protobufjs/base64@1.1.2", "", {}, "sha512-AZkcAA5vnN/v4PDqKyMR5lx7hZttPDgClv83E//FMNhR2TMcLUhfRUBHCmSl0oi9zMgDDqRUJkSxO3wm85+XLg=="],
@@ -205,6 +203,14 @@
     "@rolldown/binding-win32-x64-msvc": ["@rolldown/binding-win32-x64-msvc@1.2.6", "", { "os": "win32", "cpu": "x64" }, "sha512-np8iZSLfXlAD4kWhiyq/u0Yt8oZDtRQ8lGhQaCXo2rl37KNjeU0GjJuwr4P3oeZ++ROfofsKNBqR5LTO8aXyWQ=="],
 
     "@rolldown/pluginutils": ["@rolldown/pluginutils@1.0.1", "", {}, "sha512-2j9bGt5Jh8hj+vPtgzPtl72j0yRxHAyumoo6TNfAjsLB04UtpSvPbPcDcBMxz7n+9CYB0c1GxQFxYRg2jimqGw=="],
+
+    "@settingdust/pi-harness": ["@settingdust/pi-harness@workspace:packages/pi-harness"],
+
+    "@settingdust/pi-herdr": ["@settingdust/pi-herdr@workspace:packages/pi-herdr"],
+
+    "@settingdust/pi-herdr-subagents": ["@settingdust/pi-herdr-subagents@workspace:packages/pi-herdr-subagents"],
+
+    "@settingdust/pi-todo": ["@settingdust/pi-todo@workspace:packages/todo"],
 
     "@silvia-odwyer/photon-node": ["@silvia-odwyer/photon-node@0.3.4", "", {}, "sha512-bnly4BKB3KDTFxrUIcgCLbaeVVS8lrAkri1pEzskpmxu9MdfGQTy8b8EgcD83ywD3RPMsIulY8xJH5Awa+t9fA=="],
 
@@ -403,12 +409,6 @@
     "path-scurry": ["path-scurry@2.0.2", "", { "dependencies": { "lru-cache": "^11.0.0", "minipass": "^7.1.2" } }, "sha512-3O/iVVsJAPsOnpwWIeD+d6z/7PmqApyQePUtCndjatj/9I5LylHvt5qluFaBT3I5h3r1ejfR056c+FCv+NnNXg=="],
 
     "pathe": ["pathe@2.0.3", "", {}, "sha512-WUjGcAqP1gQacoQe+OBJsFA7Ld4DyXuUIjZ5cc75cLHvJ7dtNsTugphxIADwspS+AraAUePCKrSVtPLFj/F88w=="],
-
-    "pi-harness": ["pi-harness@workspace:packages/pi-harness"],
-
-    "pi-herdr": ["pi-herdr@workspace:packages/pi-herdr"],
-
-    "pi-herdr-subagents": ["pi-herdr-subagents@workspace:packages/pi-herdr-subagents"],
 
     "picocolors": ["picocolors@1.1.1", "", {}, "sha512-xceH2snhtb5M9liqDsmEw56le376mTZkEX/jEb/RxNFyegNul7eNslCXP9FDj/Lcu0X8KEyMceP2ntpaHrDEVA=="],
 

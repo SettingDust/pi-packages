@@ -43,7 +43,7 @@ The earlier T4 candidate was built from repository HEAD `667e61126043b6aba669410
 
 ## Pre-Role-repair final validation
 
-The previous final six-path validation is retained as historical pre-Role-repair evidence: focused admission/protocol `46 pass, 0 fail, 94 assertions`; Extension schema `1 pass, 0 fail, 41 assertions`; full `pi-harness` `101 pass, 0 fail, 428 assertions` across seven files; and package typecheck, protocol import, and Extension import plus source-level activation-registration smoke passed. The `428` assertions must not be presented as validation of the new Role-repair bytes.
+The previous final six-path validation is retained as historical pre-Role-repair evidence: focused admission/protocol `46 pass, 0 fail, 94 assertions`; Extension schema `1 pass, 0 fail, 41 assertions`; full `@settingdust/pi-harness` `101 pass, 0 fail, 428 assertions` across seven files; and package typecheck, protocol import, and Extension import plus source-level activation-registration smoke passed. The `428` assertions must not be presented as validation of the new Role-repair bytes.
 
 That validation used Bun `1.3.14`, cached TypeScript `5.9.3`, cached `proper-lockfile` `4.1.2`, and a clean compatible Pi peer environment from Pi Dust (`0.83.0`) in a temporary dependency environment. No repository dependency, package manifest, lockfile, settings, or Pi/Host/Herdr/session state was mutated.
 

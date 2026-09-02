@@ -14,7 +14,7 @@ description: Derive executable Tasks and dependencies from an accepted implement
 5. Separate independent tasks only when concurrent execution cannot conflict through files, shared state, migrations, or unresolved design.
 6. Include focused tests and documentation updates in the owning implementation task unless they have a distinct dependency or specialist boundary.
 7. Add integration or release tasks only when the Plan requires them.
-8. When a `pi-harness` Tasks artifact participates in planned admission, keep it as the direct matched partner of its selected Plan in the same Work directory. A Work may contain multiple explicit pairs; do not infer the selected pair from a status, directory order, or a lifecycle label.
+8. When a `@settingdust/pi-harness` Tasks artifact participates in planned admission, keep it as the direct matched partner of its selected Plan in the same Work directory. A Work may contain multiple explicit pairs; do not infer the selected pair from a status, directory order, or a lifecycle label.
 9. The Router Delegation Specification owns tuple grammar and admission validation. This Skill's naming guidance, headings, links, and status text do not prove document kind, receipt provenance, or acceptance.
 10. Check full Plan coverage, absence of duplicate work, and a clear path from the first unblocked task to completion.
 

@@ -1,6 +1,6 @@
-# pi-herdr-subagents Documentation
+# @settingdust/pi-herdr-subagents Documentation
 
-This directory owns durable authority and bounded implementation work for `pi-herdr-subagents`.
+This directory owns durable authority and bounded implementation work for `@settingdust/pi-herdr-subagents`.
 
 - `spec/`: normative behavior, interfaces, lifecycle, and failure contracts.
 - `works/`: derived Work entries, Context, Plans, and Tasks for one bounded delivery objective.

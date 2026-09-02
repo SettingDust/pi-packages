@@ -13,7 +13,7 @@ surface while deliberately changing activity collection, defaults, icons, and su
 semantics as stated in section 16.
 ## 1. Scope And Boundary
 
-`pi-herdr-subagents` will provide a parent-session subagent status widget with:
+`@settingdust/pi-herdr-subagents` will provide a parent-session subagent status widget with:
 
 - queued and running generations visible;
 - identity, state, and elapsed time on each active progress row;
@@ -423,7 +423,7 @@ retained as additional evidence, but the injected-capability test is normative.
 
 The widget is transient display state. It must not send messages, trigger turns,
 acknowledge completion notifications, or include terminal reasons. The existing
-`pi-herdr-subagent-completion` message remains the only terminal notification path. A
+`@settingdust/pi-herdr-subagent-completion` message remains the only terminal notification path. A
 terminal transition removes its row while notification delivery proceeds independently,
 including when rendering or clearing throws.
 

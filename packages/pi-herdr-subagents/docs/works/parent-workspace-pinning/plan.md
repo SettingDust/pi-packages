@@ -55,7 +55,7 @@ Keep `SubagentRuntime` task persistence and generation semantics unchanged. Spaw
 
 Existing runtime create failure persistence must retain the transport `Error.message`, including the workspace reason token. A failed start must not allocate a replacement surface or fall back to the foreground/default workspace.
 
-Add focused fake transport tests for spawn failure, resume failure, retained-pane recovery, delayed non-Herdr construction, no fallback, token propagation, and unchanged task/notification persistence. Do not add a manifest workspace field or alter `pi-herdr`.
+Add focused fake transport tests for spawn failure, resume failure, retained-pane recovery, delayed non-Herdr construction, no fallback, token propagation, and unchanged task/notification persistence. Do not add a manifest workspace field or alter `@settingdust/pi-herdr`.
 
 ### 4. Completed Real Herdr Mutation Acceptance
 

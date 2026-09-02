@@ -81,4 +81,4 @@ T0 cross-document reconciliation and fresh authority review
 
 ## Parallelism and exclusions
 
-No implementation tasks are parallel-safe by default because T2-T4 share the settings/protocol/Extension contract. No task covers `pi-herdr-subagents`, delegate backend source, Pi core/Host, dependencies, unrelated settings/session/runtime work, migration, fallback, reload, staging, commit, deployment, or live runtime verification.
+No implementation tasks are parallel-safe by default because T2-T4 share the settings/protocol/Extension contract. No task covers `@settingdust/pi-herdr-subagents`, delegate backend source, Pi core/Host, dependencies, unrelated settings/session/runtime work, migration, fallback, reload, staging, commit, deployment, or live runtime verification.

@@ -25,7 +25,7 @@ No new PRD is applicable. The user-visible delegation outcome and package produc
 - **response-rejected surface:** A tab-create command returned a response containing a candidate surface, but target or identity validation failed before the surface could be adopted or launched.
 - **response cleanup:** The one best-effort close of an explicitly returned root pane after response rejection. It is operational cleanup, not successful surface adoption.
 
-The implementation surfaces are the `HerdrTransport`/`createHerdrTransport` boundary and their fake transport and Herdr-client tests in `tests/runtime.test.ts`. The generic `pi-herdr` client remains a transparent arbitrary-argument CLI client and is outside this contract.
+The implementation surfaces are the `HerdrTransport`/`createHerdrTransport` boundary and their fake transport and Herdr-client tests in `tests/runtime.test.ts`. The generic `@settingdust/pi-herdr` client remains a transparent arbitrary-argument CLI client and is outside this contract.
 
 ## 3. Parent Workspace Identity
 
@@ -54,7 +54,7 @@ For every `createTab` call that can create a child execution surface:
 6. If response validation rejects a response and it contains a non-empty explicit `result.root_pane.pane_id`, the transport must make one best-effort `pane close` call for that exact pane ID before returning the primary failure. If cleanup succeeds, the primary failure remains unchanged. If cleanup fails, the primary classification and reason token remain primary and the cleanup failure is retained only as diagnostic detail. If no explicit root pane ID is available, no cleanup command is possible through this bounded transport and no tab or pane identity may be guessed.
 7. The child launch command may run only after `createTab` has returned a validated surface. A rejected response, including one whose cleanup failed, must never be used for `pane run`, result transport, steering, or task adoption.
 
-The Herdr command argument shape is owned by `pi-herdr-subagents`; `pi-herdr` must continue to forward arbitrary arguments without adding workspace policy.
+The Herdr command argument shape is owned by `@settingdust/pi-herdr-subagents`; `@settingdust/pi-herdr` must continue to forward arbitrary arguments without adding workspace policy.
 
 ## 5. Fail-Closed Behavior
 
@@ -84,7 +84,7 @@ A `SubagentRuntime.start` failure after task allocation remains a retained faile
 
 In a non-Herdr environment, transport construction remains loadable even when `HERDR_WORKSPACE_ID` is absent or unusable; extension loading, registry discovery, task inspection, and recovery retain their existing behavior. Operations that require creation of a new Herdr tab, including spawn and resume, must reject at `createTab` with the missing or invalid-target reason rather than using a foreground or default workspace. Injected fake transports used by unit tests are not required to read the real process environment, but their target and response checks must exercise the same invariant.
 
-A Herdr version that does not support `tab create --workspace`, does not return `tab.workspace_id`, or does not return the explicit nested identities required above is incompatible with this runtime contract. The runtime must expose the unsupported-contract failure and must not downgrade the command. The generic `pi-herdr` package does not add version negotiation or workspace emulation.
+A Herdr version that does not support `tab create --workspace`, does not return `tab.workspace_id`, or does not return the explicit nested identities required above is incompatible with this runtime contract. The runtime must expose the unsupported-contract failure and must not downgrade the command. The generic `@settingdust/pi-herdr` package does not add version negotiation or workspace emulation.
 
 ## 8. Invariants And Non-Goals
 
@@ -98,7 +98,7 @@ The runtime must preserve these invariants:
 - response rejection performs only the bounded explicit-root-pane cleanup and never turns cleanup into successful adoption or retry;
 - existing task identity, generation, recovery, Result, notification, steering, and removal contracts remain unchanged except for create failure propagation.
 
-This Specification does not add a workspace registry, workspace discovery, tab reparenting, cross-workspace migration, a new `pi-herdr` abstraction, retry logic, or a persistent workspace field. It does not authorize Herdr mutations during documentation preparation.
+This Specification does not add a workspace registry, workspace discovery, tab reparenting, cross-workspace migration, a new `@settingdust/pi-herdr` abstraction, retry logic, or a persistent workspace field. It does not authorize Herdr mutations during documentation preparation.
 
 ## 9. Acceptance Conditions
 
@@ -112,7 +112,7 @@ Focused fake-client and fake-transport checks must demonstrate:
 6. construction with no usable target remains loadable and defers missing/invalid failure until `createTab`, while `createTab` rejects before any Herdr call;
 7. spawn and resume failure paths retain existing task lifecycle semantics, preserve the workspace token in the propagated error message, and do not create a foreground fallback;
 8. restart/recovery adopts retained explicit panes without creating or re-homing tabs, while new resume creation uses the newly captured target;
-9. the generic `pi-herdr` client remains unchanged and arbitrary CLI args still pass through;
+9. the generic `@settingdust/pi-herdr` client remains unchanged and arbitrary CLI args still pass through;
 10. a controlled real Herdr acceptance run demonstrates the parent in workspace `wF` creates its child tab/root pane in `wF` even while `w8` is manually foregrounded, and records no child launch from a tab created in `w8`;
 11. package typecheck, the full package tests, a real `wF -> w8` regression acceptance record, and a fresh independent review pass.
 

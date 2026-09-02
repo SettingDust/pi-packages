@@ -108,7 +108,7 @@ The Router supplies root requirements to resolve and passes the resolved model/t
 
 Global and trusted-Project scope, first project materialization, reset-to-inheritance, unrelated Pi-key preservation, malformed-settings protection, and `proper-lockfile` retry behavior remain unchanged. `/harness config` edits or explicitly replaces the nested candidate configuration through the existing confirmation seam.
 
-The backend remains out of scope. Exact resolved `model` and `thinking` values continue through the existing backend adaptation unchanged. No `pi-herdr-subagents`, Pi core/Host, dependency, session, or runtime change belongs to #42.
+The backend remains out of scope. Exact resolved `model` and `thinking` values continue through the existing backend adaptation unchanged. No `@settingdust/pi-herdr-subagents`, Pi core/Host, dependency, session, or runtime change belongs to #42.
 
 ## 8. Cross-document reconciliation
 

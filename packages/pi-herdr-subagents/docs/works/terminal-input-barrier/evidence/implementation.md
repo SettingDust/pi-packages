@@ -34,7 +34,7 @@ Coverage mapping:
 
 ## Recorded Package Gates
 
-- `bun run typecheck`: passed after `bun install --frozen-lockfile` restored the missing workspace `pi-herdr` link; the install reported no dependency or lockfile changes.
+- `bun run typecheck`: passed after `bun install --frozen-lockfile` restored the missing workspace `@settingdust/pi-herdr` link; the install reported no dependency or lockfile changes.
 - `bun test`: passed, 80/80 tests and 422 assertions. The child suite passed 9/9.
 - Bounded `git diff --check` for the Spec, Work, source, and test paths passed; Git emitted only line-ending conversion warnings for the two tracked implementation files.
 

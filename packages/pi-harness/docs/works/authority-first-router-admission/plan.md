@@ -7,7 +7,7 @@
 
 ## Objective and scope
 
-Remove the entire `pi-harness` Plan activation/authorization state machine while preserving ordinary Handoff, authority-tuple, model/Skill/Role, canonicalization, and current-call drift validation. The Router/coordinator owns Plan completion, ordinary-message disclosure, one user confirmation, and delegation invocation. Harness performs no confirmation-history enforcement.
+Remove the entire `@settingdust/pi-harness` Plan activation/authorization state machine while preserving ordinary Handoff, authority-tuple, model/Skill/Role, canonicalization, and current-call drift validation. The Router/coordinator owns Plan completion, ordinary-message disclosure, one user confirmation, and delegation invocation. Harness performs no confirmation-history enforcement.
 
 Candidate source/test scope, frozen by the six current identities: implementation repairs, narrow Role validation, full technical validation, and fresh final independent correctness/security/evidence review are complete; completion-status reconciliation is complete and isolated commit remains pending:
 
@@ -65,7 +65,7 @@ Final isolated repair/revalidation of the earlier schema findings and narrow Rol
 - No source/test change occurred before explicit current-user acceptance of the exact Plan.
 - After authorization, each task has a focused check for its material behavior.
 - Package typecheck passes in the isolated supported dependency environment.
-- Full `pi-harness` tests pass without filters in the isolated supported dependency environment.
+- Full `@settingdust/pi-harness` tests pass without filters in the isolated supported dependency environment.
 - Protocol import and source-level `activateHarness` registration smoke pass in the supported package environment.
 - Search finds no old channel, activation transport, registry/receipt API, replay/session authorization state, receipt-specific acceptance gate, or stale test fixture.
 - Scoped diff contains no unrelated hunks; fresh independent review confirmed current-call authority drift and preserved protocol invariants.

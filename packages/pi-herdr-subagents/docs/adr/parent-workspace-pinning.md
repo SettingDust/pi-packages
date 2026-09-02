@@ -10,7 +10,7 @@
 
 ## Context
 
-Before the #14 implementation, the concrete `pi-herdr-subagents` transport created Herdr tabs with `--cwd`, `--label`, and `--no-focus`, but without an explicit workspace target. First-party Herdr 0.8 research confirmed that `tab create` accepts `--workspace <WORKSPACE_ID>` and returns `result.tab.workspace_id`, alongside `result.tab.tab_id` and `result.root_pane.pane_id`. Without the explicit option, creation followed Herdr's foreground/default context.
+Before the #14 implementation, the concrete `@settingdust/pi-herdr-subagents` transport created Herdr tabs with `--cwd`, `--label`, and `--no-focus`, but without an explicit workspace target. First-party Herdr 0.8 research confirmed that `tab create` accepts `--workspace <WORKSPACE_ID>` and returns `result.tab.workspace_id`, alongside `result.tab.tab_id` and `result.root_pane.pane_id`. Without the explicit option, creation followed Herdr's foreground/default context.
 
 The incident evidence supplied for this Work says the parent belonged to workspace `wF` while `w8` was manually foregrounded; the observed symptom was that the child surface followed `w8`. The cancelled subagent and diagnostic task are execution history only. This ADR records the confirmed workspace symptom, not any unverified causal detail beyond the omitted target and Herdr contract.
 
@@ -26,7 +26,7 @@ Missing, invalid, unsupported, or mismatched target evidence fails closed. Unsup
 
 When response validation rejects a response containing an explicit non-empty `result.root_pane.pane_id`, the transport makes one best-effort `pane close` call for that exact pane before returning the primary failure. A cleanup failure remains diagnostic and does not replace the primary classification or token. If no explicit root-pane ID exists, no cleanup identity is guessed. No rejected surface may be launched, adopted, retried, or used for steering.
 
-Workspace ownership remains transport construction state. It is not added to task identity, persisted manifests, Result artifacts, or the generic `pi-herdr` client. Existing pane operations continue using explicit persisted pane IDs. Restart captures the environment again for future create operations; recovery adopts retained panes without creating or re-homing them.
+Workspace ownership remains transport construction state. It is not added to task identity, persisted manifests, Result artifacts, or the generic `@settingdust/pi-herdr` client. Existing pane operations continue using explicit persisted pane IDs. Restart captures the environment again for future create operations; recovery adopts retained panes without creating or re-homing them.
 
 This ADR is a new distinct decision lifecycle rather than an amendment to the retrospective runtime-lifecycle ADR. The lifecycle ADR remains the owner of its historical chronology and existing recovery/notification/continuation decisions.
 
@@ -38,7 +38,7 @@ This ADR is a new distinct decision lifecycle rather than an amendment to the re
 - Checking the returned workspace closes the gap between requested and actual placement.
 - Stable tokens in `Error.message` make fail-closed classification observable through existing runtime error propagation.
 - Closing only an explicitly returned root pane provides bounded cleanup using the existing transport capability without inventing tab discovery or a new cleanup API.
-- Keeping the policy in `pi-herdr-subagents` preserves the generic CLI client's low-level forwarding role and avoids introducing a new adapter layer.
+- Keeping the policy in `@settingdust/pi-herdr-subagents` preserves the generic CLI client's low-level forwarding role and avoids introducing a new adapter layer.
 - The change is a separate runtime safety/ownership contract, so hiding it in the lifecycle Spec would make ownership and chronology less clear.
 
 ## Alternatives Considered
@@ -49,7 +49,7 @@ The following alternatives are grounded in the supplied first-party research and
 2. **Infer the target from cwd, session file, task ID, tab ID, pane ID, label, prefix, or workspace listing.** Rejected because none is the authoritative parent workspace identity and inference can silently select the wrong workspace.
 3. **Pass `--workspace` but trust the returned tab without checking `workspace_id`.** Rejected because request intent alone does not prove the created surface's ownership.
 4. **Treat every failed Herdr create command as unsupported.** Rejected because unsupported classification requires explicit option rejection or a successful response with an incompatible shape; unrelated command failures must retain their existing semantics.
-5. **Add workspace policy to `pi-herdr`.** Rejected because the generic client already forwards arbitrary arguments and has no runtime parent-workspace ownership context.
+5. **Add workspace policy to `@settingdust/pi-herdr`.** Rejected because the generic client already forwards arbitrary arguments and has no runtime parent-workspace ownership context.
 6. **Persist workspace identity in task manifests or migrate/re-home existing panes.** Rejected for this bounded fix because workspace ownership belongs to the transport context and recovery must preserve existing explicit pane lifecycle semantics.
 7. **Invent tab discovery or a new cleanup abstraction for rejected responses.** Rejected because the existing bounded capability is one explicit root-pane close; no identity may be guessed when the response does not provide it.
 

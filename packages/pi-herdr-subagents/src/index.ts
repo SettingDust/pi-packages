@@ -10,7 +10,7 @@ import { promisify } from "node:util";
 import { StringEnum, Type } from "@earendil-works/pi-ai";
 import { defineTool, getAgentDir, type ExtensionAPI, type ExtensionContext, type Theme } from "@earendil-works/pi-coding-agent";
 import { Text, stripTerminalSequences, truncateToWidth, type Component, type TUI } from "@earendil-works/pi-tui";
-import { commandFailure, createHerdrClient, hasHerdrErrorCode, type HerdrClient } from "pi-herdr";
+import { commandFailure, createHerdrClient, hasHerdrErrorCode, type HerdrClient } from "@settingdust/pi-herdr";
 
 const exec = promisify(execFile);
 export const paneChildExtensionPath = resolve(dirname(fileURLToPath(import.meta.url)), "../extensions/pane-child.ts");

@@ -2,7 +2,7 @@
 
 ## Goal
 
-Add a minimal parent-session status widget above the Pi editor that shows only the currently running `pi-herdr-subagents` tasks.
+Add a minimal parent-session status widget above the Pi editor that shows only the currently running `@settingdust/pi-herdr-subagents` tasks.
 
 ## Authority
 

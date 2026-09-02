@@ -1,4 +1,4 @@
-# pi-herdr-subagents
+# @settingdust/pi-herdr-subagents
 
 An independent Herdr-backed Pi subagent runtime. It registers `subagent_spawn`, `subagent_resume`, `subagent_steer`, `subagent_inspect`, `subagent_join`, `subagent_cancel`, and `subagent_remove`.
 

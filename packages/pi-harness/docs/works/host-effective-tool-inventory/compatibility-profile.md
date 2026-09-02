@@ -1,4 +1,4 @@
-# Host Compatibility Profile: `pi-herdr-subagents/subagent_spawn` v1
+# Host Compatibility Profile: `@settingdust/pi-herdr-subagents/subagent_spawn` v1
 
 - Status: draft fixture contract; unaccepted; unimplemented; unexecuted
 - Updated: 2026-08-22
@@ -14,7 +14,7 @@ This document defines the first source-grounded fixture contract for host compat
 
 ```yaml
 interface: effective-tool-compatibility/v1
-profileId: pi-herdr-subagents/subagent_spawn
+profileId: @settingdust/pi-herdr-subagents/subagent_spawn
 profileVersion: 1
 hostVersions:
   piCodingAgent: 0.84.2

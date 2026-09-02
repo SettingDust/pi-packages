@@ -1,4 +1,4 @@
-# @pi9/todo
+# @settingdust/pi-todo
 
 A phased, session-aware todo tool for the [Pi coding agent](https://github.com/earendil-works/pi-mono), with adaptive system reminders and a persistent widget that keeps the current plan visible while you work.
 

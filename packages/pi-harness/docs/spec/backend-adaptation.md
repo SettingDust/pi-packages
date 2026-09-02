@@ -44,9 +44,9 @@ An absent, stale, malformed, or incompatible host outcome blocks before resoluti
 
 Compatibility does not create a static Skill allowlist. The Resolver's current model-visible Skill set remains authoritative for Handoff validation.
 
-## 3. `pi-herdr-subagents` Mapping
+## 3. `@settingdust/pi-herdr-subagents` Mapping
 
-When the host issues a compatible outcome for the approved `pi-herdr-subagents/subagent_spawn` profile, Router maps one resolved invocation to:
+When the host issues a compatible outcome for the approved `@settingdust/pi-herdr-subagents/subagent_spawn` profile, Router maps one resolved invocation to:
 
 ```yaml
 subagent_spawn:

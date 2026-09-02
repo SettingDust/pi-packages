@@ -3,7 +3,7 @@ import { spawnSync } from "node:child_process";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
-import { createHerdrClient } from "pi-herdr";
+import { createHerdrClient } from "@settingdust/pi-herdr";
 import activateSubagents, { AgentRegistry, SubagentRuntime, createHerdrTransport, createSubagentTools, validateExplicitSpawnModel, type CompletionNotification, type HerdrTransport } from "../src/index.js";
 
 function fakeTransport(paneExists: boolean | (() => boolean) = true) {

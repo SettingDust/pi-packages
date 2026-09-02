@@ -2,7 +2,7 @@
 
 ## Objective
 
-Reconcile SDD authority for three already-committed `pi-herdr-subagents` behaviors:
+Reconcile SDD authority for three already-committed `@settingdust/pi-herdr-subagents` behaviors:
 
 1. persistent runtime task recovery;
 2. parent terminal completion notification; and

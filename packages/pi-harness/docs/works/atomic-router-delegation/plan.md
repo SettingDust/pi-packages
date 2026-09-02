@@ -14,7 +14,7 @@ Implement the smallest #3 change that validates one clear Handoff outcome and co
 
 - Complete repaired authority package is independently reviewed and later confirmed once by the user.
 - Host object-snapshot module and #36 adapters are implemented and tested.
-- Host exposes the approved `pi-herdr-subagents/subagent_spawn` v1 outcome through the private Harness read path and Host-owned Router projection.
+- Host exposes the approved `@settingdust/pi-herdr-subagents/subagent_spawn` v1 outcome through the private Harness read path and Host-owned Router projection.
 - The semantic backend evidence remains compatible with the current backend source.
 - Any concrete implementation Handoff has an independently checkable boundary and stopping condition.
 

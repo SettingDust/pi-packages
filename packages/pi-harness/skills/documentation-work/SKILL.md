@@ -13,7 +13,7 @@ description: Create or update a bounded Work entry and processed Context from cu
 4. Maintain processed Context containing accepted decisions, constraints, established facts, relevant references, current implementation status, and open work.
 5. Exclude raw transcripts, speculative proposals, duplicated authority, and task-level execution logs. Link source artifacts instead of copying them.
 6. Reconcile Context when authority or accepted decisions change; mark superseded facts rather than leaving contradictions.
-7. When `pi-harness` planned-admission material needs a selected tuple, keep one direct `work.md` and zero or more direct matched Plan/Tasks slices in the same Work directory. Do not use Work status, directory order, or an inferred active slice as admission state.
+7. When `@settingdust/pi-harness` planned-admission material needs a selected tuple, keep one direct `work.md` and zero or more direct matched Plan/Tasks slices in the same Work directory. Do not use Work status, directory order, or an inferred active slice as admission state.
 8. The Router Delegation Specification owns the selected-tuple grammar and validation. A Skill, heading, link, or Markdown status is drafting guidance, never document-kind proof or receipt evidence.
 9. Keep Plan and Tasks in their owning artifacts when the Work needs them; never record D2/D3, acceptance, or a persistent admission lifecycle in Work material.
 

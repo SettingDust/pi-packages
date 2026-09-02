@@ -1,5 +1,5 @@
 {
-  "name": "@pi9/todo",
+  "name": "@settingdust/pi-todo",
   "version": "0.3.7",
   "description": "Phased, session-aware todo planning for Pi agents.",
   "license": "MIT",
@@ -25,13 +25,7 @@
     "CHANGELOG.md",
     "LICENSE"
   ],
-  "keywords": [
-    "pi",
-    "pi-extension",
-    "pi-package",
-    "pi9",
-    "todo"
-  ],
+  "keywords": ["pi-package", "pi", "todo"],
   "engines": {
     "node": ">=22.0.0"
   },

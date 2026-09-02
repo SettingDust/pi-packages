@@ -4,7 +4,7 @@ Read-only evidence for Plan #41 T1.
 
 ```json
 {
-  "command_or_invocation": "PowerShell read-only probe: package/version metadata; Get-FileHash -Algorithm SHA256 over the exact Work/Plan/Tasks paths; source inspection of current Harness, pi-herdr-subagents, Pi 0.84.4 host declarations, and configured @tintinweb/pi-tasks 0.9.0.",
+  "command_or_invocation": "PowerShell read-only probe: package/version metadata; Get-FileHash -Algorithm SHA256 over the exact Work/Plan/Tasks paths; source inspection of current Harness, @settingdust/pi-herdr-subagents, Pi 0.84.4 host declarations, and configured @tintinweb/pi-tasks 0.9.0.",
   "environment_identity": {
     "cwd": "E:/Projects/pi-packages",
     "os": "Microsoft Windows 11 (PowerShell host)",
@@ -44,7 +44,7 @@ Read-only evidence for Plan #41 T1.
         "finding": "No current-turn API or source-backed proof was found that multiple independent resolve-to-spawn chains can start in one scheduling wave. This is treated as ambiguous under Plan #41, not proof of impossibility.",
         "query_or_selection_method": "Read declarations and all relevant registration/schema/execute paths; no subagent or task tool invocation",
         "result": "inconclusive",
-        "searched_scope": "Current installed Pi 0.84.4 declarations, Harness extension, pi-herdr-subagents registration/tests, and configured task extension source"
+        "searched_scope": "Current installed Pi 0.84.4 declarations, Harness extension, @settingdust/pi-herdr-subagents registration/tests, and configured task extension source"
       },
       {
         "finding": "Available task operations conflict with required #41 terminal-state, correlation/idempotence, and stale-only cleanup semantics.",
@@ -76,7 +76,7 @@ Read-only evidence for Plan #41 T1.
         "locator": "packages/pi-herdr-subagents/src/index.ts:467-485,624-695; packages/pi-herdr-subagents/tests/runtime.test.ts:124-156",
         "scope": "registration, dispatch, execution, task persistence, terminal notification boundary",
         "support": "Direct inspected source and focused test.",
-        "title": "Current pi-herdr-subagents runtime and tests"
+        "title": "Current @settingdust/pi-herdr-subagents runtime and tests"
       },
       {
         "accessed": "2026-08-30",
@@ -144,7 +144,7 @@ Read-only evidence for Plan #41 T1.
     "P": {
       "consequence": "serial_fallback",
       "decision": "ambiguous",
-      "evidence": "The current Harness prompt maps one resolved invocation to the environment delegate as its next action; the current pi-herdr-subagents contract and tests say to spawn and end the Router turn. The installed task extension mentions independent tool calls running in parallel, but no current provider-turn evidence proves multiple independent resolve-to-spawn chains can start in one scheduling wave."
+      "evidence": "The current Harness prompt maps one resolved invocation to the environment delegate as its next action; the current @settingdust/pi-herdr-subagents contract and tests say to spawn and end the Router turn. The installed task extension mentions independent tool calls running in parallel, but no current provider-turn evidence proves multiple independent resolve-to-spawn chains can start in one scheduling wave."
     },
     "T2_GO_NO_GO": "NO-GO: C is contradictory; T2-T4 are blocked for authority review. P independently selects serial fallback and does not convert C failure into fallback.",
     "authority_identity": {

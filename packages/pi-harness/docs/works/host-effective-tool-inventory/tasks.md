@@ -25,7 +25,7 @@ T0 fresh review/confirmation gate
 
 ## T1. Finalize Source Map and Profile Fixture
 
-- Outcome: reviewed implementation locators plus concrete `pi-herdr-subagents/subagent_spawn` v1 profile values.
+- Outcome: reviewed implementation locators plus concrete `@settingdust/pi-herdr-subagents/subagent_spawn` v1 profile values.
 - Depends on: T0 and later confirmation.
 - Inputs: [compatibility-profile.md](compatibility-profile.md) and Pi 0.84.2 source hashes/ranges.
 - Constraints: retain configured/resolved paths separately; exact loader-path matching only; no jiti-byte/closure/cross-alias claims; identify every execution option.

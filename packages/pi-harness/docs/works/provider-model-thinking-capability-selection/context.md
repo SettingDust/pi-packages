@@ -21,7 +21,7 @@
 - The Router prompt uses a semantic 0..3 scale with examples, without binding research or implementation phases to fixed levels.
 - Dynamic resolver schema generation reads no Registry state, performs no candidate availability filtering or attestation, and exposes only the closed root request shape and relevant static descriptions. During resolve execution, after structural and numeric validation and before qualification and selection, the Registry is read exactly once; that snapshot alone is authoritative for the execution.
 - Existing settings scope/locking and exact backend model/thinking pass-through remain.
-- Backend and `pi-herdr-subagents` require no changes.
+- Backend and `@settingdust/pi-herdr-subagents` require no changes.
 
 ## Evidence map
 

@@ -217,9 +217,9 @@ Immediately before invoking `tool.execute`, the host must verify:
 
 Failure blocks before package side effects. `stale_generation` and `revoked` are distinct. Package-owned JIT validation follows this host guard and may still reject stale Skill, Role, Agent, model, workspace, or lifecycle state.
 
-## 11. `pi-herdr-subagents/subagent_spawn` Profile
+## 11. `@settingdust/pi-herdr-subagents/subagent_spawn` Profile
 
-The first profile is `pi-herdr-subagents/subagent_spawn` version 1. Its complete fixture contract is [compatibility-profile.md](../works/host-effective-tool-inventory/compatibility-profile.md). It must cover:
+The first profile is `@settingdust/pi-herdr-subagents/subagent_spawn` version 1. Its complete fixture contract is [compatibility-profile.md](../works/host-effective-tool-inventory/compatibility-profile.md). It must cover:
 
 - Pi and agent-core exact versions, platform/runtime, configured and resolved extension paths;
 - reviewed digest scope and its explicit trust limits;

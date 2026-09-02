@@ -1,6 +1,6 @@
 # Changelog
 
-All notable changes to `@pi9/todo` will be documented in this file.
+All notable changes to `@settingdust/pi-todo` will be documented in this file.
 
 ## [Unreleased]
 

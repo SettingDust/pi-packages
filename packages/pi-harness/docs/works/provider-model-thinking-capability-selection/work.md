@@ -42,7 +42,7 @@ The accepted implementation boundary is:
 - `packages/pi-harness/tests/protocol.test.ts`
 - `packages/pi-harness/tests/extension.test.ts`
 
-The seven #42 documents and six dependent authority documents are the documentation outputs for this reconciliation unit. Only those thirteen paths may change in this unit. Source, tests, settings, backend packages, `pi-herdr-subagents`, Pi core/Host, dependencies, runtime, sessions, and Git operations are excluded.
+The seven #42 documents and six dependent authority documents are the documentation outputs for this reconciliation unit. Only those thirteen paths may change in this unit. Source, tests, settings, backend packages, `@settingdust/pi-herdr-subagents`, Pi core/Host, dependencies, runtime, sessions, and Git operations are excluded.
 
 ## Contract checkpoint
 

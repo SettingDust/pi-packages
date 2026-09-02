@@ -2,7 +2,7 @@
 
 - Status: draft; unaccepted; unimplemented
 - Date: 2026-08-22
-- Owners: `pi-harness` and `pi-herdr-subagents` as package adapters
+- Owners: `@settingdust/pi-harness` and `@settingdust/pi-herdr-subagents` as package adapters
 - Host authority: [ADR-0008](../adr/0008-host-owned-effective-tool-inventory.md), [Effective Tool Inventory Specification](../spec/effective-tool-inventory.md)
 - Candidate adapter contract: [Early Stable Tool Registration Specification](../spec/early-stable-tool-registration.md)
 - Existing Work: [Early Stable Tool Registration Work](../works/early-stable-tool-registration/work.md)

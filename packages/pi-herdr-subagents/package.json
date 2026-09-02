@@ -1,5 +1,5 @@
 {
-  "name": "pi-herdr-subagents",
+  "name": "@settingdust/pi-herdr-subagents",
   "version": "0.1.0",
   "description": "Independent Herdr-backed Pi subagent runtime",
   "keywords": ["pi-package", "pi", "herdr", "subagent"],
@@ -10,7 +10,7 @@
     "test": "bun test"
   },
   "dependencies": {
-    "pi-herdr": "workspace:*"
+    "@settingdust/pi-herdr": "workspace:*"
   },
   "peerDependencies": {
     "@earendil-works/pi-ai": "*",

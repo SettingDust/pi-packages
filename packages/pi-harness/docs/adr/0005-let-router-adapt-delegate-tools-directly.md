@@ -7,7 +7,7 @@
 
 ## Context
 
-The Resolver produces a provider-neutral Handler invocation, while environments may delegate through different tools. A package-owned wrapper or backend registry would duplicate tool schemas and couple `pi-harness` to runtimes it does not own.
+The Resolver produces a provider-neutral Handler invocation, while environments may delegate through different tools. A package-owned wrapper or backend registry would duplicate tool schemas and couple `@settingdust/pi-harness` to runtimes it does not own.
 
 The accepted base decision let the Router adapt directly from the currently available tool contract. Later #3 research established a limit: tool name, schema, description, package/version, and historical source mapping cannot prove that the current effective registration is the reviewed implementation or that dispatch will reach that registration.
 
@@ -15,7 +15,7 @@ The draft host authority assigns host-observed effective-tool preparation, exact
 
 ## Accepted Base Decision
 
-The Router adapts a resolved invocation directly to a compatible environment delegate tool. `pi-harness` does not register a delegate wrapper, callback interface, backend registry, or backend-specific adapter.
+The Router adapts a resolved invocation directly to a compatible environment delegate tool. `@settingdust/pi-harness` does not register a delegate wrapper, callback interface, backend registry, or backend-specific adapter.
 
 A compatible backend must start an independent Handler, guarantee exact resolved model/thinking, apply the fixed `handler` Agent, preserve normal Skill/reference access, return stable task identity, and preserve the Handler YAML Result.
 The Pi host effective-inventory module owns host-observed effective-tool preparation, active winner selection, exact per-turn `context.tools` snapshots, compatibility-profile evaluation, runtime-generation validity, and dispatch pinning.

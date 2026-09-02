@@ -2,7 +2,7 @@
 
 ## 1. Scope
 
-This specification defines the child-side terminal input barrier and completion-persistence state for one `pi-herdr-subagents` generation. It owns how `pane-child` treats an `input` event while a `subagent_done` Result is being persisted and after the first successful persistence but before child shutdown completes. Collector/Q1 real-environment acceptance has been withdrawn and is not part of this product authority.
+This specification defines the child-side terminal input barrier and completion-persistence state for one `@settingdust/pi-herdr-subagents` generation. It owns how `pane-child` treats an `input` event while a `subagent_done` Result is being persisted and after the first successful persistence but before child shutdown completes. Collector/Q1 real-environment acceptance has been withdrawn and is not part of this product authority.
 
 Implementation provenance is recorded in the derived Work documents: `extensions/pane-child.ts` and `tests/pane-child.test.ts` are committed in `2a49f9936cc3c6e76041696ea11004a1afbf93ff`, while this #18 documentation/evidence set remains uncommitted until a later documentation commit.
 

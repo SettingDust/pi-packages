@@ -2,7 +2,7 @@
 
 ## 1. Authority And Reconciliation Status
 
-This document is the normative lifecycle authority for the three already-submitted `pi-herdr-subagents` runtime behaviors covered by:
+This document is the normative lifecycle authority for the three already-submitted `@settingdust/pi-herdr-subagents` runtime behaviors covered by:
 
 - persistent runtime task recovery;
 - terminal completion notification; and

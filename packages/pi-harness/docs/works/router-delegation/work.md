@@ -2,7 +2,7 @@
 
 ## Goal
 
-Implement the first publishable `pi-harness` package: an always-on Router extension, dynamically constrained delegation resolver, user Model Role TUI, and backend-neutral Handler Agent definition.
+Implement the first publishable `@settingdust/pi-harness` package: an always-on Router extension, dynamically constrained delegation resolver, user Model Role TUI, and backend-neutral Handler Agent definition.
 
 ## Authoritative Inputs
 

@@ -35,7 +35,7 @@ Included:
 - exact `context.tools` object binding for provider definitions and execute closure;
 - deterministic duplicate winner, run/turn generation, revocation, reload, and stale callback behavior;
 - exact loader-resolved path matching and narrowly scoped reviewed digest compatibility evidence;
-- `effective-tool-compatibility/v1` and `pi-herdr-subagents/subagent_spawn` profile fixture contract;
+- `effective-tool-compatibility/v1` and `@settingdust/pi-herdr-subagents/subagent_spawn` profile fixture contract;
 - #36 contributors, #3 consumer, and integrated verification.
 
 Excluded:

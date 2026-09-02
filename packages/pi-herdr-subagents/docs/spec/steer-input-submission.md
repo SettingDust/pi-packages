@@ -2,7 +2,7 @@
 
 ## 1. Scope
 
-This specification defines how `pi-herdr-subagents` submits a `subagent_steer` message to a running child Pi pane. It owns submission behavior, tool success and failure semantics, and acceptance conditions. It does not change task lifecycle, Result retrieval, or the public tool schema.
+This specification defines how `@settingdust/pi-herdr-subagents` submits a `subagent_steer` message to a running child Pi pane. It owns submission behavior, tool success and failure semantics, and acceptance conditions. It does not change task lifecycle, Result retrieval, or the public tool schema.
 
 ## 2. Public Tool Contract
 

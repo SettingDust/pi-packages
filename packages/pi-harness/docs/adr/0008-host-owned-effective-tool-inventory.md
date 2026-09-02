@@ -79,7 +79,7 @@ Negative:
 
 ## Compatibility and Migration
 
-The first profile is `pi-herdr-subagents/subagent_spawn` v1. It records Pi/agent-core versions, platform/runtime, configured/resolved paths, reviewed digest scope, semantic fields, execution options, snapshot binding, and the Router/Harness read path. Existing tool definitions remain the contributor format. No persistent user/task migration is required. Reload starts a new run generation; old callbacks and calls fail stale.
+The first profile is `@settingdust/pi-herdr-subagents/subagent_spawn` v1. It records Pi/agent-core versions, platform/runtime, configured/resolved paths, reviewed digest scope, semantic fields, execution options, snapshot binding, and the Router/Harness read path. Existing tool definitions remain the contributor format. No persistent user/task migration is required. Reload starts a new run generation; old callbacks and calls fail stale.
 
 ## Revisit Criteria
 

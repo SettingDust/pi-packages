@@ -176,7 +176,7 @@ A prior temporary fixture and collector reported the contract and observations b
 The historical report states the temporary test/collector created one run-owned root per attempt with Node-compatible APIs:
 
 ```ts
-const runRoot = await mkdtemp(join(tmpdir(), "pi-herdr-task29-real-"));
+const runRoot = await mkdtemp(join(tmpdir(), "@settingdust/pi-herdr-task29-real-"));
 const fixturePath = join(runRoot, "task29-explicit-spawn-model-validation.ts");
 const runtimeRoot = join(runRoot, "runtime-root");
 ```

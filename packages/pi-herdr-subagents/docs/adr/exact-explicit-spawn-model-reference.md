@@ -8,7 +8,7 @@
 
 ## Context
 
-Pi `0.84.2` supports broad model resolution for CLI/interactive UX. Its private resolver can match exact references, scoped models, shorthand, names, fuzzy substrings, and custom fallbacks. Before the previously authorized #29 implementation, `pi-herdr-subagents` forwarded an explicit model without preflight validation and combined model/thinking into one `--model` value inside shared spawn/resume launch code.
+Pi `0.84.2` supports broad model resolution for CLI/interactive UX. Its private resolver can match exact references, scoped models, shorthand, names, fuzzy substrings, and custom fallbacks. Before the previously authorized #29 implementation, `@settingdust/pi-herdr-subagents` forwarded an explicit model without preflight validation and combined model/thinking into one `--model` value inside shared spawn/resume launch code.
 
 Background admission is a different boundary: a child-side failure occurs after identity, files, runtime state, Herdr surface, and notification consequences. The selected requirement is side-effect-free rejection using Pi's public per-invocation registry snapshot, without copying private resolution policy.
 

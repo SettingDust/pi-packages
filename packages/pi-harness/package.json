@@ -1,5 +1,5 @@
 {
-  "name": "pi-harness",
+  "name": "@settingdust/pi-harness",
   "version": "0.1.0",
   "description": "A Router and delegated-work protocol for Pi",
   "keywords": ["pi-package"],

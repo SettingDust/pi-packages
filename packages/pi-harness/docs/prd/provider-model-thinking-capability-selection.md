@@ -37,7 +37,7 @@ Success means a valid request resolves to the deterministic minimum-qualified ca
 
 Included: package-local settings parsing/normalization, `/harness config` candidate replacement UX, Resolver schema/input/output changes, Router prompt and delegation mapping, focused tests, and package-local documentation reconciliation.
 
-Excluded: `pi-herdr-subagents`, any delegate backend change, Pi core/Host changes, new dependencies, settings/session/runtime mutation outside existing package behavior, automatic migration, fallback, cross-provider policy, and Git operations.
+Excluded: `@settingdust/pi-herdr-subagents`, any delegate backend change, Pi core/Host changes, new dependencies, settings/session/runtime mutation outside existing package behavior, automatic migration, fallback, cross-provider policy, and Git operations.
 
 ## Success criteria
 

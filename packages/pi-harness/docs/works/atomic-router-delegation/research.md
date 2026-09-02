@@ -1,4 +1,4 @@
-# T1 Research: `pi-herdr-subagents` Source-Mapping Baseline
+# T1 Research: `@settingdust/pi-herdr-subagents` Source-Mapping Baseline
 
 - Status: reproducible historical/source baseline; it cannot prove a future or current model-visible registration; not authority, acceptance, or implementation authorization
 - Work: [Atomic Router Delegation](work.md)
@@ -8,7 +8,7 @@
 
 ## Objective and Boundary
 
-T1 establishes the reusable package-owned source mapping required by `tasks.md` T1 for the first `pi-herdr-subagents` `subagent_spawn` profile. It does not inspect, enumerate, invoke, or prove the `subagent_spawn` schema and description model-visible in a future or current parent Router pass.
+T1 establishes the reusable package-owned source mapping required by `tasks.md` T1 for the first `@settingdust/pi-herdr-subagents` `subagent_spawn` profile. It does not inspect, enumerate, invoke, or prove the `subagent_spawn` schema and description model-visible in a future or current parent Router pass.
 
 No source, tests, settings, Git history, Herdr state, or subagent lifecycle were changed or called for this research. The completed prior T1 trace Result was treated as input; the source ranges below were independently rechecked where available in this Handler.
 

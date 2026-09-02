@@ -59,7 +59,7 @@ The production implementation boundary remains the parent notification coordinat
 - Focused F8 test: `bun test packages/pi-herdr-subagents/tests/runtime.test.ts --test-name-pattern "F8"` passed (1 test).
 - Package typecheck passed with `bun run --cwd packages/pi-herdr-subagents typecheck`.
 - Package tests passed: 100 tests, 0 failures.
-- Workspace typechecks passed for `pi-herdr`, `pi-harness`, and `pi-herdr-subagents`.
+- Workspace typechecks passed for `@settingdust/pi-herdr`, `@settingdust/pi-harness`, and `@settingdust/pi-herdr-subagents`.
 - Workspace tests passed: 200 tests, 0 failures.
 - The supplied independent review found no P0/P1/P2 correctness defect and identified F8 as its only evidence gap; this unit closes that gap. A fresh post-amendment independent review remains part of the final commit gate.
 
