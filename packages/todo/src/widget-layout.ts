@@ -2,8 +2,8 @@ import { truncateToWidth, visibleWidth } from "@earendil-works/pi-tui";
 import type { Theme } from "@earendil-works/pi-coding-agent";
 
 import { TODO_SEPARATOR_GLYPH, TODO_TRUNCATION_GLYPH, WORKING_SPINNER_FRAMES, todoGlyph } from "./glyphs.js";
-import { currentTodoPhaseIndex } from "./state.js";
-import { isTerminalTodo, todoTaskPriority, type Todo, type TodoPhase, type TodoState } from "./types.js";
+import { deriveActiveTask } from "./state.js";
+import type { Todo, TodoState, TodoTask } from "./types.js";
 
 export type TodoWidgetLayoutOptions = {
   maxVisible?: number;
@@ -12,8 +12,7 @@ export type TodoWidgetLayoutOptions = {
 };
 
 type ThemeLike = Partial<Pick<Theme, "bold" | "fg" | "strikethrough">>;
-
-type DisplayTask = Todo & { taskIndex: number };
+type DisplayTodo = Todo & { todoIndex: number };
 
 /** Produces compact widget rows constrained to the supplied display width. */
 export function renderTodoWidgetLines(
@@ -23,27 +22,27 @@ export function renderTodoWidgetLines(
   options: TodoWidgetLayoutOptions = {},
 ): string[] {
   const safeWidth = Math.max(1, Math.floor(width) || 1);
-  const phases = state?.phases ?? [];
-  const selectedPhaseIndex = selectedTodoPhaseIndex(phases);
-  if (selectedPhaseIndex < 0) return [];
-  const selectedPhase = phases[selectedPhaseIndex];
+  const tasks = state?.tasks ?? [];
+  const selectedTaskIndex = selectedTodoTaskIndex(tasks);
+  if (selectedTaskIndex < 0) return [];
+  const selectedTask = tasks[selectedTaskIndex];
   const maxVisible = boundedMaxVisible(options.maxVisible);
-  const selectedTasks = visibleTasks(selectedPhase.tasks, maxVisible);
+  const selectedTodos = visibleTodos(selectedTask.todos, maxVisible);
   const lines: string[] = [fit(toolTitle("Todos", theme), safeWidth)];
 
-  for (let phaseIndex = 0; phaseIndex < phases.length; phaseIndex++) {
-    const phase = phases[phaseIndex];
-    const selected = phaseIndex === selectedPhaseIndex;
-    lines.push(fit(renderTodoPhaseTitle(phase, phaseIndex, selected, theme), safeWidth));
+  for (let taskIndex = 0; taskIndex < tasks.length; taskIndex += 1) {
+    const task = tasks[taskIndex];
+    const selected = taskIndex === selectedTaskIndex;
+    lines.push(fit(renderTodoTaskTitle(task, taskIndex, selected, theme), safeWidth));
 
     if (selected) {
-      for (const task of selectedTasks) {
-        lines.push(fit(renderTodoTaskLine(task, theme, options.fallbackGlyphs), safeWidth));
+      for (const todo of selectedTodos) {
+        lines.push(fit(renderTodoLine(todo, theme, options.fallbackGlyphs), safeWidth));
       }
-      const openTasks = phase.tasks.filter(task => !isTerminalTodo(task));
-      const hidden = openTasks.length - selectedTasks.length;
+      const openTodos = task.todos.filter((todo) => !isTerminal(todo));
+      const hidden = openTodos.length - selectedTodos.length;
       if (hidden > 0) lines.push(fit(`    +${hidden} more`, safeWidth));
-      const terminalSummary = terminalTaskSummary(phase.tasks);
+      const terminalSummary = terminalTodoSummary(task.todos);
       if (terminalSummary) {
         const line = `    + ${terminalSummary}`;
         lines.push(fit(theme?.fg ? theme.fg("muted", line) : line, safeWidth));
@@ -61,14 +60,16 @@ export function renderTodoWidgetLines(
   return lines.map((line) => line ? fit(` ${line}`, safeWidth) : line);
 }
 
-export function selectedTodoPhaseIndex(phases: readonly TodoPhase[]): number {
-  const currentPhaseIndex = currentTodoPhaseIndex(phases);
-  return currentPhaseIndex >= 0 ? currentPhaseIndex : lastNonEmptyPhaseIndex(phases);
+export function selectedTodoTaskIndex(tasks: readonly TodoTask[]): number {
+  const activeTask = deriveActiveTask(tasks);
+  if (activeTask) return tasks.indexOf(activeTask);
+  const openTaskIndex = tasks.findIndex((task) => task.todos.some((todo) => !isTerminal(todo)));
+  return openTaskIndex >= 0 ? openTaskIndex : lastNonEmptyTaskIndex(tasks);
 }
 
-function lastNonEmptyPhaseIndex(phases: readonly TodoPhase[]): number {
-  for (let index = phases.length - 1; index >= 0; index -= 1) {
-    if (phases[index].tasks.length > 0) return index;
+function lastNonEmptyTaskIndex(tasks: readonly TodoTask[]): number {
+  for (let index = tasks.length - 1; index >= 0; index -= 1) {
+    if (tasks[index].todos.length > 0) return index;
   }
   return -1;
 }
@@ -78,10 +79,10 @@ function boundedMaxVisible(value: number | undefined): number {
   return Math.max(1, Math.floor(value));
 }
 
-export function renderTodoPhaseTitle(phase: TodoPhase, phaseIndex: number, selected: boolean, theme: ThemeLike | undefined): string {
-  const title = `  ${phaseIndex + 1}. ${phase.name}`;
-  const terminal = phase.tasks.filter(isTerminalTodo).length;
-  const progress = `${TODO_SEPARATOR_GLYPH} ${terminal}/${phase.tasks.length}`;
+export function renderTodoTaskTitle(task: TodoTask, taskIndex: number, selected: boolean, theme: ThemeLike | undefined): string {
+  const title = `  ${taskIndex + 1}. ${task.name}`;
+  const terminal = task.todos.filter(isTerminal).length;
+  const progress = `${TODO_SEPARATOR_GLYPH} ${terminal}/${task.todos.length}`;
   if (!selected) {
     const line = `${title} ${progress}`;
     return theme?.fg ? theme.fg("muted", line) : line;
@@ -95,38 +96,41 @@ function toolTitle(text: string, theme: ThemeLike | undefined): string {
   return theme?.fg ? theme.fg("toolTitle", bold) : bold;
 }
 
-function visibleTasks(tasks: readonly Todo[], maxVisible: number): DisplayTask[] {
-  const ordered = tasks
-    .map((task, taskIndex) => ({ ...task, taskIndex }))
-    .filter(task => !isTerminalTodo(task))
-    .sort((left, right) => todoTaskPriority(left) - todoTaskPriority(right) || left.taskIndex - right.taskIndex);
-  const active = ordered.filter(isActive);
+function visibleTodos(todos: readonly Todo[], maxVisible: number): DisplayTodo[] {
+  const ordered = todos
+    .map((todo, todoIndex) => ({ ...todo, todoIndex }))
+    .filter((todo) => !isTerminal(todo))
+    .sort((left, right) => todoPriority(left) - todoPriority(right) || left.todoIndex - right.todoIndex);
+  const active = ordered.filter((todo) => todo.status === "in_progress");
   return active.length > maxVisible ? active : ordered.slice(0, maxVisible);
 }
 
-export function renderTodoTaskLine(task: Todo, theme: ThemeLike | undefined, fallbackGlyphs = false): string {
-  const marker = todoGlyph(task.status, fallbackGlyphs);
-  const color = task.status === "in_progress" ? "text" : task.status === "completed" ? "success" : "muted";
-  const name = isTerminalTodo(task) && theme?.strikethrough
-    ? theme.strikethrough(task.name)
-    : task.name;
+export function renderTodoLine(todo: Todo, theme: ThemeLike | undefined, fallbackGlyphs = false): string {
+  const marker = todoGlyph(todo.status, fallbackGlyphs);
+  const color = todo.status === "in_progress" ? "text" : todo.status === "completed" ? "success" : "muted";
+  const name = isTerminal(todo) && theme?.strikethrough
+    ? theme.strikethrough(todo.name)
+    : todo.name;
   const line = `    ${marker} ${name}`;
-  if (!theme?.fg) return line;
-  return theme.fg(color, line);
+  return theme?.fg ? theme.fg(color, line) : line;
 }
 
-function terminalTaskSummary(tasks: readonly Todo[]): string | undefined {
-  const completed = tasks.filter(task => task.status === "completed").length;
-  const cancelled = tasks.filter(task => task.status === "cancelled").length;
+function terminalTodoSummary(todos: readonly Todo[]): string | undefined {
+  const completed = todos.filter((todo) => todo.status === "completed").length;
+  const cancelled = todos.filter((todo) => todo.status === "cancelled").length;
   const parts = [
-    ...(completed ? [`${completed} complete ${completed === 1 ? "task" : "tasks"}`] : []),
-    ...(cancelled ? [`${cancelled} cancelled ${cancelled === 1 ? "task" : "tasks"}`] : []),
+    ...(completed ? [`${completed} complete ${completed === 1 ? "todo" : "todos"}`] : []),
+    ...(cancelled ? [`${cancelled} cancelled ${cancelled === 1 ? "todo" : "todos"}`] : []),
   ];
   return parts.length > 0 ? parts.join(` ${TODO_SEPARATOR_GLYPH} `) : undefined;
 }
 
-function isActive(task: Todo): boolean {
-  return task.status === "in_progress";
+function isTerminal(todo: Todo): boolean {
+  return todo.status === "completed" || todo.status === "cancelled";
+}
+
+function todoPriority(todo: Todo): number {
+  return todo.status === "in_progress" ? 0 : todo.status === "pending" ? 1 : 2;
 }
 
 function fit(line: string, width: number): string {

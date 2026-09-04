@@ -1,244 +1,119 @@
 import {
-  TODO_ACTIONS,
-  TODO_STATUSES,
-  isTodoActionName,
   isTodoStatus,
-  type TodoAction,
-  type TodoActionName,
-  type TodoPhase,
-  type TodoPhaseInput,
+  type Todo,
+  type TodoAddRequest,
+  type TodoCreation,
+  type TodoSetRequest,
   type TodoState,
   type TodoStatus,
-  type TodoTransitionInput,
+  type TodoTask,
+  type TodoTaskCreation,
+  type TodoTransition,
+  type TodoTransitionRequest,
+  type TodoViewRequest,
 } from "./types.js";
 
 export function createTodoState(): TodoState {
-  return { phases: [] };
+  return { tasks: [] };
 }
 
 export function cloneTodoState(state: TodoState): TodoState {
-  return {
-    phases: state.phases.map((phase) => ({
-      name: phase.name,
-      tasks: phase.tasks.map((task) => ({ ...task })),
-    })),
-    ...(state.workingOn === undefined ? {} : { workingOn: state.workingOn }),
-  };
+  assertTodoState(state);
+  return canonicalState(state.tasks);
 }
 
-/** Applies an action atomically without mutating the supplied state or action. */
-export function transitionTodoState(state: TodoState, value: unknown): TodoState {
-  assertTodoState(state);
-  const action = parseTodoAction(value);
+export function deriveActiveTask(tasks: readonly TodoTask[]): TodoTask | undefined {
+  return tasks.find((task) => task.todos.some((todo) => todo.status === "in_progress"));
+}
 
-  let next: TodoState;
-  switch (action.action) {
-    case "set":
-      next = { phases: action.phases.map(newPhase) };
-      break;
-    case "add":
-      next = addPhases(state, action.phases);
-      break;
-    case "transition":
-      next = applyTransitions(state, action.transitions, action.workingOn);
-      break;
-    case "view":
-      next = state;
-      break;
+export function deriveWorkingOn(tasks: readonly TodoTask[]): string | undefined {
+  return deriveActiveTask(tasks)?.todos.find((todo) => todo.status === "in_progress")?.description;
+}
+
+export function applyTodoSet(request: TodoSetRequest): TodoState {
+  const parsed = parseTodoSetRequest(request);
+  const tasks = parsed.tasks.map((task) => ({
+    name: task.name,
+    todos: task.todos.map((todo) => ({ ...todo, status: "pending" as const })),
+  }));
+  return canonicalState(tasks);
+}
+
+export function applyTodoAdd(state: TodoState, request: TodoAddRequest): TodoState {
+  assertTodoState(state);
+  const parsed = parseTodoAddRequest(request);
+  const target = state.tasks.find((task) => task.name === parsed.task);
+  if (!target) throw new Error("Todo task does not exist.");
+
+  const todoNames = new Set(target.todos.map((todo) => todo.name));
+  for (const todo of parsed.todos) {
+    if (todoNames.has(todo.name)) throw new Error("Duplicate todo name.");
+    todoNames.add(todo.name);
   }
 
-  assertTodoState(next);
+  return canonicalState(state.tasks.map((task) => task.name !== parsed.task
+    ? task
+    : { ...task, todos: [...task.todos, ...parsed.todos.map((todo) => ({ ...todo, status: "pending" as const }))] }));
+}
+
+export function applyTodoTransition(state: TodoState, request: TodoTransitionRequest): TodoState {
+  assertTodoState(state);
+  const parsed = parseTodoTransitionRequest(request);
+  const changes = new Map<string, TodoStatus>();
+  for (const transition of parsed.transitions) {
+    const key = transitionKey(transition.task, transition.todo);
+    const task = state.tasks.find((candidate) => candidate.name === transition.task);
+    if (!task || !task.todos.some((todo) => todo.name === transition.todo)) {
+      throw new Error("Todo transition target does not exist.");
+    }
+    changes.set(key, transition.status);
+  }
+
+  const next = canonicalState(state.tasks.map((task) => ({
+    ...task,
+    todos: task.todos.map((todo) => {
+      const status = changes.get(transitionKey(task.name, todo.name));
+      return status === undefined ? todo : { ...todo, status };
+    }),
+  })));
+  if (parsed.workingOn !== undefined && parsed.workingOn !== next.workingOn) {
+    throw new Error("workingOn does not match the derived active todo.");
+  }
   return next;
 }
 
-function newPhase(input: TodoPhaseInput): TodoPhase {
+export function parseTodoSetRequest(value: unknown): TodoSetRequest {
+  const input = exactObject(value, ["tasks"]);
+  if (!Array.isArray(input.tasks)) throw new Error("tasks must be an array.");
+  const tasks = input.tasks.map(parseTodoTaskCreation);
+  assertUnique(tasks.map((task) => task.name), "Duplicate task name.");
+  return { tasks };
+}
+
+export function parseTodoAddRequest(value: unknown): TodoAddRequest {
+  const input = exactObject(value, ["task", "todos"]);
+  if (!Array.isArray(input.todos) || input.todos.length === 0) throw new Error("todos must be a non-empty array.");
+  const todos = input.todos.map(parseTodoCreation);
+  assertUnique(todos.map((todo) => todo.name), "Duplicate todo name.");
+  return { task: todoString(input.task), todos };
+}
+
+export function parseTodoTransitionRequest(value: unknown): TodoTransitionRequest {
+  const input = exactObject(value, ["transitions"], ["workingOn"]);
+  if (!Array.isArray(input.transitions) || input.transitions.length === 0) {
+    throw new Error("transitions must be a non-empty array.");
+  }
+  const transitions = input.transitions.map(parseTodoTransition);
+  assertUnique(transitions.map((transition) => transitionKey(transition.task, transition.todo)), "Duplicate transition target.");
   return {
-    name: input.name,
-    tasks: input.tasks.map((task) => ({ ...task, status: "pending" })),
+    transitions,
+    ...(input.workingOn === undefined ? {} : { workingOn: todoString(input.workingOn) }),
   };
 }
 
-function addPhases(state: TodoState, inputs: readonly TodoPhaseInput[]): TodoState {
-  const existingPhases = new Map(state.phases.map((phase) => [phase.name, phase]));
-  for (const input of inputs) {
-    const phase = existingPhases.get(input.name);
-    if (!phase) continue;
-
-    const taskNames = new Set(phase.tasks.map((task) => task.name));
-    for (const task of input.tasks) {
-      if (taskNames.has(task.name)) throw new Error(`Duplicate task name in phase ${input.name}: ${task.name}.`);
-      taskNames.add(task.name);
-    }
-  }
-
-  const additions = new Map(inputs.map((phase) => [phase.name, phase.tasks]));
-  const phases = state.phases.map((phase) => {
-    const tasks = additions.get(phase.name);
-    return !tasks
-      ? phase
-      : { ...phase, tasks: [...phase.tasks, ...tasks.map((task) => ({ ...task, status: "pending" as const }))] };
-  });
-
-  for (const input of inputs) {
-    if (!existingPhases.has(input.name)) phases.push(newPhase(input));
-  }
-  return { ...state, phases };
-}
-
-function applyTransitions(
-  state: TodoState,
-  transitions: readonly TodoTransitionInput[],
-  workingOn: string | undefined,
-): TodoState {
-  if (transitions.length === 0) throw new Error("transition requires at least one status change.");
-
-  const statuses = new Map<string, TodoStatus>();
-  for (const transition of transitions) {
-    const key = todoAddressKey(transition.phase, transition.task);
-    if (statuses.has(key)) {
-      throw new Error(`Task may only be transitioned once per call: ${transition.phase} / ${transition.task}.`);
-    }
-
-    const phase = state.phases.find((candidate) => candidate.name === transition.phase);
-    if (!phase) throw new Error(phaseNotFoundMessage(state.phases, transition.phase));
-    if (!phase.tasks.some((candidate) => candidate.name === transition.task)) {
-      throw new Error(taskNotFoundMessage(phase, transition.task));
-    }
-    statuses.set(key, transition.status);
-  }
-
-  const phases = state.phases.map((phase) => ({
-    ...phase,
-    tasks: phase.tasks.map((task) => {
-      const status = statuses.get(todoAddressKey(phase.name, task.name));
-      return status === undefined ? task : { ...task, status };
-    }),
-  }));
-  const hasActiveTasks = phases.some((phase) => phase.tasks.some((task) => task.status === "in_progress"));
-  if (!hasActiveTasks) return { phases };
-  if (workingOn === undefined) {
-    throw new Error("transition requires workingOn when tasks remain in_progress.");
-  }
-  return { phases, workingOn };
-}
-
-function parseTodoAction(value: unknown): TodoAction {
-  const input = record(value, "Todo action");
-  const action = actionName(input.action);
-
-  switch (action) {
-    case "set":
-    case "add":
-      assertOnlyFields(input, ["action", "phases"], action);
-      return { action, phases: parsePhases(input.phases) };
-    case "transition":
-      assertOnlyFields(input, ["action", "transitions", "workingOn"], action);
-      return {
-        action,
-        transitions: parseTransitions(input.transitions),
-        ...(input.workingOn === undefined
-          ? {}
-          : { workingOn: name(input.workingOn, "transition workingOn") }),
-      };
-    case "view":
-      assertOnlyFields(input, ["action"], action);
-      return { action };
-  }
-}
-
-function parsePhases(value: unknown): TodoPhaseInput[] {
-  if (!Array.isArray(value)) throw new Error("phases must be an array.");
-  if (value.length === 0) throw new Error("phases must contain at least one phase.");
-  const phases = value.map((item, phaseIndex) => {
-    const input = record(item, `phases[${phaseIndex}]`);
-    assertOnlyFields(input, ["name", "tasks"], `phases[${phaseIndex}]`);
-    const phaseName = name(input.name, `phases[${phaseIndex}].name`);
-    if (!Array.isArray(input.tasks)) throw new Error(`phases[${phaseIndex}].tasks must be an array.`);
-    if (input.tasks.length === 0) throw new Error(`phases[${phaseIndex}].tasks must contain at least one task.`);
-    const tasks = input.tasks.map((task, taskIndex) => {
-      const label = `phases[${phaseIndex}].tasks[${taskIndex}]`;
-      const taskInput = record(task, label);
-      assertOnlyFields(taskInput, ["name", "description"], label);
-      return {
-        name: name(taskInput.name, `${label}.name`),
-        description: name(taskInput.description, `${label}.description`),
-      };
-    });
-    assertUnique(tasks.map((task) => task.name), (task) => `Duplicate task name in phase ${phaseName}: ${task}.`);
-    return { name: phaseName, tasks };
-  });
-  assertUnique(phases.map((phase) => phase.name), (phase) => `Duplicate phase name: ${phase}.`);
-  return phases;
-}
-
-function parseTransitions(value: unknown): TodoTransitionInput[] {
-  if (!Array.isArray(value)) throw new Error("transitions must be an array.");
-  return value.map((item, index) => {
-    const input = record(item, `transitions[${index}]`);
-    assertOnlyFields(input, ["phase", "task", "status"], `transitions[${index}]`);
-    return {
-      phase: name(input.phase, `transitions[${index}].phase`),
-      task: name(input.task, `transitions[${index}].task`),
-      status: status(input.status, `transitions[${index}].status`),
-    };
-  });
-}
-
-function record(value: unknown, label: string): Record<string, unknown> {
-  if (!value || typeof value !== "object" || Array.isArray(value)) throw new Error(`${label} must be an object.`);
-  return value as Record<string, unknown>;
-}
-
-function name(value: unknown, label: string): string {
-  if (typeof value !== "string" || value.trim() === "") throw new Error(`${label} must be a non-empty string.`);
-  if (value !== value.trim()) throw new Error(`${label} must not have leading or trailing whitespace.`);
-  return value;
-}
-
-function actionName(value: unknown): TodoActionName {
-  if (!isTodoActionName(value)) throw new Error(`Todo action must be one of: ${TODO_ACTIONS.join(", ")}.`);
-  return value;
-}
-
-function status(value: unknown, label: string): TodoStatus {
-  if (!isTodoStatus(value)) throw new Error(`${label} must be one of: ${TODO_STATUSES.join(", ")}.`);
-  return value;
-}
-
-function assertOnlyFields(input: Record<string, unknown>, allowed: readonly string[], label: string): void {
-  const unexpected = Object.keys(input).find((key) => !allowed.includes(key));
-  if (unexpected) throw new Error(`${label} does not accept field: ${unexpected}.`);
-}
-
-function assertUnique(values: readonly string[], message: (value: string) => string): void {
-  const seen = new Set<string>();
-  for (const value of values) {
-    if (seen.has(value)) throw new Error(message(value));
-    seen.add(value);
-  }
-}
-
-function phaseNotFoundMessage(phases: readonly TodoPhase[], phaseName: string): string {
-  const names = phases.map((phase) => `- ${phase.name}`).join("\n");
-  return names ? `Phase not found: ${phaseName}.\n\nCurrent phases:\n${names}` : `Phase not found: ${phaseName}. The todo plan is empty.`;
-}
-
-function taskNotFoundMessage(phase: TodoPhase, taskName: string): string {
-  const names = phase.tasks.map((task) => `- ${task.name}`).join("\n");
-  return names
-    ? `Task not found: ${phase.name} / ${taskName}.\n\nCurrent tasks in ${phase.name}:\n${names}`
-    : `Task not found: ${phase.name} / ${taskName}. Phase ${phase.name} has no tasks.`;
-}
-
-export function todoAddressKey(phase: string, task: string): string {
-  return `${phase}\0${task}`;
-}
-
-export function currentTodoPhaseIndex(phases: readonly TodoPhase[]): number {
-  const active = phases.findIndex((phase) => phase.tasks.some((task) => task.status === "in_progress"));
-  return active >= 0
-    ? active
-    : phases.findIndex((phase) => phase.tasks.some((task) => task.status === "pending"));
+export function parseTodoViewRequest(value: unknown): TodoViewRequest {
+  exactObject(value, []);
+  return {};
 }
 
 export function isTodoState(value: unknown): value is TodoState {
@@ -250,50 +125,96 @@ export function isTodoState(value: unknown): value is TodoState {
   }
 }
 
-function assertTodoState(value: unknown): asserts value is TodoState {
-  if (!value || typeof value !== "object" || !Array.isArray((value as { phases?: unknown }).phases)) {
-    throw new Error("Invalid todo state.");
+export function assertTodoState(value: unknown): asserts value is TodoState {
+  const input = exactObject(value, ["tasks"], ["workingOn"]);
+  if (!Array.isArray(input.tasks)) throw new Error("tasks must be an array.");
+
+  const tasks = input.tasks.map((task) => {
+    const group = exactObject(task, ["name", "todos"]);
+    if (!Array.isArray(group.todos)) throw new Error("todos must be an array.");
+    return {
+      name: todoString(group.name),
+      todos: group.todos.map((todo) => {
+        const item = exactObject(todo, ["name", "description", "status"]);
+        if (!isTodoStatus(item.status)) throw new Error("Invalid todo status.");
+        return { name: todoString(item.name), description: todoString(item.description), status: item.status };
+      }),
+    };
+  });
+  assertTaskShape(tasks);
+
+  const derived = deriveWorkingOn(tasks);
+  if (input.workingOn !== undefined && todoString(input.workingOn) !== derived) {
+    throw new Error("workingOn does not match the derived active todo.");
   }
+  if (input.workingOn === undefined && derived !== undefined) {
+    throw new Error("workingOn is required for an active todo.");
+  }
+}
 
-  const state = value as { phases: unknown[]; workingOn?: unknown };
-  const workingOn = state.workingOn === undefined ? undefined : name(state.workingOn, "workingOn");
-  const phaseNames = new Set<string>();
-  let activePhase: string | undefined;
+function canonicalState(tasks: readonly TodoTask[]): TodoState {
+  const copied = tasks.map((task) => ({
+    name: task.name,
+    todos: task.todos.map((todo) => ({ ...todo })),
+  }));
+  assertTaskShape(copied);
+  const workingOn = deriveWorkingOn(copied);
+  return workingOn === undefined ? { tasks: copied } : { tasks: copied, workingOn };
+}
 
-  for (const value of state.phases) {
-    if (!value || typeof value !== "object" || !Array.isArray((value as { tasks?: unknown }).tasks)) {
-      throw new Error("Invalid todo state.");
+function parseTodoTaskCreation(value: unknown): TodoTaskCreation {
+  const input = exactObject(value, ["name", "todos"]);
+  if (!Array.isArray(input.todos)) throw new Error("todos must be an array.");
+  const todos = input.todos.map(parseTodoCreation);
+  assertUnique(todos.map((todo) => todo.name), "Duplicate todo name.");
+  return { name: todoString(input.name), todos };
+}
+
+function parseTodoCreation(value: unknown): TodoCreation {
+  const input = exactObject(value, ["name", "description"]);
+  return { name: todoString(input.name), description: todoString(input.description) };
+}
+
+function parseTodoTransition(value: unknown): TodoTransition {
+  const input = exactObject(value, ["task", "todo", "status"]);
+  if (!isTodoStatus(input.status)) throw new Error("Invalid todo status.");
+  return { task: todoString(input.task), todo: todoString(input.todo), status: input.status };
+}
+
+function assertTaskShape(tasks: readonly TodoTask[]): void {
+  assertUnique(tasks.map((task) => task.name), "Duplicate task name.");
+  for (const task of tasks) {
+    todoString(task.name);
+    assertUnique(task.todos.map((todo) => todo.name), "Duplicate todo name.");
+    for (const todo of task.todos) {
+      todoString(todo.name);
+      todoString(todo.description);
+      if (!isTodoStatus(todo.status)) throw new Error("Invalid todo status.");
     }
-    const phase = value as { name?: unknown; tasks: unknown[] };
-    if (phase.tasks.length === 0) throw new Error("Invalid todo state: phases must contain at least one task.");
-    const phaseName = name(phase.name, "phase name");
-    if (phaseNames.has(phaseName)) throw new Error("Invalid todo state: duplicate phase name.");
-    phaseNames.add(phaseName);
+  }
+}
 
-    const taskNames = new Set<string>();
-    for (const value of phase.tasks) {
-      if (!value || typeof value !== "object") throw new Error("Invalid todo state.");
-      const task = value as { name?: unknown; description?: unknown; status?: unknown };
-      const taskName = name(task.name, "task name");
-      name(task.description, "task description");
-      if (taskNames.has(taskName)) throw new Error("Invalid todo state: duplicate task name.");
-      if (!isTodoStatus(task.status)) throw new Error("Invalid todo state.");
-      if (task.status === "in_progress") {
-        if (activePhase !== undefined && activePhase !== phaseName) {
-          throw new Error(
-            `Invalid todo state: in_progress tasks span conflicting phases: ${activePhase} and ${phaseName}.`,
-          );
-        }
-        activePhase = phaseName;
-      }
-      taskNames.add(taskName);
-    }
+function exactObject(value: unknown, required: readonly string[], optional: readonly string[] = []): Record<string, unknown> {
+  if (!value || typeof value !== "object" || Array.isArray(value)) throw new Error("Value must be an object.");
+  const input = value as Record<string, unknown>;
+  const allowed = new Set([...required, ...optional]);
+  if (Object.keys(input).some((key) => !allowed.has(key)) || required.some((key) => !(key in input))) {
+    throw new Error("Object has an invalid shape.");
   }
+  return input;
+}
 
-  if (activePhase !== undefined && workingOn === undefined) {
-    throw new Error("Invalid todo state: workingOn is required while tasks are in_progress.");
+function todoString(value: unknown): string {
+  if (typeof value !== "string" || value === "" || value !== value.trim()) {
+    throw new Error("Todo text must be trimmed and non-empty.");
   }
-  if (activePhase === undefined && workingOn !== undefined) {
-    throw new Error("Invalid todo state: workingOn requires an in_progress task.");
-  }
+  return value;
+}
+
+function assertUnique(values: readonly string[], message: string): void {
+  if (new Set(values).size !== values.length) throw new Error(message);
+}
+
+function transitionKey(task: string, todo: string): string {
+  return JSON.stringify([task, todo]);
 }

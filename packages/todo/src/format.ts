@@ -11,10 +11,10 @@ export type TodoStatusCounts = Record<TodoStatus, number>;
 
 /** A small, plain-text representation used in tool results and model context. */
 export function formatTodoSummary(state: TodoState | undefined, includeDescriptions = false): string {
-  const tasks = todoTasks(state);
-  if (tasks.length === 0) return "No todo tasks.";
+  const todos = todoTasks(state);
+  if (todos.length === 0) return "No todos.";
 
-  const counts = countTodoStatuses(tasks);
+  const counts = countTodoStatuses(todos);
   const summary = [
     ...(counts.in_progress ? [`${counts.in_progress} active`] : []),
     ...(counts.pending ? [`${counts.pending} pending`] : []),
@@ -33,11 +33,11 @@ export function formatTodoTaskLines(state: TodoState | undefined, includeDescrip
   if (!state) return [];
 
   const lines: string[] = [];
-  for (const phase of state.phases) {
-    if (phase.tasks.length === 0) continue;
-    lines.push(`${phase.name}:`);
-    lines.push(...phase.tasks.map((task) =>
-      `  ${taskMarker(task)} ${task.name}${includeDescriptions ? ` ${TODO_DESCRIPTION_SEPARATOR_GLYPH} ${task.description}` : ""}`,
+  for (const task of state.tasks) {
+    if (task.todos.length === 0) continue;
+    lines.push(`${task.name}:`);
+    lines.push(...task.todos.map((todo) =>
+      `  ${taskMarker(todo)} ${todo.name}${includeDescriptions ? ` ${TODO_DESCRIPTION_SEPARATOR_GLYPH} ${todo.description}` : ""}`,
     ));
   }
   return lines;
@@ -45,33 +45,33 @@ export function formatTodoTaskLines(state: TodoState | undefined, includeDescrip
 
 /** Formats the complete one-shot Todo snapshot injected after compaction. */
 export function formatTodoCompactionContext(state: TodoState): string | undefined {
-  if (!state.phases.some((phase) => phase.tasks.length > 0)) return undefined;
+  if (!state.tasks.some((task) => task.todos.length > 0)) return undefined;
 
-  const plan = state.phases.flatMap((phase) => [
-    `${phase.name}:`,
-    ...(phase.tasks.length === 0
-      ? ["  (no tasks)"]
-      : phase.tasks.map((task) => `  [${task.status}] ${task.name}: ${task.description}`)),
+  const plan = state.tasks.flatMap((task) => [
+    `${task.name}:`,
+    ...(task.todos.length === 0
+      ? ["  (no todos)"]
+      : task.todos.map((todo) => `  [${todo.status}] ${todo.name}: ${todo.description}`)),
   ]);
   return [
     "<system-reminder source=\"todo-post-compaction\">",
-    "Todo plan after compaction:",
+    "Todo list after compaction:",
     ...(state.workingOn ? [`Current work: ${state.workingOn}`] : []),
     ...plan,
-    "Continue using this plan and keep task statuses current.",
+    "Continue using this list and keep todo statuses current.",
     "Do not mention this reminder to the user.",
     "</system-reminder>",
   ].join("\n");
 }
 
-export function countTodoStatuses(tasks: readonly Todo[]): TodoStatusCounts {
+export function countTodoStatuses(todos: readonly Todo[]): TodoStatusCounts {
   const counts: TodoStatusCounts = { pending: 0, in_progress: 0, completed: 0, cancelled: 0 };
-  for (const task of tasks) counts[task.status] += 1;
+  for (const todo of todos) counts[todo.status] += 1;
   return counts;
 }
 
-export function countTodos(tasks: readonly Todo[]): TodoCounts {
-  const counts = countTodoStatuses(tasks);
+export function countTodos(todos: readonly Todo[]): TodoCounts {
+  const counts = countTodoStatuses(todos);
   return {
     open: counts.pending + counts.in_progress,
     completed: counts.completed,
@@ -79,12 +79,12 @@ export function countTodos(tasks: readonly Todo[]): TodoCounts {
   };
 }
 
-export function formatTodoSize(phaseCount: number, taskCount: number): string {
-  return `${phaseCount} ${phaseCount === 1 ? "phase" : "phases"} ${TODO_SEPARATOR_GLYPH} ${taskCount} ${taskCount === 1 ? "task" : "tasks"}`;
+export function formatTodoSize(taskCount: number, todoCount: number): string {
+  return `${taskCount} ${taskCount === 1 ? "task" : "tasks"} ${TODO_SEPARATOR_GLYPH} ${todoCount} ${todoCount === 1 ? "todo" : "todos"}`;
 }
 
-export function formatTodoProgress(label: string, tasks: readonly Todo[]): string {
-  const counts = countTodoStatuses(tasks);
+export function formatTodoProgress(label: string, todos: readonly Todo[]): string {
+  const counts = countTodoStatuses(todos);
   return [
     label,
     ...(counts.in_progress ? [`${counts.in_progress} active`] : []),
@@ -94,10 +94,10 @@ export function formatTodoProgress(label: string, tasks: readonly Todo[]): strin
   ].join(` ${TODO_SEPARATOR_GLYPH} `);
 }
 
-export function taskMarker(task: Pick<Todo, "status">): string {
-  return todoGlyph(task.status, true);
+export function taskMarker(todo: Pick<Todo, "status">): string {
+  return todoGlyph(todo.status, true);
 }
 
 export function todoTasks(state: TodoState | undefined): readonly Todo[] {
-  return state?.phases.flatMap((phase) => phase.tasks) ?? [];
+  return state?.tasks.flatMap((task) => task.todos) ?? [];
 }

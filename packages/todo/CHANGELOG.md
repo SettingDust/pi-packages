@@ -3,7 +3,11 @@
 All notable changes to `@settingdust/pi-todo` will be documented in this file.
 
 ## [Unreleased]
+### Changed
 
+- Replace the phased Todo API with `todo_set`, `todo_add`, `todo_transition`, and `todo_view` over canonical `tasks[].todos[]` state.
+- Make creation pending by default and reserve lifecycle status changes for `todo_transition`; derive `workingOn` from the first in-progress todo.
+- Document the branch-local Host-recorded restore boundary and update public Todo terminology from phases/tasks to tasks/todos.
 ## [0.3.7] - 2026-08-03
 
 ### Changed

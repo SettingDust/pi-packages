@@ -2,8 +2,8 @@ import type { Theme } from "@earendil-works/pi-coding-agent";
 import { Text } from "@earendil-works/pi-tui";
 
 import { formatTodoSize, todoTasks } from "./format.js";
-import { todoTaskPriority, type Todo, type TodoToolDetails } from "./types.js";
-import { renderTodoPhaseTitle, renderTodoTaskLine, selectedTodoPhaseIndex } from "./widget-layout.js";
+import type { Todo, TodoState } from "./types.js";
+import { renderTodoLine, renderTodoTaskTitle, selectedTodoTaskIndex } from "./widget-layout.js";
 
 type ThemeLike = Partial<Pick<Theme, "fg" | "bold" | "strikethrough">>;
 type ThemeColor = Parameters<Theme["fg"]>[0];
@@ -11,36 +11,40 @@ type ThemeColor = Parameters<Theme["fg"]>[0];
 export type TodoRendererOptions = { fallbackGlyphs?: boolean };
 
 export function renderResult(
-  result: { details?: TodoToolDetails; content?: readonly { type?: string; text?: string }[] },
+  result: { details?: { snapshot?: TodoState }; content?: readonly { type?: string; text?: string }[] },
   options: { expanded?: boolean } = {},
   theme?: ThemeLike,
   rendererOptions: TodoRendererOptions = {},
 ): Text {
-  const state = result.details?.state;
+  const state = result.details?.snapshot;
   if (!state) return new Text(fallbackText(result), 0, 0);
 
-  const tasks = todoTasks(state);
+  const todos = todoTasks(state);
   if (options.expanded !== true) {
-    return new Text(paint(theme, "muted", formatTodoSize(state.phases.length, tasks.length)), 0, 0);
+    return new Text(paint(theme, "muted", formatTodoSize(state.tasks.length, todos.length)), 0, 0);
   }
-  if (tasks.length === 0 && state.phases.length === 0) return new Text(paint(theme, "muted", "No todo tasks."), 0, 0);
+  if (todos.length === 0) return new Text(paint(theme, "muted", "No todos."), 0, 0);
 
-  const selectedPhase = selectedTodoPhaseIndex(state.phases);
+  const selectedTask = selectedTodoTaskIndex(state.tasks);
   const lines: string[] = [];
-  for (const [index, phase] of state.phases.entries()) {
-    lines.push(renderTodoPhaseTitle(phase, index, index === selectedPhase, theme));
-    for (const task of orderedTasks(phase.tasks)) {
-      lines.push(renderTodoTaskLine(task, theme, rendererOptions.fallbackGlyphs));
+  for (const [index, task] of state.tasks.entries()) {
+    lines.push(renderTodoTaskTitle(task, index, index === selectedTask, theme));
+    for (const todo of orderedTodos(task.todos)) {
+      lines.push(renderTodoLine(todo, theme, rendererOptions.fallbackGlyphs));
     }
   }
   return new Text(lines.join("\n"), 0, 0);
 }
 
-function orderedTasks(tasks: readonly Todo[]): Todo[] {
-  return tasks
-    .map((task, index) => ({ task, index }))
-    .sort((left, right) => todoTaskPriority(left.task) - todoTaskPriority(right.task) || left.index - right.index)
-    .map(({ task }) => task);
+function orderedTodos(todos: readonly Todo[]): Todo[] {
+  return todos
+    .map((todo, index) => ({ todo, index }))
+    .sort((left, right) => todoPriority(left.todo) - todoPriority(right.todo) || left.index - right.index)
+    .map(({ todo }) => todo);
+}
+
+function todoPriority(todo: Todo): number {
+  return todo.status === "in_progress" ? 0 : todo.status === "pending" ? 1 : 2;
 }
 
 function paint(theme: ThemeLike | undefined, color: ThemeColor, text: string): string {
@@ -48,5 +52,5 @@ function paint(theme: ThemeLike | undefined, color: ThemeColor, text: string): s
 }
 
 function fallbackText(result: { content?: readonly { type?: string; text?: string }[] }): string {
-  return result.content?.find((part) => part.type === "text")?.text || "No todo tasks.";
+  return result.content?.find((part) => part.type === "text")?.text || "No todos.";
 }

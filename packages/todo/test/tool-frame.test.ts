@@ -38,7 +38,7 @@ describe("TodoToolFrame", () => {
     const calls: ThemeCall[] = [];
     const frame = new TodoToolFrame({
       title: "todo",
-      action: "plan",
+      action: "transition",
       state: "pending",
       content: componentContent,
     }, recordingTheme(calls));
@@ -82,7 +82,7 @@ describe("TodoToolFrame", () => {
   it("keeps every line within narrow and normal widths", () => {
     const frame = new TodoToolFrame({
       title: "todo",
-      action: "long-action-name",
+      action: "transition",
       content: "A deliberately long todo result that must wrap safely.",
     });
 

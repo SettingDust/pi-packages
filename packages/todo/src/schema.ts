@@ -1,29 +1,35 @@
 import { StringEnum } from "@earendil-works/pi-ai";
 import { Type } from "typebox";
-import { TODO_ACTIONS, TODO_STATUSES } from "./types.js";
+import { TODO_STATUSES } from "./types.js";
 
-export const TodoTaskSchema = Type.Object({
-  name: Type.String({ description: "Unique task name; ~5–10 words describing what, not how." }),
-  description: Type.String({
-    description: "1–3 sentences expanding on the name with relevant context, constraints, or expected outcome.",
-  }),
+export const TodoCreationSchema = Type.Object({
+  name: Type.String(),
+  description: Type.String(),
 }, { additionalProperties: false });
 
-export const TodoPhaseSchema = Type.Object({
-  name: Type.String({ description: "Unique phase name; 1–2 words." }),
-  tasks: Type.Array(TodoTaskSchema, { minItems: 1 }),
+export const TodoTaskCreationSchema = Type.Object({
+  name: Type.String(),
+  todos: Type.Array(TodoCreationSchema, { minItems: 0 }),
+}, { additionalProperties: false });
+
+export const TodoSetParamsSchema = Type.Object({
+  tasks: Type.Array(TodoTaskCreationSchema, { minItems: 0 }),
+}, { additionalProperties: false });
+
+export const TodoAddParamsSchema = Type.Object({
+  task: Type.String(),
+  todos: Type.Array(TodoCreationSchema, { minItems: 1 }),
 }, { additionalProperties: false });
 
 export const TodoTransitionSchema = Type.Object({
-  phase: Type.String(),
   task: Type.String(),
-  status: StringEnum(TODO_STATUSES, { description: "Status to assign to the task." }),
+  todo: Type.String(),
+  status: StringEnum(TODO_STATUSES),
 }, { additionalProperties: false });
 
-/** Flat provider-facing schema. Action-specific requirements are enforced by the transition. */
-export const TodoParamsSchema = Type.Object({
-  action: StringEnum(TODO_ACTIONS),
-  phases: Type.Optional(Type.Array(TodoPhaseSchema, { minItems: 1 })),
-  transitions: Type.Optional(Type.Array(TodoTransitionSchema, { minItems: 1 })),
-  workingOn: Type.Optional(Type.String({ description: "Concise summary of the current work." })),
+export const TodoTransitionParamsSchema = Type.Object({
+  transitions: Type.Array(TodoTransitionSchema, { minItems: 1 }),
+  workingOn: Type.Optional(Type.String()),
 }, { additionalProperties: false });
+
+export const TodoViewParamsSchema = Type.Object({}, { additionalProperties: false });

@@ -1,0 +1,311 @@
+{
+  "manifestVersion": 1,
+  "work": "packages/todo/docs/works/todo-protocol-redesign/work.md",
+  "entries": [
+    {
+      "path": "packages/todo/CHANGELOG.md",
+      "classification": "public-breaking-doc",
+      "owner": "T8",
+      "baselineSha256": "451be27cbaab9d4b9cf31178272e666de24acce6c185346d2a14c8e9c4182eee"
+    },
+    {
+      "path": "packages/todo/LICENSE",
+      "classification": "excluded",
+      "owner": "none",
+      "baselineSha256": "8fcc992735fe73f43e5549990a0f40f9b56cf1532c9c1ab19bb6559cc557477e"
+    },
+    {
+      "path": "packages/todo/README.md",
+      "classification": "public-breaking-doc",
+      "owner": "T8",
+      "baselineSha256": "1c5e7a7121ad36294c20bb3681fff258a93a4bae2b17c6fba82647fd0a4d6a6f"
+    },
+    {
+      "path": "packages/todo/docs/works/todo-protocol-redesign/context.md",
+      "classification": "protected",
+      "owner": "T0",
+      "baselineSha256": "745b190e186ea5729263f7857efecfde0a54d479f963a3b8bb2eca8819e20eb7"
+    },
+    {
+      "path": "packages/todo/docs/works/todo-protocol-redesign/plan.md",
+      "classification": "protected",
+      "owner": "T0",
+      "baselineSha256": "4745dba489551e41658517664ff5a088f974069f11559218e9736f9e45b16042"
+    },
+    {
+      "path": "packages/todo/docs/works/todo-protocol-redesign/spec.md",
+      "classification": "protected",
+      "owner": "T0",
+      "baselineSha256": "3ae9538d65fac920c937167487525908fc316115cd49390c5ee1cb3b47c11eea"
+    },
+    {
+      "path": "packages/todo/docs/works/todo-protocol-redesign/tasks.md",
+      "classification": "protected",
+      "owner": "T0",
+      "baselineSha256": "101d80fd2723420ec2081bd0a41ce475a2b587e83ac3899c89d8c4062af30363"
+    },
+    {
+      "path": "packages/todo/docs/works/todo-protocol-redesign/work.md",
+      "classification": "protected",
+      "owner": "T0",
+      "baselineSha256": "2d6f6c516078a39f7edbea001bdec98e83db9e4d2cb99bb9a36e7792a7a28352"
+    },
+    {
+      "path": "packages/todo/package.json",
+      "classification": "protected",
+      "owner": "T0",
+      "baselineSha256": "d3e72a45d976ea789ce7d60bab8e188a26677dd9362268f83fb99698c3e91590"
+    },
+    {
+      "path": "packages/todo/src/format.ts",
+      "classification": "implementation",
+      "owner": "T5",
+      "baselineSha256": "baccf289776bf4089277e49f19102373e583c5d99c9e98dffc38497870e1cdf2",
+      "postTaskSha256": "04ad2bf7dd9b040f49d49c22b1a54d01c2606225862e6705f1ed68b5d7e8dbda"
+    },
+    {
+      "path": "packages/todo/src/glyphs.ts",
+      "classification": "protected",
+      "owner": "T0",
+      "baselineSha256": "69afd5155f5139a57c9bb0b93c196a8905c35d8011f5c13d4f05f55552060ca7"
+    },
+    {
+      "path": "packages/todo/src/index.ts",
+      "classification": "implementation",
+      "owner": "T2",
+      "baselineSha256": "0512dd05092039303181b2e4142110c0b5bcc9b0a32daedd1de2e379ec0c5b83",
+      "postTaskSha256": "4014f43f2fd59734981afaa0d4643de197a7b423552da95dfd095bc535a0e326"
+    },
+    {
+      "path": "packages/todo/src/persistence.ts",
+      "classification": "implementation",
+      "owner": "T3",
+      "baselineSha256": "658f85db55db1ce716d0f72a8c54ba67abc323b22f76a8e845ce43ade53ed0b7",
+      "postTaskSha256": "d735a58a6da527e190339a9d268739c933f585d5c77dc1aefd37f64e812dd6d0"
+    },
+    {
+      "path": "packages/todo/src/reminder-cadence.ts",
+      "classification": "protected",
+      "owner": "T0",
+      "baselineSha256": "fa25927e827a713f94819ad66e59e8faf5c39159124082fdec83912bb5986fc9"
+    },
+    {
+      "path": "packages/todo/src/reminder.ts",
+      "classification": "implementation",
+      "owner": "T5",
+      "baselineSha256": "94bafaf56c4d031bcbab7f54a43ea7ecb6bf94485728339bac6e11b7bb67a9c1",
+      "postTaskSha256": "3b26a533a7d3d9d48d39c66ab3e6274f114c264464c60f224bec3d80d20ae909"
+    },
+    {
+      "path": "packages/todo/src/renderer.ts",
+      "classification": "implementation",
+      "owner": "T5",
+      "baselineSha256": "c087f0c954ba5d9f2627d5a29391db9fe62b1c30e7f845c6f722484f875b0ecf",
+      "postTaskSha256": "53882a1f09d110b5753f6abcd8971b86ed27b38a7cdb845ac1fa326a1ea4bf6f"
+    },
+    {
+      "path": "packages/todo/src/schema.ts",
+      "classification": "implementation",
+      "owner": "T1",
+      "baselineSha256": "32bfaaf1a7edcff371d380d3171fa734c798750f73cc6d80e7034922f0b071b9",
+      "postTaskSha256": "bc73fda9527555ceb6b8eaee8bded3d0eb9b8061a91e52959d330b55735dc43e"
+    },
+    {
+      "path": "packages/todo/src/settings.ts",
+      "classification": "protected",
+      "owner": "T0",
+      "baselineSha256": "ce3673ea7ff4314c212606ef4bd794c11378fb927c485fdba49d1b9adfece8fe"
+    },
+    {
+      "path": "packages/todo/src/state.ts",
+      "classification": "implementation",
+      "owner": "T1",
+      "baselineSha256": "e1d30c1dcd1c46de3eaf5b44930da2e9c3e5722b0fb71696574aadb6875a3eea",
+      "postTaskSha256": "6d80242f8f537413671f9659fff980766082679131102f8c5343b22a8abf5251"
+    },
+    {
+      "path": "packages/todo/src/tool-frame.ts",
+      "classification": "implementation",
+      "owner": "T5",
+      "baselineSha256": "daf753735a88e76a1ab2073bc40290409fb1e2873446c825458ad345f686376b",
+      "postTaskSha256": "833ae888d258207840fa49b5a0f71c00aea95c86e0415ed9148994a276b37927"
+    },
+    {
+      "path": "packages/todo/src/tool.ts",
+      "classification": "implementation",
+      "owner": "T2",
+      "baselineSha256": "adf52ace28e6653c15ddd26b14d7144b770d1c617239f60e65ef2dc143a62835",
+      "postTaskSha256": "d5e49fd7605f88ee031bb6892c147ca34975b48f7a838782080257f584a21894"
+    },
+    {
+      "path": "packages/todo/src/types.ts",
+      "classification": "implementation",
+      "owner": "T1",
+      "baselineSha256": "4e9d938f18da063ad4396466e3deb32c022eaede699d81fe5485387abff4aac6",
+      "postTaskSha256": "f20f0dabc5196e0b49b564ba8ba84507592a35a8d7004b086b41ab8430df78d4"
+    },
+    {
+      "path": "packages/todo/src/visibility.ts",
+      "classification": "implementation",
+      "owner": "T5",
+      "baselineSha256": "1f1e38ec3c129b7afe55724a3ff594d82c470da45460fe193b43136cb3d9ee4f",
+      "postTaskSha256": "a452d8f80b1a2a3e0319d7c71792c2b59b91d6f1c3fa8cc569344298f58652d3"
+    },
+    {
+      "path": "packages/todo/src/widget-component.ts",
+      "classification": "protected",
+      "owner": "T0",
+      "baselineSha256": "e19a56ee6f75dea79a4caf12a46dca3aacf50298e3a0226f7f064f1b98940b0a"
+    },
+    {
+      "path": "packages/todo/src/widget-layout.ts",
+      "classification": "implementation",
+      "owner": "T5",
+      "baselineSha256": "9c0c711b0a04ea043000e2b189fe57891685495b3d550b75951eac728cce4cb9",
+      "postTaskSha256": "45ac2202c7822b6f1c9f9bb42c76aa06fc9c59fb4c4eab38988dc2942387d437"
+    },
+    {
+      "path": "packages/todo/src/widget.ts",
+      "classification": "implementation",
+      "owner": "T5",
+      "baselineSha256": "df83c814839bf4b7d9965a225483662232e75a46fa315dc45f7f12ca5af2933f",
+      "postTaskSha256": "54ac26658ad077f06dc4757409df9c1b00e58986bd9a17b5a0d9bb77a5d22522"
+    },
+    {
+      "path": "packages/todo/test/format.test.ts",
+      "classification": "implementation",
+      "owner": "T5",
+      "baselineSha256": "fd283e1eaff14ee24f707a7ee6435f16f38e773235fd7d797650886de77882f8",
+      "postTaskSha256": "60c0704465957d49c7c0a8219cd4750cd76646810b639b2e88a1d5a85e77c6ff"
+    },
+    {
+      "path": "packages/todo/test/helpers.ts",
+      "classification": "implementation",
+      "owner": "T5",
+      "baselineSha256": "faeaf6eb2709332ed02426e785780df5cd4d161bc274f30430d2b8c066af1a5e",
+      "postTaskSha256": "59572ebe088a4df71262b8110f7fe03e3bbc3a8ab9bcd384de476b7f926543d3"
+    },
+    {
+      "path": "packages/todo/test/index.test.ts",
+      "classification": "implementation",
+      "owner": "T2",
+      "baselineSha256": "ef8853173ed3d3cd9e47a97916645d91b05aed7b882a3503512d8e94eda80926",
+      "postTaskSha256": "8c8db8741bf6aec387e62149333aa1e6ee725201fc22fa77c411600a1d9be140"
+    },
+    {
+      "path": "packages/todo/test/persistence.test.ts",
+      "classification": "implementation",
+      "owner": "T3",
+      "baselineSha256": "b0b9fba2ded4b2a10d402ce45f5ab8aa634701c9796fe684387e49cd49f3de0e",
+      "postTaskSha256": "dac3655c43919f462024da3b03f8862cf37aba28ebe3c704a8419a26e544e2b6"
+    },
+    {
+      "path": "packages/todo/test/reminder-cadence.test.ts",
+      "classification": "protected",
+      "owner": "T0",
+      "baselineSha256": "3168c97bb5cb8c84d80e7508064eefc08c497ad6ff8b02eca59db148392eff3c"
+    },
+    {
+      "path": "packages/todo/test/reminder.test.ts",
+      "classification": "implementation",
+      "owner": "T5",
+      "baselineSha256": "a882f3ac909f2e9e66888987305f984d0c9361e14469b8ef16c6f9da68321901",
+      "postTaskSha256": "4255a900b1ddbdd0be77c0e75ff94c3589232d4a437d12183645f70606ed6431"
+    },
+    {
+      "path": "packages/todo/test/renderer.test.ts",
+      "classification": "implementation",
+      "owner": "T5",
+      "baselineSha256": "e8c24bcc5254285a73b0a9ea7e6583e8a1cd7f871415d96c5b8a5982e7b88706",
+      "postTaskSha256": "3b89fd113bdb9839a2fb10f710d4e0bea91b66acfca03f76916ebad6ad4f8d53"
+    },
+    {
+      "path": "packages/todo/test/schema.test.ts",
+      "classification": "implementation",
+      "owner": "T1",
+      "baselineSha256": "98cd0a7d97a2e4f7b0fd4e3ed55ab01af1d912450d7b28290fa49455399c2a57",
+      "postTaskSha256": "70234f58bd28e688e2e3f2e735acb631bb9d8a23d11c7e6b318e82248d1a4aae"
+    },
+    {
+      "path": "packages/todo/test/settings.test.ts",
+      "classification": "protected",
+      "owner": "T0",
+      "baselineSha256": "4bb71ee510ed18c1cd5893be7a2497401c0a4c2bdbf96da1d9855da2d729e114"
+    },
+    {
+      "path": "packages/todo/test/state.test.ts",
+      "classification": "implementation",
+      "owner": "T1",
+      "baselineSha256": "89933c5b23673c02d0092ce10487bacf318dac53ba4ed717de58e0f19dcfb97c",
+      "postTaskSha256": "0393791e1b7807cb5e02cfb1003a4833b682a89a57ef20351824eb68a9ef8781"
+    },
+    {
+      "path": "packages/todo/test/tool-frame.test.ts",
+      "classification": "implementation",
+      "owner": "T5",
+      "baselineSha256": "3b15f1cdb868c64d553ce663e98b79a8fddec8087dea61e5ed56ff9748716e95",
+      "postTaskSha256": "c9129b72cda970e657a6e5f26fd5f8593a004959ec0365c429a29791d56e7c58"
+    },
+    {
+      "path": "packages/todo/test/visibility.test.ts",
+      "classification": "implementation",
+      "owner": "T5",
+      "baselineSha256": "3bd9a9b2b5ce0626f4a7089f3fe47c7d27d149d400211268efffede1efa94687",
+      "postTaskSha256": "3bd9a9b2b5ce0626f4a7089f3fe47c7d27d149d400211268efffede1efa94687"
+    },
+    {
+      "path": "packages/todo/test/widget.test.ts",
+      "classification": "implementation",
+      "owner": "T5",
+      "baselineSha256": "1317c4926c5e131e5b5b9a31d3799073d2d873a52efe52d77f3399ac3a2e73e8",
+      "postTaskSha256": "3f0f1fd694e14d67b5423bd074e5b2f8fe0352edaa44df92f384d35e51e483c6"
+    },
+    {
+      "path": "packages/todo/tsconfig.json",
+      "classification": "protected",
+      "owner": "T0",
+      "baselineSha256": "a48bf6822b4c0f6f4bb767384d35fa5a85d45d5607fac9677375eb9d0e968061"
+    },
+    {
+      "path": "packages/todo/vitest.config.ts",
+      "classification": "protected",
+      "owner": "T0",
+      "baselineSha256": "cb434f7d269d3848ba0645d4ee90fa101a9ff086768d162ad61aec73f4fa536e"
+    }
+  ],
+  "aggregateSha256": "0decc644ba0c86814eaef9452a2f5736db0be6e8e459b513434d016006573548",
+  "reconciliation": {
+    "authoritySha256": [
+      {
+        "path": "packages/todo/docs/works/todo-protocol-redesign/work.md",
+        "sha256": "9ab4cd6e09b9e916ba34b558b02a473c6e3d7ac99f3151e09a21006fdd7456fb"
+      },
+      {
+        "path": "packages/todo/docs/works/todo-protocol-redesign/context.md",
+        "sha256": "2fd7ce917b84eeff3954b01e149a882bab508745598b7636d0e142b59742d27b"
+      },
+      {
+        "path": "packages/todo/docs/works/todo-protocol-redesign/spec.md",
+        "sha256": "b072067d160b4cc116ffce775157e9e140d449c07c4d0592e8627af7313527bf"
+      },
+      {
+        "path": "packages/todo/docs/works/todo-protocol-redesign/plan.md",
+        "sha256": "e68acb110dd0305f407945ae6190dbfda1c18a385713ddcadf669de8b9cd2211"
+      },
+      {
+        "path": "packages/todo/docs/works/todo-protocol-redesign/tasks.md",
+        "sha256": "948c3d2d06d606a23b1674c720fe147a81688203e52d62e938911a1edb3a77b5"
+      }
+    ],
+    "head": "4fd5dd85ccc77dadc959219be2018f755b717c8e",
+    "stagedPaths": [],
+    "authorizedWorktreePaths": [
+      "packages/todo/docs/works/todo-protocol-redesign/work.md",
+      "packages/todo/docs/works/todo-protocol-redesign/context.md",
+      "packages/todo/docs/works/todo-protocol-redesign/plan.md",
+      "packages/todo/docs/works/todo-protocol-redesign/spec.md",
+      "packages/todo/docs/works/todo-protocol-redesign/tasks.md"
+    ],
+    "unknownWorktreePaths": []
+  }
+}

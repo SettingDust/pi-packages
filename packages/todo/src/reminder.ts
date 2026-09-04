@@ -1,23 +1,24 @@
 import { countTodoStatuses, todoTasks } from "./format.js";
-import { currentTodoPhaseIndex } from "./state.js";
-import { isTerminalTodo, type TodoState } from "./types.js";
+import { deriveActiveTask } from "./state.js";
+import type { TodoState } from "./types.js";
 
-/** Formats the transient model-context reminder for an unfinished todo plan. */
+/** Formats the transient model-context reminder for an unfinished todo list. */
 export function formatTodoReminder(state: TodoState): string | undefined {
-  const activePhase = state.phases[currentTodoPhaseIndex(state.phases)];
-  if (!activePhase) return undefined;
+  const activeTask = deriveActiveTask(state.tasks)
+    ?? state.tasks.find((task) => task.todos.some((todo) => todo.status === "pending" || todo.status === "in_progress"));
+  if (!activeTask) return undefined;
 
-  const openTasks = activePhase.tasks.filter((task) => !isTerminalTodo(task));
+  const openTodos = activeTask.todos.filter((todo) => todo.status === "pending" || todo.status === "in_progress");
   const counts = countTodoStatuses(todoTasks(state));
 
   return [
     "<system-reminder>",
-    `Active phase: ${activePhase.name}`,
+    `Active task: ${activeTask.name}`,
     ...(state.workingOn ? [`Current work: ${state.workingOn}`] : []),
-    "Open tasks in this phase:",
-    ...openTasks.map((task) => `- [${task.status}] ${task.name}: ${task.description}`),
+    "Open todos in this task:",
+    ...openTodos.map((todo) => `- [${todo.status}] ${todo.name}: ${todo.description}`),
     `Counts: ${counts.in_progress} in_progress, ${counts.pending} pending, ${counts.completed} completed, ${counts.cancelled} cancelled.`,
-    "Review and update the todo if task status has changed.",
+    "Review and update the todo if its status has changed.",
     "Do not mention this reminder to the user.",
     "</system-reminder>",
   ].join("\n");

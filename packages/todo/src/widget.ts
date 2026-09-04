@@ -2,7 +2,7 @@ import type { Component, TUI } from "@earendil-works/pi-tui";
 import type { Theme } from "@earendil-works/pi-coding-agent";
 
 import type { TodoSettings } from "./settings.js";
-import { isTerminalTodo, type TodoState } from "./types.js";
+import type { TodoState } from "./types.js";
 import { TodoWidgetComponent } from "./widget-component.js";
 
 export type TodoWidgetSettings = Partial<Pick<
@@ -21,7 +21,7 @@ type TodoWidgetUI = {
 
 const TERMINAL_WIDGET_DELAY_MS = 5_000;
 type TodoWidgetLifecycle = {
-  hadOpenTasks: boolean;
+  hadOpenTodos: boolean;
   terminalClearTimer?: ReturnType<typeof setTimeout>;
 };
 const widgetLifecycles = new WeakMap<TodoWidgetUI, TodoWidgetLifecycle>();
@@ -32,11 +32,20 @@ export type TodoWidgetContext = {
   ui?: TodoWidgetUI;
 };
 
+export function resetTodoWidgetLifecycle(ctx: TodoWidgetContext | undefined): void {
+  if (!ctx?.hasUI || !ctx.ui?.setWidget) return;
+  const ui = ctx.ui;
+  const lifecycle = widgetLifecycles.get(ui);
+  if (!lifecycle) return;
+  cancelTerminalClear(lifecycle);
+  widgetLifecycles.delete(ui);
+}
+
 /** Update (or clear) the persistent todo widget without requiring the host UI at runtime. */
 export function updateTodoWidget(ctx: TodoWidgetContext | undefined, state: TodoState | undefined, settings: TodoWidgetSettings = {}): void {
   if (!ctx?.hasUI || !ctx.ui?.setWidget) return;
   const ui = ctx.ui;
-  const lifecycle = widgetLifecycles.get(ui) ?? { hadOpenTasks: false };
+  const lifecycle = widgetLifecycles.get(ui) ?? { hadOpenTodos: false };
 
   try {
     const placement = settings.widgetPlacement ?? "aboveEditor";
@@ -47,11 +56,11 @@ export function updateTodoWidget(ctx: TodoWidgetContext | undefined, state: Todo
       return;
     }
 
-    const hasTasks = state?.phases.some((phase) => phase.tasks.length > 0) ?? false;
-    const hasOpenTasks = state?.phases.some((phase) => phase.tasks.some((task) => !isTerminalTodo(task))) ?? false;
-    const showFinalState = hasTasks && !hasOpenTasks
-      && (lifecycle.hadOpenTasks || lifecycle.terminalClearTimer !== undefined);
-    const visibleState = hasOpenTasks || showFinalState ? state : undefined;
+    const hasTodos = state?.tasks.some((task) => task.todos.length > 0) ?? false;
+    const hasOpenTodos = state?.tasks.some((task) => task.todos.some((todo) => todo.status === "pending" || todo.status === "in_progress")) ?? false;
+    const showFinalState = hasTodos && !hasOpenTodos
+      && (lifecycle.hadOpenTodos || lifecycle.terminalClearTimer !== undefined);
+    const visibleState = hasOpenTodos || showFinalState ? state : undefined;
     const factory: WidgetComponentFactory | undefined = visibleState
       ? (tui, theme) => new TodoWidgetComponent(visibleState, theme, {
           maxVisible: settings.maxVisibleTasks,
@@ -62,12 +71,12 @@ export function updateTodoWidget(ctx: TodoWidgetContext | undefined, state: Todo
       : undefined;
     ui.setWidget!("todo", factory, { placement });
 
-    if (hasOpenTasks) {
+    if (hasOpenTodos) {
       cancelTerminalClear(lifecycle);
-      lifecycle.hadOpenTasks = true;
+      lifecycle.hadOpenTodos = true;
       widgetLifecycles.set(ui, lifecycle);
     } else if (showFinalState) {
-      lifecycle.hadOpenTasks = false;
+      lifecycle.hadOpenTodos = false;
       if (!lifecycle.terminalClearTimer) {
         const timer = setTimeout(() => {
           widgetLifecycles.delete(ui);

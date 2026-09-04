@@ -11,28 +11,28 @@ import { todo } from "./helpers.js";
 afterEach(() => vi.useRealTimers());
 
 const state: TodoState = {
-  phases: [
-    { name: "Plan", tasks: [
-      todo("Active task", "in_progress"),
-      todo("First pending task"),
-      todo("Finished task", "completed"),
-      todo("Cancelled task", "cancelled"),
+  tasks: [
+    { name: "Plan", todos: [
+      todo("Active todo", "in_progress", "Updating the todo widget"),
+      todo("First pending todo"),
+      todo("Finished todo", "completed"),
+      todo("Cancelled todo", "cancelled"),
     ] },
-    { name: "Build", tasks: [todo("Second pending task")] },
+    { name: "Build", todos: [todo("Second pending todo")] },
   ],
   workingOn: "Updating the todo widget",
 };
 
-test("todo widget shows only open tasks from the selected phase", () => {
+test("todo widget shows only open todos from the selected task", () => {
   const lines = renderTodoWidgetLines(state, undefined, 80, { maxVisible: 2, fallbackGlyphs: true });
   const output = lines.join("\n");
 
-  assert.ok(output.indexOf("Active task") < output.indexOf("First pending task"));
+  assert.ok(output.indexOf("Active todo") < output.indexOf("First pending todo"));
   assert.ok(output.includes(state.workingOn ?? ""));
-  assert.doesNotMatch(output, /Detailed description|Second pending task|Finished task|Cancelled task/);
+  assert.doesNotMatch(output, /Detailed description|Second pending todo|Finished todo|Cancelled todo/);
 });
 
-test("todo widget applies semantic colors to task and secondary rows", () => {
+test("todo widget applies semantic colors to todo and secondary rows", () => {
   const calls: { color: string; text: string }[] = [];
   renderTodoWidgetLines(state, {
     bold: (text: string) => text,
@@ -42,39 +42,39 @@ test("todo widget applies semantic colors to task and secondary rows", () => {
     },
   } as never, 80, { maxVisible: 10, fallbackGlyphs: true });
 
-  assert.equal(calls.find(({ text }) => text.includes("Active task"))?.color, "text");
-  assert.equal(calls.find(({ text }) => text.includes("First pending task"))?.color, "muted");
-  assert.equal(calls.find(({ text }) => text.includes("complete task"))?.color, "muted");
+  assert.equal(calls.find(({ text }) => text.includes("Active todo"))?.color, "text");
+  assert.equal(calls.find(({ text }) => text.includes("First pending todo"))?.color, "muted");
+  assert.equal(calls.find(({ text }) => text.includes("complete todo"))?.color, "muted");
   assert.equal(calls.find(({ text }) => text.includes("Build"))?.color, "muted");
   assert.equal(calls.find(({ text }) => text.includes(state.workingOn ?? ""))?.color, "muted");
   assert.ok(calls.every(({ color }) => color !== "dim"));
 });
 
-test("todo widget prioritizes statuses stably and shows every active task over the limit", () => {
+test("todo widget prioritizes statuses stably and shows every active todo over the limit", () => {
   const activeState: TodoState = {
-    phases: [{ name: "Work", tasks: [
+    tasks: [{ name: "Work", todos: [
       todo("pending first"),
       todo("active first", "in_progress"),
       todo("completed", "completed"),
       todo("active second", "in_progress"),
       todo("pending second"),
     ] }],
-    workingOn: "Handling both active tasks",
+    workingOn: "active first",
   };
   const lines = renderTodoWidgetLines(activeState, undefined, 80, { maxVisible: 1, fallbackGlyphs: true });
   const text = lines.join("\n");
   assert.ok(text.indexOf("active first") < text.indexOf("active second"));
   assert.doesNotMatch(lines.slice(2).join("\n"), /pending first|completed|pending second/);
   assert.match(text, /\+2 more/);
-  assert.match(text, /1 complete task/);
+  assert.match(text, /1 complete todo/);
 });
 
-test("todo widget falls back to the first pending phase and renders terminal phase summaries", () => {
+test("todo widget falls back to the first open task and renders terminal task summaries", () => {
   const pendingState: TodoState = {
-    phases: [
-      { name: "Done", tasks: [todo("old", "completed")] },
-      { name: "Next", tasks: [todo("ready")] },
-      { name: "Later", tasks: [todo("later")] },
+    tasks: [
+      { name: "Done", todos: [todo("old", "completed")] },
+      { name: "Next", todos: [todo("ready")] },
+      { name: "Later", todos: [todo("later")] },
     ],
   };
   const pendingLines = renderTodoWidgetLines(pendingState, undefined, 80, { fallbackGlyphs: true });
@@ -82,12 +82,12 @@ test("todo widget falls back to the first pending phase and renders terminal pha
   assert.doesNotMatch(pendingLines.join("\n"), /    ○ later/);
 
   const terminalLines = renderTodoWidgetLines({
-    phases: [{ name: "Done", tasks: [
+    tasks: [{ name: "Done", todos: [
       todo("finished", "completed"),
       todo("cancelled", "cancelled"),
     ] }],
   }, undefined, 80, { fallbackGlyphs: true });
-  assert.match(terminalLines.join("\n"), /  1\. Done · 2\/2[\s\S]*1 complete task · 1 cancelled task/);
+  assert.match(terminalLines.join("\n"), /  1\. Done · 2\/2[\s\S]*1 complete todo · 1 cancelled todo/);
 });
 
 test("todo widget remains safe at narrow widths", () => {
@@ -164,7 +164,7 @@ test("updateTodoWidget shows terminal state for five seconds before clearing", (
   component.dispose();
 
   updateTodoWidget(context, {
-    phases: [{ name: "Done", tasks: [todo("finished", "completed")] }],
+    tasks: [{ name: "Done", todos: [todo("finished", "completed")] }],
   }, {});
   assert.equal(typeof calls[1][1], "function");
   const finalComponent = (calls[1][1] as (tui: never, theme: never) => TodoWidgetComponent)(undefined as never, undefined as never);
@@ -174,7 +174,7 @@ test("updateTodoWidget shows terminal state for five seconds before clearing", (
   vi.advanceTimersByTime(1);
   assert.deepEqual(calls[2], ["todo", undefined]);
 
-  updateTodoWidget(context, { phases: [] }, {});
+  updateTodoWidget(context, { tasks: [] }, {});
   assert.deepEqual(calls[3], ["todo", undefined, { placement: "aboveEditor" }]);
 
   updateTodoWidget({ hasUI: false, ui: { setWidget: (...args: unknown[]) => calls.push(args) } }, state, {});
@@ -186,7 +186,7 @@ test("repeated terminal refreshes preserve the final summary until its timer exp
   const calls: unknown[][] = [];
   const context = { hasUI: true, ui: { setWidget: (...args: unknown[]) => calls.push(args) } };
   const terminalState: TodoState = {
-    phases: [{ name: "Done", tasks: [{ name: "finished", description: "Finished the work.", status: "completed" }] }],
+    tasks: [{ name: "Done", todos: [{ name: "finished", description: "Finished the work.", status: "completed" }] }],
   };
 
   updateTodoWidget(context, state);
@@ -201,12 +201,12 @@ test("repeated terminal refreshes preserve the final summary until its timer exp
   assert.deepEqual(calls[3], ["todo", undefined]);
 });
 
-test("an already-terminal restored plan stays hidden", () => {
+test("an already-terminal restored list stays hidden", () => {
   vi.useFakeTimers();
   const calls: unknown[][] = [];
   const context = { hasUI: true, ui: { setWidget: (...args: unknown[]) => calls.push(args) } };
   updateTodoWidget(context, {
-    phases: [{ name: "Done", tasks: [{ name: "finished", description: "Finished the work.", status: "completed" }] }],
+    tasks: [{ name: "Done", todos: [{ name: "finished", description: "Finished the work.", status: "completed" }] }],
   });
 
   assert.deepEqual(calls, [["todo", undefined, { placement: "aboveEditor" }]]);
@@ -219,7 +219,7 @@ test("new open work cancels a pending terminal clear", () => {
   const calls: unknown[][] = [];
   const context = { hasUI: true, ui: { setWidget: (...args: unknown[]) => calls.push(args) } };
   const terminalState: TodoState = {
-    phases: [{ name: "Done", tasks: [{ name: "finished", description: "Finished the work.", status: "completed" }] }],
+    tasks: [{ name: "Done", todos: [{ name: "finished", description: "Finished the work.", status: "completed" }] }],
   };
   updateTodoWidget(context, state);
   updateTodoWidget(context, terminalState);

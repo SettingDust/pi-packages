@@ -1,6 +1,6 @@
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
-import { Container, Text, type Component } from "@earendil-works/pi-tui";
-import { formatTodoCompactionContext, formatTodoSize, formatTodoSummary, todoTasks } from "./format.js";
+import { Container, Text } from "@earendil-works/pi-tui";
+import { formatTodoCompactionContext, formatTodoSize, todoTasks } from "./format.js";
 import { restoreTodoState } from "./persistence.js";
 import {
   beginReminderAgentRun,
@@ -13,79 +13,81 @@ import {
 import { formatTodoReminder } from "./reminder.js";
 import { renderResult as renderTodoResult } from "./renderer.js";
 import { TodoToolFrame, type TodoToolFrameContent, type TodoToolFrameTheme } from "./tool-frame.js";
-import { TodoParamsSchema } from "./schema.js";
+import {
+  TodoAddParamsSchema,
+  TodoSetParamsSchema,
+  TodoTransitionParamsSchema,
+  TodoViewParamsSchema,
+} from "./schema.js";
 import { DEFAULT_TODO_SETTINGS, loadTodoSettings, type TodoSettings } from "./settings.js";
-import { createTodoState, todoAddressKey, transitionTodoState } from "./state.js";
-import type { TodoAddress, TodoState, TodoStatus, TodoToolDetails } from "./types.js";
+import {
+  applyTodoAdd,
+  applyTodoSet,
+  applyTodoTransition,
+  cloneTodoState,
+  createTodoState,
+  parseTodoViewRequest,
+} from "./state.js";
+import type { TodoState } from "./types.js";
 import { shouldRenderTodoAction } from "./visibility.js";
-import { updateTodoWidget } from "./widget.js";
+import { resetTodoWidgetLifecycle, updateTodoWidget } from "./widget.js";
 
-function taskStatuses(state: TodoState): Map<string, TodoStatus> {
-  return new Map(state.phases.flatMap((phase) => phase.tasks.map((task) => [todoAddressKey(phase.name, task.name), task.status])));
-}
+type TodoResult = "set" | "add" | "transition" | "view";
+type TodoSuccess = { result: TodoResult; snapshot: TodoState };
+type TodoFailure = { result: "error"; error: { code: string; message: string } };
+type TodoResponse = TodoSuccess | TodoFailure;
 
-function taskAddresses(state: TodoState): TodoAddress[] {
-  return state.phases.flatMap((phase) => phase.tasks.map((task) => ({
-    phase: phase.name,
-    task: task.name,
-  })));
-}
+class TodoCoordinator {
+  private state = createTodoState();
+  private queue: Promise<void> = Promise.resolve();
 
-function pendingTodoSummary(args: unknown, state: TodoState): string {
-  const input = args as { action?: unknown; phases?: unknown };
-  const phases = Array.isArray(input.phases) ? input.phases : [];
-  const inputTaskCount = phases.reduce((count, phase) => {
-    const tasks = phase && typeof phase === "object" && Array.isArray((phase as { tasks?: unknown }).tasks)
-      ? (phase as { tasks: unknown[] }).tasks.length
-      : 0;
-    return count + tasks;
-  }, 0);
-
-  if (input.action === "set") return formatTodoSize(phases.length, inputTaskCount);
-  if (input.action !== "add") return formatTodoSize(state.phases.length, todoTasks(state).length);
-
-  const phaseNames = new Set(state.phases.map((phase) => phase.name));
-  let phaseCount = state.phases.length;
-  for (const phase of phases) {
-    const name = phase && typeof phase === "object" ? (phase as { name?: unknown }).name : undefined;
-    if (typeof name !== "string" || !phaseNames.has(name)) {
-      phaseCount += 1;
-      if (typeof name === "string") phaseNames.add(name);
-    }
+  restore(ctx: ExtensionContext, settings: TodoSettings): void {
+    resetTodoWidgetLifecycle(ctx);
+    this.state = restoreTodoState(ctx);
+    updateTodoWidget(ctx, this.state, settings);
   }
-  return formatTodoSize(phaseCount, todoTasks(state).length + inputTaskCount);
-}
 
-function changedTasks(previous: TodoState, next: TodoState): TodoAddress[] {
-  const before = taskStatuses(previous);
-  return next.phases.flatMap((phase) => phase.tasks.flatMap((task) =>
-    before.get(todoAddressKey(phase.name, task.name)) === task.status
-      ? []
-      : [{ phase: phase.name, task: task.name }],
-  ));
-}
+  snapshot(): TodoState {
+    return cloneTodoState(this.state);
+  }
 
-function createTodoFrame(
-  state: "pending" | "success" | "error",
-  action: string | undefined,
-  content: TodoToolFrameContent,
-  theme: TodoToolFrameTheme,
-): TodoToolFrame {
-  return new TodoToolFrame({
-    title: "todo",
-    action,
-    state,
-    content,
-    empty: "frame",
-  }, theme);
+  run(operation: () => TodoSuccess): Promise<TodoSuccess> {
+    const pending = this.queue.then(operation);
+    this.queue = pending.then(() => undefined, () => undefined);
+    return pending;
+  }
+
+  set(request: unknown, ctx: ExtensionContext, settings: TodoSettings): Promise<TodoSuccess> {
+    return this.run(() => this.commit("set", applyTodoSet(request as never), ctx, settings));
+  }
+
+  add(request: unknown, ctx: ExtensionContext, settings: TodoSettings): Promise<TodoSuccess> {
+    return this.run(() => this.commit("add", applyTodoAdd(this.state, request as never), ctx, settings));
+  }
+
+  transition(request: unknown, ctx: ExtensionContext, settings: TodoSettings): Promise<TodoSuccess> {
+    return this.run(() => this.commit("transition", applyTodoTransition(this.state, request as never), ctx, settings));
+  }
+
+  view(request: unknown): Promise<TodoSuccess> {
+    return this.run(() => {
+      parseTodoViewRequest(request);
+      return { result: "view", snapshot: cloneTodoState(this.state) };
+    });
+  }
+
+  private commit(result: TodoResult, candidate: TodoState, ctx: ExtensionContext, settings: TodoSettings): TodoSuccess {
+    this.state = candidate;
+    const snapshot = cloneTodoState(this.state);
+    updateTodoWidget(ctx, snapshot, settings);
+    return { result, snapshot };
+  }
 }
 
 type TodoRenderInput = {
-  details?: TodoToolDetails;
+  details?: { result?: TodoResult; snapshot?: TodoState };
   content?: readonly { type?: string; text?: string }[];
 };
-type TodoRenderTheme = Parameters<typeof renderTodoResult>[2];
-type TrackedSetRenderer = { toolCallId: string; invalidate?: () => void };
 
 function reminderConfig(settings: TodoSettings): ReminderCadenceConfig {
   return {
@@ -96,45 +98,72 @@ function reminderConfig(settings: TodoSettings): ReminderCadenceConfig {
   };
 }
 
-/** Expanded content for the one set result that is allowed to follow in-memory state. */
-class LiveSetResult implements Component {
-  constructor(
-    private readonly result: TodoRenderInput,
-    private readonly getState: () => TodoState,
-    private readonly isCurrent: () => boolean,
-    private readonly theme: TodoRenderTheme,
-    private readonly fallbackGlyphs: boolean,
-  ) {}
-
-  invalidate(): void {}
-
-  render(width: number): string[] {
-    const details = this.result.details;
-    const liveResult: TodoRenderInput = !this.isCurrent() || !details
-      ? this.result
-      : { ...this.result, details: { ...details, state: this.getState(), changedTasks: [] } };
-    return renderTodoResult(liveResult, { expanded: true }, this.theme, { fallbackGlyphs: this.fallbackGlyphs }).render(width);
-  }
+function createTodoFrame(state: "pending" | "success" | "error", action: TodoResult | undefined, content: TodoToolFrameContent, theme: TodoToolFrameTheme): TodoToolFrame {
+  return new TodoToolFrame({ title: "todo", action, state, content, empty: "frame" }, theme);
 }
 
-export function registerTodoTool(pi: ExtensionAPI): void {
-  let state = createTodoState();
+function pendingSummary(args: unknown, state: TodoState): string {
+  const input = args as { tasks?: unknown[]; todos?: unknown[] };
+  if (Array.isArray(input.tasks)) {
+    const count = input.tasks.reduce<number>((total, task) => total + (task && typeof task === "object" && Array.isArray((task as { todos?: unknown }).todos) ? (task as { todos: unknown[] }).todos.length : 0), 0);
+    return formatTodoSize(input.tasks.length, count);
+  }
+  if (Array.isArray(input.todos)) return formatTodoSize(state.tasks.length, todoTasks(state).length + input.todos.length);
+  return formatTodoSize(state.tasks.length, todoTasks(state).length);
+}
+
+function registerHandler(
+  pi: ExtensionAPI,
+  coordinator: TodoCoordinator,
+  result: TodoResult,
+  description: string,
+  parameters: any,
+  execute: (params: unknown, ctx: ExtensionContext) => Promise<TodoSuccess>,
+  getSettings: () => TodoSettings,
+  onSuccess: (result: TodoResult) => void,
+): void {
+  pi.registerTool({
+    name: `todo_${result}`,
+    label: `Todo ${result}`,
+    description,
+    parameters,
+    execute: async (_toolCallId, params, _signal, _onUpdate, ctx) => {
+      let details: TodoResponse;
+      try {
+        details = await execute(params, ctx);
+        onSuccess(details.result);
+      } catch (error) {
+        const message = error instanceof Error ? error.message : "Invalid Todo request.";
+        details = { result: "error", error: { code: errorCode(message), message } };
+      }
+      return { content: [{ type: "text" as const, text: JSON.stringify(details) }], details };
+    },
+    renderCall(args: unknown, theme: TodoToolFrameTheme, context: { isPartial?: boolean; isError?: boolean }) {
+      if (!context.isPartial || context.isError) return new Container();
+      return createTodoFrame("pending", result, new Text(theme.fg?.("muted", pendingSummary(args, coordinator.snapshot())) ?? pendingSummary(args, coordinator.snapshot()), 0, 0), theme);
+    },
+    renderResult(resultValue: any, options: any, theme: any, context: any) {
+      if (!context.isError && !shouldRenderTodoAction(result, getSettings().toolVisibility)) return new Container();
+      if (options.isPartial && !context.isError) return new Container();
+      const content = renderTodoResult(resultValue, options, theme);
+      return createTodoFrame(context.isError ? "error" : "success", resultValue.details?.result ?? result, content, theme);
+    },
+  });
+}
+
+function errorCode(message: string): string {
+  if (message.includes("does not exist")) return "not_found";
+  if (message.includes("Duplicate")) return "duplicate";
+  if (message.includes("workingOn")) return "invalid_working_on";
+  return "invalid_request";
+}
+
+export function registerTodoTools(pi: ExtensionAPI): void {
+  const coordinator = new TodoCoordinator();
   let settings: TodoSettings = { ...DEFAULT_TODO_SETTINGS };
   let reminderCadence = createReminderCadenceState();
   let pendingCompactionContext: string | undefined;
   let interactedWithTodoThisTurn = false;
-  let queue: Promise<void> = Promise.resolve();
-  let latestSetRenderer: TrackedSetRenderer | undefined;
-
-  const invalidateLatestSetRenderer = (): void => {
-    latestSetRenderer?.invalidate?.();
-  };
-
-  const restore = (ctx: ExtensionContext): void => {
-    state = restoreTodoState(ctx);
-    invalidateLatestSetRenderer();
-    updateTodoWidget(ctx, state, settings);
-  };
 
   const resetReminderTracking = (): void => {
     reminderCadence = createReminderCadenceState();
@@ -144,149 +173,47 @@ export function registerTodoTool(pi: ExtensionAPI): void {
   pi.on("session_start", async (_event, ctx) => {
     const loaded = await loadTodoSettings(ctx);
     settings = loaded.settings;
-    if (loaded.warning) ctx.ui.notify(loaded.warning, "warning");
-    restore(ctx);
+    if (loaded.warning) ctx.ui?.notify?.(loaded.warning, "warning");
+    coordinator.restore(ctx, settings);
     pendingCompactionContext = undefined;
     resetReminderTracking();
   });
   pi.on("session_tree", (_event, ctx) => {
-    restore(ctx);
+    coordinator.restore(ctx, settings);
     pendingCompactionContext = undefined;
     resetReminderTracking();
   });
   pi.on("session_compact", () => {
-    pendingCompactionContext = formatTodoCompactionContext(state);
+    pendingCompactionContext = formatTodoCompactionContext(coordinator.snapshot());
     if (pendingCompactionContext) reminderCadence = noteTodoInteraction(reminderCadence);
   });
-  pi.on("before_agent_start", () => {
-    reminderCadence = beginReminderAgentRun(reminderCadence);
-  });
-  pi.on("agent_start", (_event, ctx) => {
-    updateTodoWidget(ctx, state, settings);
-  });
-  pi.on("agent_settled", (_event, ctx) => {
-    updateTodoWidget(ctx, state, settings);
-  });
+  pi.on("before_agent_start", () => { reminderCadence = beginReminderAgentRun(reminderCadence); });
+  pi.on("agent_start", (_event, ctx) => updateTodoWidget(ctx, coordinator.snapshot(), settings));
+  pi.on("agent_settled", (_event, ctx) => updateTodoWidget(ctx, coordinator.snapshot(), settings));
   pi.on("turn_end", (event) => {
-    reminderCadence = interactedWithTodoThisTurn
-      ? noteTodoInteraction(reminderCadence)
-      : noteReminderTurn(
-          reminderCadence,
-          event.message.role === "assistant" ? event.message.usage?.output ?? 0 : 0,
-        );
+    reminderCadence = interactedWithTodoThisTurn ? noteTodoInteraction(reminderCadence) : noteReminderTurn(reminderCadence, event.message.role === "assistant" ? event.message.usage?.output ?? 0 : 0);
     interactedWithTodoThisTurn = false;
   });
   pi.on("context", (event) => {
     if (pendingCompactionContext) {
       const content = pendingCompactionContext;
       pendingCompactionContext = undefined;
-      return {
-        messages: [...event.messages, { role: "user", content, timestamp: Date.now() }],
-      };
+      return { messages: [...event.messages, { role: "user", content, timestamp: Date.now() }] };
     }
-
     if (!settings.dynamicReminders) return;
-
-    const reminder = formatTodoReminder(state);
+    const reminder = formatTodoReminder(coordinator.snapshot());
     if (!reminder) return;
-
     const consumed = consumeDueReminder(reminderCadence, reminderConfig(settings));
     if (!consumed.due) return;
-
     reminderCadence = consumed.state;
-    return {
-      messages: [...event.messages, { role: "user", content: reminder, timestamp: Date.now() }],
-    };
+    return { messages: [...event.messages, { role: "user", content: reminder, timestamp: Date.now() }] };
   });
 
-  pi.registerTool({
-    name: "todo",
-    label: "Todo",
-    description: [
-      "Maintain a phased task plan for complex work with 3+ distinct steps.",
-      "Actions:",
-      "  set(phases): Replace the entire plan; all tasks start `pending`.",
-      "  add(phases): Add described tasks; preserve existing tasks and statuses.",
-      "  transition(transitions, workingOn?): Set statuses and current work by exact phase and task names.",
-      "  view(): Return the full plan with task descriptions.",
-    ].join("\n"),
-    promptSnippet: "Track multi-step work in a phased task plan",
-    promptGuidelines: [
-      "When creating a todo plan, prefer a few broad phases with many concrete tasks; use smaller phases only for meaningful execution boundaries.",
-      "Transition the todo plan immediately as work starts, finishes and is verified, or is abandoned; never defer status transitions to the end.",
-      "Confine `in_progress` todo tasks to a single phase, and include an accurate `workingOn` summary in every transition that leaves any task `in_progress`.",
-      "As work evolves, mark stale todo tasks `cancelled` and use todo `add` for newly discovered tasks instead of expanding the scope of existing tasks",
-    ],
-    parameters: TodoParamsSchema,
-    renderShell: "self",
-
-    execute(_toolCallId, params, _signal, _onUpdate, ctx) {
-      const run = queue.then(() => {
-        const previous = state;
-        const next = transitionTodoState(previous, params);
-        const details: TodoToolDetails = {
-          action: params.action,
-          state: next,
-          changedTasks: params.action === "view"
-            ? []
-            : params.action === "set"
-              ? taskAddresses(next)
-              : changedTasks(previous, next),
-        };
-        if (params.action !== "view") {
-          state = next;
-          invalidateLatestSetRenderer();
-        }
-        updateTodoWidget(ctx, state, settings);
-        interactedWithTodoThisTurn = true;
-        return {
-          content: [{ type: "text" as const, text: formatTodoSummary(next, params.action === "view") }],
-          details,
-        };
-      });
-      queue = run.then(() => undefined, () => undefined);
-      return run;
-    },
-
-    renderCall(args, theme, context) {
-      // The self shell replaces the call with the final result once execution settles. Keeping
-      // this slot empty after completion also prevents a visible call and result frame at once.
-      if (!context.isPartial || context.isError || !shouldRenderTodoAction(args.action, settings.toolVisibility)) {
-        return new Container();
-      }
-      const summary = new Text(theme.fg("muted", pendingTodoSummary(args, state)), 0, 0);
-      return createTodoFrame("pending", args.action, summary, theme);
-    },
-
-    renderResult(result, options, theme, context) {
-      const details = result.details as TodoToolDetails | undefined;
-      const action = details?.action ?? context.args.action;
-      if (!context.isError && !shouldRenderTodoAction(action, settings.toolVisibility)) return new Container();
-
-      const isSetResult = !context.isError && details?.action === "set";
-      if (isSetResult) {
-        if (!latestSetRenderer || latestSetRenderer.toolCallId !== context.toolCallId) {
-          latestSetRenderer = { toolCallId: context.toolCallId, invalidate: context.invalidate };
-        } else {
-          latestSetRenderer.invalidate = context.invalidate;
-        }
-      }
-
-      // Partial updates are represented by the pending call frame. This keeps streaming updates
-      // from briefly rendering two self-owned frames in one tool row.
-      if ((options.isPartial || context.isPartial) && !context.isError) return new Container();
-
-      const renderInput = result as TodoRenderInput;
-      const content = isSetResult && options.expanded
-        ? new LiveSetResult(
-          renderInput,
-          () => state,
-          () => latestSetRenderer?.toolCallId === context.toolCallId,
-          theme,
-          settings.fallbackGlyphs,
-        )
-        : renderTodoResult(renderInput, options, theme, { fallbackGlyphs: settings.fallbackGlyphs });
-      return createTodoFrame(context.isError ? "error" : "success", action, content, theme);
-    },
-  });
+  const markInteraction = (result: TodoResult): void => {
+    if (result !== "view") interactedWithTodoThisTurn = true;
+  };
+  registerHandler(pi, coordinator, "set", "Replace the complete Todo state.", TodoSetParamsSchema, (params, ctx) => coordinator.set(params, ctx, settings), () => settings, markInteraction);
+  registerHandler(pi, coordinator, "add", "Append pending todos to an existing task.", TodoAddParamsSchema, (params, ctx) => coordinator.add(params, ctx, settings), () => settings, markInteraction);
+  registerHandler(pi, coordinator, "transition", "Change Todo statuses by exact task and todo name.", TodoTransitionParamsSchema, (params, ctx) => coordinator.transition(params, ctx, settings), () => settings, markInteraction);
+  registerHandler(pi, coordinator, "view", "Return the complete Todo snapshot without mutation.", TodoViewParamsSchema, (params) => coordinator.view(params), () => settings, markInteraction);
 }

@@ -1,6 +1,6 @@
-import type { Todo, TodoStatus, TodoTaskInput } from "../src/types.js";
+import type { Todo, TodoCreation, TodoStatus } from "../src/types.js";
 
-export function describedTask(name: string, description = `Detailed description for ${name}.`): TodoTaskInput {
+export function describedTask(name: string, description = `Detailed description for ${name}.`): TodoCreation {
   return { name, description };
 }
 

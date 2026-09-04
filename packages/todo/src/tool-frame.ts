@@ -1,20 +1,21 @@
 import { Box, Text, type Component } from "@earendil-works/pi-tui";
 import type { Theme } from "@earendil-works/pi-coding-agent";
 
+import type { TodoResult } from "./types.js";
+
 export type TodoToolFrameState = "pending" | "success" | "error";
 export type TodoToolFrameContent = Component | string | readonly (Component | string)[] | null | undefined;
 export type TodoToolFrameTheme = Partial<Pick<Theme, "fg" | "bg" | "bold">>;
 
 export interface TodoToolFrameOptions {
   title?: string;
-  action?: string;
+  action?: TodoResult;
   state?: TodoToolFrameState;
   content?: TodoToolFrameContent;
   paddingX?: number;
   paddingY?: number;
   empty?: "hide" | "frame";
 }
-
 type FrameColor = Parameters<Theme["fg"]>[0];
 type FrameBackground = Parameters<Theme["bg"]>[0];
 
@@ -86,7 +87,6 @@ export class TodoToolFrame implements Component {
   private bold(text: string): string {
     return this.theme?.bold ? this.theme.bold(text) : text;
   }
-
 }
 
 function normalizeWidth(width: number): number {

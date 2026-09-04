@@ -1,9 +1,9 @@
 import type { TodoToolVisibility } from "./settings.js";
-import { isTodoActionName } from "./types.js";
+import { TODO_RESULTS, type TodoResult } from "./types.js";
 
-/** Returns whether a successful todo action should be shown in tool output. */
+/** Returns whether a successful canonical Todo result should be shown in tool output. */
 export function shouldRenderTodoAction(action: unknown, visibility: TodoToolVisibility): boolean {
-  if (!isTodoActionName(action)) return false;
+  if (typeof action !== "string" || !TODO_RESULTS.includes(action as TodoResult)) return false;
 
   switch (visibility) {
     case "all":
