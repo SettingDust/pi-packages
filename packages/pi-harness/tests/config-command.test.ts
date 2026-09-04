@@ -75,6 +75,7 @@ function context(
   models = [{ provider: "test", id: "reasoning", reasoning: true }],
 ) {
   const notices: Array<[string, string | undefined]> = [];
+  const inputTitles: string[] = [];
   const confirmations: Array<[string, string]> = [];
   const selections: Array<[string, string[]]> = [];
   const ctx = {
@@ -85,6 +86,10 @@ function context(
       getAvailable: () => models,
     },
     ui: {
+      input: async (title: string) => {
+        inputTitles.push(title);
+        return inputs.shift();
+      },
       select: async (title: string, options: string[]) => {
         selections.push([title, options]);
         return selects.shift();
@@ -93,12 +98,11 @@ function context(
         confirmations.push([title, message]);
         return confirms.shift() ?? true;
       },
-      input: async () => inputs.shift(),
       editor: async () => undefined,
       notify: (message: string, type?: string) => notices.push([message, type]),
     },
   } as unknown as ExtensionCommandContext;
-  return { ctx, notices, confirmations, selections };
+  return { ctx, notices, confirmations, selections, inputTitles };
 }
 
 describe("/harness config", () => {
@@ -132,11 +136,15 @@ describe("/harness config", () => {
 
   test("adds a candidate with explicit capability values", async () => {
     const repository = new MemoryRepository();
-    const { ctx } = context(["Global", "Add candidate", "test/reasoning", "medium", "Save"], ["2", "1"]);
+    const { ctx, inputTitles } = context(["Global", "Add candidate", "test/reasoning", "medium", "Save"], ["2", "1"]);
 
     await runHarnessConfig(ctx, repository);
 
     expect(repository.writes).toEqual([{ scope: "global", candidates: { "test/reasoning": standard } }]);
+    expect(inputTitles).toEqual([
+      "Reasoning capability (finite integer >= 0; 0 routine, 1 modest, 2 substantial, 3 exceptional; 0-3 guidance, not an upper bound)",
+      "Impact capability (finite integer >= 0; 0 routine, 1 modest, 2 substantial, 3 exceptional; 0-3 guidance, not an upper bound)",
+    ]);
   });
 
   test("requires confirmation before replacing a colliding canonical tuple", async () => {

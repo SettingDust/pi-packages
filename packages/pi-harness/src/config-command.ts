@@ -188,8 +188,8 @@ async function inputCapabilities(
   ctx: ConfigContext,
   current?: ConfiguredCandidateCapabilities,
 ): Promise<ConfiguredCandidateCapabilities | undefined> {
-  const reasoning = await ctx.ui.input("Reasoning capability", current ? String(current.reasoning) : "0");
-  const impact = await ctx.ui.input("Impact capability", current ? String(current.impact) : "0");
+  const reasoning = await ctx.ui.input("Reasoning capability (finite integer >= 0; 0 routine, 1 modest, 2 substantial, 3 exceptional; 0-3 guidance, not an upper bound)", current ? String(current.reasoning) : "0");
+  const impact = await ctx.ui.input("Impact capability (finite integer >= 0; 0 routine, 1 modest, 2 substantial, 3 exceptional; 0-3 guidance, not an upper bound)", current ? String(current.impact) : "0");
   if (reasoning === undefined || impact === undefined) return undefined;
   const values = { reasoning: Number(reasoning), impact: Number(impact) };
   return Object.values(values).every((value) => Number.isFinite(value) && Number.isInteger(value) && value >= 0) ? values : undefined;
