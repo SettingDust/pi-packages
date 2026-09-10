@@ -69,6 +69,26 @@ test("todo widget prioritizes statuses stably and shows every active todo over t
   assert.match(text, /1 complete todo/);
 });
 
+test("todo widget expands every active task in canonical order with independent limits", () => {
+  const multiState: TodoState = {
+    tasks: [
+      { name: "First", todos: [todo("first active", "in_progress"), todo("first pending"), todo("first done", "completed")] },
+      { name: "Second", todos: [todo("second pending"), todo("second active", "in_progress"), todo("second done", "completed")] },
+      { name: "Third", todos: [todo("third pending")] },
+    ],
+    workingOn: "first active",
+  };
+  const lines = renderTodoWidgetLines(multiState, undefined, 80, { maxVisible: 1, fallbackGlyphs: true });
+  const text = lines.join("\n");
+
+  assert.ok(text.indexOf("First") < text.indexOf("first active"));
+  assert.ok(text.indexOf("first active") < text.indexOf("Second"));
+  assert.ok(text.indexOf("Second") < text.indexOf("second active"));
+  assert.doesNotMatch(text, /third pending/);
+  assert.equal((text.match(/\+1 more/g) ?? []).length, 2);
+  assert.equal((text.match(/1 complete todo/g) ?? []).length, 1);
+});
+
 test("todo widget falls back to the first open task and renders terminal task summaries", () => {
   const pendingState: TodoState = {
     tasks: [

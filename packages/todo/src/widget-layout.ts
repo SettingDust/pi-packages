@@ -25,24 +25,25 @@ export function renderTodoWidgetLines(
   const tasks = state?.tasks ?? [];
   const selectedTaskIndex = selectedTodoTaskIndex(tasks);
   if (selectedTaskIndex < 0) return [];
-  const selectedTask = tasks[selectedTaskIndex];
+  const activeGroups = tasks.map((task) => task.todos.some((todo) => todo.status === "in_progress"));
+  const hasActiveGroups = activeGroups.some(Boolean);
   const maxVisible = boundedMaxVisible(options.maxVisible);
-  const selectedTodos = visibleTodos(selectedTask.todos, maxVisible);
   const lines: string[] = [fit(toolTitle("Todos", theme), safeWidth)];
 
   for (let taskIndex = 0; taskIndex < tasks.length; taskIndex += 1) {
     const task = tasks[taskIndex];
-    const selected = taskIndex === selectedTaskIndex;
-    lines.push(fit(renderTodoTaskTitle(task, taskIndex, selected, theme), safeWidth));
+    const expanded = hasActiveGroups ? activeGroups[taskIndex] : taskIndex === selectedTaskIndex;
+    lines.push(fit(renderTodoTaskTitle(task, taskIndex, expanded, theme), safeWidth));
 
-    if (selected) {
+    if (expanded) {
+      const selectedTodos = visibleTodos(task.todos, maxVisible);
       for (const todo of selectedTodos) {
         lines.push(fit(renderTodoLine(todo, theme, options.fallbackGlyphs), safeWidth));
       }
       const openTodos = task.todos.filter((todo) => !isTerminal(todo));
       const hidden = openTodos.length - selectedTodos.length;
       if (hidden > 0) lines.push(fit(`    +${hidden} more`, safeWidth));
-      const terminalSummary = terminalTodoSummary(task.todos);
+      const terminalSummary = taskIndex === selectedTaskIndex ? terminalTodoSummary(task.todos) : undefined;
       if (terminalSummary) {
         const line = `    + ${terminalSummary}`;
         lines.push(fit(theme?.fg ? theme.fg("muted", line) : line, safeWidth));
