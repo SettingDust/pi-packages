@@ -1,9 +1,9 @@
 import { randomUUID } from "node:crypto";
 import { execFile } from "node:child_process";
-import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync } from "node:fs";
+import { existsSync, lstatSync, realpathSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync } from "node:fs";
 import { writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { basename, dirname, join, resolve } from "node:path";
+import { basename, dirname, isAbsolute, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { setTimeout as delay } from "node:timers/promises";
 import { promisify } from "node:util";
@@ -143,6 +143,22 @@ export type SubagentTask = {
   surfaceCleanups?: unknown[];
 };
 
+export type RetainedSessionKey = Readonly<{ scopeIdentity: string; subagentId: string; observedGeneration: number }>;
+export type CurrentRetainedSessionItem = RetainedSessionKey & Readonly<{
+  label: string; agent: string; terminalStatus: Exclude<TaskStatus, ActiveTaskStatus>;
+  sessionFile: string; resultFile: string;
+  displayedTime: { label: "Result file modified time"; mtimeMs: number };
+}>;
+
+function checkedRetainedPath(path: string, directory: boolean): string {
+  const absolute = resolve(path);
+  const stat = lstatSync(absolute);
+  if (stat.isSymbolicLink() || (directory ? !stat.isDirectory() : !stat.isFile())) throw new Error("invalid_retained_path");
+  const canonical = realpathSync(absolute);
+  if (relative(absolute, canonical) !== "") throw new Error("invalid_retained_path");
+  return canonical;
+}
+
 export type TaskIdAllocationErrorCode = "invalid_task_slug" | "task_id_exhausted" | "filesystem_reservation_failed";
 
 export class TaskIdAllocationError extends Error {
@@ -215,9 +231,18 @@ function resolveCurrentPiInvocation(): { command: string; args: string[] } {
   return { command: "pi", args: [] };
 }
 
-function buildNodeLaunchScript(cwd: string, command: string, args: string[]): string {
+function buildNodeLaunchScript(cwd: string, command: string, args: string[], retainedSession = false): string {
   const invocation = command === "pi" ? resolveCurrentPiInvocation() : { command, args: [] };
   const spec = Buffer.from(JSON.stringify({ cwd, command: invocation.command, args: [...invocation.args, ...args] }), "utf8").toString("base64");
+  if (retainedSession) return [
+    `const { spawnSync } = require("node:child_process");`,
+    `const spec = JSON.parse(Buffer.from(${JSON.stringify(spec)}, "base64").toString("utf8"));`,
+    `const env = { ...process.env };`,
+    `for (const key of Object.keys(env)) if (key.startsWith("PI_HERDR_SUBAGENT_")) delete env[key];`,
+    `const result = spawnSync(spec.command, spec.args, { cwd: spec.cwd, env, stdio: "inherit" });`,
+    `if (result.error) throw result.error;`,
+    `process.exit(result.status ?? 1);`,
+  ].join("\r\n");
   return [
     `const { spawnSync } = require("node:child_process");`,
     `const { existsSync, renameSync, writeFileSync } = require("node:fs");`,
@@ -457,6 +482,71 @@ export class SubagentRuntime {
       ...(task.startedAt ? { startedAt: task.startedAt } : {}),
       updatedAt: task.updatedAt,
     }));
+  }
+
+  private retainedScope(parentSessionFile?: string): string {
+    if (!parentSessionFile?.trim() || !isAbsolute(parentSessionFile)) throw new Error("persisted_parent_session_required");
+    checkedRetainedPath(parentSessionFile, false);
+    // Deliberately bypass the test-root/cwd fallback: neither proves parent ownership.
+    const scope = resolve(join(parentSessionFile.replace(/\.jsonl$/i, ""), "tasks"));
+    if (scope !== this.activeTasksDir) throw new Error("retained_parent_scope_mismatch");
+    return scope;
+  }
+
+  listRetainedSessions(parentSessionFile?: string): CurrentRetainedSessionItem[] {
+    const scopeIdentity = this.retainedScope(parentSessionFile);
+    const items: CurrentRetainedSessionItem[] = [];
+    for (const task of this.tasks.values()) {
+      try {
+        const item = this.resolveRetainedSession(parentSessionFile, { scopeIdentity, subagentId: task.subagentId, observedGeneration: task.generation });
+        if (item) items.push(item);
+      } catch { /* Invalid artifacts are ineligible; never repair them here. */ }
+    }
+    return items.sort((a, b) => b.displayedTime.mtimeMs - a.displayedTime.mtimeMs || a.subagentId.localeCompare(b.subagentId));
+  }
+
+  resolveRetainedSession(parentSessionFile: string | undefined, key: RetainedSessionKey | undefined): CurrentRetainedSessionItem | undefined {
+    if (key === undefined) return; // Picker cancellation has no filesystem or runtime effects.
+    const scopeIdentity = this.retainedScope(parentSessionFile);
+    if (key.scopeIdentity !== scopeIdentity) throw new Error("retained_parent_scope_mismatch");
+    const task = this.get(key.subagentId);
+    if (task.generation !== key.observedGeneration || !isTerminalStatus(task.status)) throw new Error("stale_retained_selection");
+    if (!isNotificationSubagentId(task.subagentId)) throw new Error("invalid_retained_task");
+    const root = checkedRetainedPath(scopeIdentity, true);
+    const artifactRoot = checkedRetainedPath(join(root, `${task.subagentId}-artifacts`), true);
+    if (relative(root, artifactRoot) !== `${task.subagentId}-artifacts`) throw new Error("invalid_retained_path");
+    const resultFile = checkedRetainedPath(join(artifactRoot, `result-${task.generation}.json`), false);
+    if (resolve(task.resultPath) !== resultFile) throw new Error("invalid_retained_path");
+    const recordPath = checkedRetainedPath(join(artifactRoot, "task.json"), false);
+    const record = this.readTaskRecord(recordPath, root, artifactRoot, task.subagentId);
+    if (!record || record.generation !== task.generation || record.status !== task.status || record.sessionFile !== task.sessionFile) throw new Error("stale_retained_selection");
+    const expectedSession = join(root, `${task.subagentId}-g1.jsonl`);
+    if (!isAbsolute(record.sessionFile) || record.sessionFile.split(/[\\/]/).includes("..") || resolve(record.sessionFile) !== expectedSession) throw new Error("invalid_retained_path");
+    const sessionFile = checkedRetainedPath(record.sessionFile, false);
+    const result = this.readResult({ ...task, resultPath: resultFile });
+    if (!result.valid || result.status !== task.status) throw new Error("invalid_retained_result");
+    return {
+      scopeIdentity, subagentId: task.subagentId, observedGeneration: task.generation,
+      label: cleanIdentity(task.label) || task.subagentId, agent: cleanIdentity(task.agent), terminalStatus: task.status,
+      sessionFile, resultFile, displayedTime: { label: "Result file modified time", mtimeMs: lstatSync(resultFile).mtimeMs },
+    };
+  }
+
+  async launchRetainedSession(parentSessionFile: string | undefined, key: RetainedSessionKey | undefined): Promise<void> {
+    const item = this.resolveRetainedSession(parentSessionFile, key);
+    if (!item) return;
+    const cwd = this.get(item.subagentId).cwd;
+    const script = buildNodeLaunchScript(cwd, "pi", ["--session", item.sessionFile], true);
+    const surface = await this.transport.createTab({ cwd, label: item.label });
+    try {
+      await this.transport.run(surface.paneId, bootstrapRuntime(), ["-e", script]);
+    } catch (error) {
+      try { await this.transport.closeTab(surface.tabId); }
+      catch (closeError) {
+        throw new Error(`${error instanceof Error ? error.message : String(error)}; cleanup failed: ${briefReason(String(closeError))}`, { cause: error });
+      }
+      throw error;
+    }
   }
 
   onTaskUpdate(listener: () => void): () => void {
@@ -1252,7 +1342,7 @@ export function createSubagentTools(runtime: SubagentRuntime, cwd: string, paren
   });
   return [
     // Optional avoids schema rejection so missing values use the stable runtime error contract.
-    tool("subagent_spawn", "Start one background subagent. taskSlug is required and must be a caller-provided canonical task identity; the parent receives a terminal completion notification without the full Result. After spawning, end the current turn and wait for that notification instead of polling or routinely calling inspect or join.", Type.Object({ agent: StringEnum(runtime.agentNames()), prompt: Type.String({ minLength: 1 }), label: Type.String({ minLength: 1 }), taskSlug: Type.Optional(Type.String()), model: Type.Optional(Type.String()), thinking: Type.Optional(Type.String()) }), async (params, _update, _signal, ctx) => {
+    tool("subagent_spawn", "Start one background subagent. taskSlug is required and must be a caller-provided canonical task identity; the parent receives a terminal completion notification without the full Result. After spawning, end the Router turn and wait for that notification instead of polling or routinely calling inspect or join.", Type.Object({ agent: StringEnum(runtime.agentNames()), prompt: Type.String({ minLength: 1 }), label: Type.String({ minLength: 1 }), taskSlug: Type.Optional(Type.String()), model: Type.Optional(Type.String()), thinking: Type.Optional(Type.String()) }), async (params, _update, _signal, ctx) => {
       try { return await runtime.spawn({ ...params, cwd, parentSessionFile }, ctx?.modelRegistry); }
       catch (error) {
         if (!(error instanceof ExplicitSpawnModelError)) throw error;
@@ -1526,6 +1616,39 @@ export default function subagentsExtension(pi: ExtensionAPI, dependencies: {
     runtime.setCompletionNotifier(notification => registerNotification(notification, coordinator));
   };
   bindNotificationNotifier(notificationCoordinator);
+  pi.registerCommand?.("subagent-open", {
+    description: "Open a retained terminal subagent session in a new tab.",
+    handler: async (_args, ctx) => {
+      if (ctx.mode !== "tui" || !ctx.hasUI) {
+        ctx.ui.notify("/subagent-open requires the interactive TUI.", "warning");
+        return;
+      }
+      const parentSessionFile = ctx.sessionManager?.getSessionFile?.();
+      if (!parentSessionFile?.trim()) {
+        ctx.ui.notify("/subagent-open requires a persisted parent session.", "warning");
+        return;
+      }
+      let items: CurrentRetainedSessionItem[];
+      try { items = runtime.listRetainedSessions(parentSessionFile); }
+      catch (error) {
+        ctx.ui.notify(error instanceof Error ? error.message : String(error), "error");
+        return;
+      }
+      if (items.length === 0) {
+        ctx.ui.notify("No eligible terminal subagent sessions.", "info");
+        return;
+      }
+      const rows = items.map(item => `${item.label} · ${item.subagentId} · current generation ${item.observedGeneration} · ${item.terminalStatus} · ${item.displayedTime.label} ${new Date(item.displayedTime.mtimeMs).toISOString()}`);
+      const selected = await ctx.ui.select("Open retained subagent session", rows);
+      if (selected === undefined) return;
+      const item = items[rows.indexOf(selected)];
+      if (!item) return;
+      const { scopeIdentity, subagentId, observedGeneration } = item;
+      try { await runtime.launchRetainedSession(parentSessionFile, { scopeIdentity, subagentId, observedGeneration }); }
+      catch (error) { ctx.ui.notify(error instanceof Error ? error.message : String(error), "error"); }
+    },
+  });
+
 
   const recoverCurrent = async (ctx: ExtensionContext, startup = false) => {
     const coordinator = notificationCoordinator;
