@@ -531,6 +531,217 @@ describe("pi-herdr-subagents runtime", () => {
   });
 });
 
+describe("retained-session launch submission", () => {
+  async function fixture() {
+    const parent = join(mkdtempSync(join(tmpdir(), "subagents-open-")), "parent.jsonl");
+    writeFileSync(parent, "");
+    const { calls, transport } = fakeTransport();
+    const runtime = new SubagentRuntime(transport, handlerRegistry());
+    const task = await runtime.spawn({ agent: "handler", cwd: dirname(parent), prompt: "unused", label: "open me", taskSlug: "open-task", parentSessionFile: parent });
+    writeFileSync(task.sessionFile, "retained");
+    writeFileSync(task.resultPath, JSON.stringify({ subagentId: task.subagentId, generation: 1, status: "completed", result: "done" }));
+    await runtime.join(task.subagentId);
+    calls.length = 0;
+    const snapshot = () => JSON.stringify({ task: runtime.inspect(task.subagentId), files: [task.sessionFile, ...readdirSync(dirname(task.resultPath)).sort().map(name => join(dirname(task.resultPath), name))].map(path => [path, readFileSync(path, "utf8")]) });
+    return { runtime, parent, task, transport, calls, snapshot, key: runtime.listRetainedSessions(parent)[0]! };
+  }
+
+  test("exact argv, independent tabs, no readiness calls or artifact mutation", async () => {
+    const f = await fixture();
+    const before = f.snapshot();
+    let count = 0;
+    f.transport.createTab = async input => { f.calls.push({ op: "create", input }); return { tabId: `tab-${++count}`, paneId: `pane-${count}` }; };
+    await f.runtime.launchRetainedSession(f.parent, f.key);
+    await f.runtime.launchRetainedSession(f.parent, f.key);
+    expect(f.calls.map(call => (call as any).op)).toEqual(["create", "run", "create", "run"]);
+    expect((f.calls[0] as any).input).toEqual({ cwd: f.task.cwd, label: "open me" });
+    for (const [index, call] of [f.calls[1], f.calls[3]].entries()) {
+      const launch = call as { paneId: string; command: string; args: string[] };
+      expect(launch.paneId).toBe(`pane-${index + 1}`);
+      expect(launch.args[0]).toBe("-e");
+      const script = launch.args[1]!;
+      const encoded = script.match(/Buffer\.from\("([^"]+)"/)![1]!;
+      const spec = JSON.parse(Buffer.from(encoded, "base64").toString("utf8"));
+      expect(spec).toEqual({ cwd: f.task.cwd, command: process.execPath, args: [process.argv[1], "--session", f.task.sessionFile] });
+      let captured: any;
+      const env = { KEEP: "yes", PI_HERDR_SUBAGENT_RESULT_PATH: "forbidden", PI_HERDR_SUBAGENT_ID: "old" };
+      new Function("require", "process", "Buffer", script)(() => ({ spawnSync: (...args: any[]) => { captured = args; return { status: 0 }; } }), { env, exit() {} }, Buffer);
+      expect(captured[2]).toEqual({ cwd: f.task.cwd, env: { KEEP: "yes" }, stdio: "inherit" });
+    }
+    expect(f.snapshot()).toBe(before);
+    f.runtime.stop();
+  });
+
+  test("create failure and submission rollback preserve state and primary error", async () => {
+    const f = await fixture();
+    const before = f.snapshot();
+    const create = f.transport.createTab;
+    f.transport.createTab = async () => { throw new Error("create failed"); };
+    await expect(f.runtime.launchRetainedSession(f.parent, f.key)).rejects.toThrow("create failed");
+    expect(f.calls).toEqual([]);
+    f.transport.createTab = create;
+    const primary = new Error("submission failed");
+    f.transport.run = async () => { throw primary; };
+    await expect(f.runtime.launchRetainedSession(f.parent, f.key)).rejects.toBe(primary);
+    expect(f.calls).toEqual([{ op: "create", input: { cwd: f.task.cwd, label: "open me" } }, { op: "closeTab", tabId: "tab-1" }]);
+    f.transport.closeTab = async () => { throw new Error("x".repeat(500)); };
+    try { await f.runtime.launchRetainedSession(f.parent, f.key); throw new Error("expected rejection"); }
+    catch (error) { expect((error as Error).cause).toBe(primary); expect((error as Error).message.length).toBeLessThan(210); }
+    expect(f.snapshot()).toBe(before);
+    f.runtime.stop();
+  });
+});
+
+describe("/subagent-open command wiring", () => {
+  async function commandFixture() {
+    const parent = join(mkdtempSync(join(tmpdir(), "subagents-open-cmd-")), "parent.jsonl");
+    writeFileSync(parent, "");
+    const { calls, transport } = fakeTransport();
+    const runtime = new SubagentRuntime(transport, handlerRegistry());
+    const task = await runtime.spawn({ agent: "handler", cwd: dirname(parent), prompt: "unused", label: "open me", taskSlug: "open-task", parentSessionFile: parent });
+    writeFileSync(task.sessionFile, "retained");
+    writeFileSync(task.resultPath, JSON.stringify({ subagentId: task.subagentId, generation: 1, status: "completed", result: "SECRET_RESULT_BODY" }));
+    await runtime.join(task.subagentId);
+    calls.length = 0;
+    const launched: unknown[] = [];
+    const original = runtime.launchRetainedSession.bind(runtime);
+    (runtime as any).launchRetainedSession = async (sessionFile: string | undefined, key: unknown) => {
+      launched.push(key);
+      return original(sessionFile, key as any);
+    };
+    const commands: Array<{ name: string; options: { handler: (args: string, ctx: any) => Promise<void> } }> = [];
+    const previous = process.env.PI_HERDR_SUBAGENT_RESULT_PATH;
+    delete process.env.PI_HERDR_SUBAGENT_RESULT_PATH;
+    try {
+      activateSubagents({
+        on() {},
+        sendMessage() {},
+        registerTool() {},
+        getActiveTools() { return []; },
+        setActiveTools() {},
+        registerCommand(name: string, options: any) { commands.push({ name, options }); },
+      } as any, { runtime, registry: handlerRegistry() });
+    } finally {
+      if (previous === undefined) delete process.env.PI_HERDR_SUBAGENT_RESULT_PATH;
+      else process.env.PI_HERDR_SUBAGENT_RESULT_PATH = previous;
+    }
+    const snapshot = () => JSON.stringify({ task: runtime.inspect(task.subagentId), files: [task.sessionFile, ...readdirSync(dirname(task.resultPath)).sort().map(name => join(dirname(task.resultPath), name))].map(path => [path, readFileSync(path, "utf8")]) });
+    return { runtime, parent, task, calls, commands, launched, snapshot };
+  }
+
+  test("registers on the parent extension only", () => {
+    expect(readFileSync(join(import.meta.dir, "../extensions/pane-child.ts"), "utf8")).not.toContain("subagent-open");
+    const parentNames: string[] = [];
+    const childNames: string[] = [];
+    const previous = process.env.PI_HERDR_SUBAGENT_RESULT_PATH;
+    delete process.env.PI_HERDR_SUBAGENT_RESULT_PATH;
+    try {
+      activateSubagents({
+        on() {}, sendMessage() {}, registerTool() {}, getActiveTools() { return []; }, setActiveTools() {},
+        registerCommand(name: string) { parentNames.push(name); },
+      } as any, { runtime: new SubagentRuntime(fakeTransport().transport, handlerRegistry()), registry: handlerRegistry() });
+      process.env.PI_HERDR_SUBAGENT_RESULT_PATH = join(tmpdir(), "child-result.json");
+      activateSubagents({
+        on() {}, sendMessage() {}, registerTool() {}, getActiveTools() { return []; }, setActiveTools() {},
+        registerCommand(name: string) { childNames.push(name); },
+      } as any);
+    } finally {
+      if (previous === undefined) delete process.env.PI_HERDR_SUBAGENT_RESULT_PATH;
+      else process.env.PI_HERDR_SUBAGENT_RESULT_PATH = previous;
+    }
+    expect(parentNames).toEqual(["subagent-open"]);
+    expect(childNames).toEqual([]);
+  });
+
+  test("guards non-TUI and missing parent session before picker creation", async () => {
+    const f = await commandFixture();
+    const before = f.snapshot();
+    const notifications: Array<{ message: string; type?: string }> = [];
+    const ctx = (mode: string, hasUI: boolean, sessionFile: string | undefined) => ({
+      mode, hasUI, sessionManager: { getSessionFile: () => sessionFile },
+      ui: {
+        notify(message: string, type?: string) { notifications.push({ message, type }); },
+        select() { throw new Error("picker must not open"); },
+      },
+    });
+    await f.commands[0]!.options.handler("", ctx("print", false, f.parent));
+    await f.commands[0]!.options.handler("", ctx("rpc", true, f.parent));
+    await f.commands[0]!.options.handler("", ctx("tui", true, undefined));
+    await f.commands[0]!.options.handler("", ctx("tui", true, "  "));
+    expect(notifications).toEqual([
+      { message: "/subagent-open requires the interactive TUI.", type: "warning" },
+      { message: "/subagent-open requires the interactive TUI.", type: "warning" },
+      { message: "/subagent-open requires a persisted parent session.", type: "warning" },
+      { message: "/subagent-open requires a persisted parent session.", type: "warning" },
+    ]);
+    expect(f.calls).toEqual([]);
+    expect(f.launched).toEqual([]);
+    expect(f.snapshot()).toBe(before);
+    f.runtime.stop();
+  });
+
+  test("cancel is side-effect-free and selection rows stay metadata-only", async () => {
+    const f = await commandFixture();
+    const before = f.snapshot();
+    const selects: Array<{ title: string; rows: string[] }> = [];
+    await f.commands[0]!.options.handler("", {
+      mode: "tui", hasUI: true, sessionManager: { getSessionFile: () => f.parent },
+      ui: {
+        notify() { throw new Error("cancel must not notify"); },
+        async select(title: string, rows: string[]) { selects.push({ title, rows }); return undefined; },
+      },
+    });
+    expect(selects).toHaveLength(1);
+    expect(selects[0]!.title).toBe("Open retained subagent session");
+    expect(selects[0]!.rows).toHaveLength(1);
+    expect(selects[0]!.rows[0]).toContain("open me");
+    expect(selects[0]!.rows[0]).toContain(f.task.subagentId);
+    expect(selects[0]!.rows[0]).toContain("current generation 1");
+    expect(selects[0]!.rows[0]).toContain("completed");
+    expect(selects[0]!.rows[0]).toContain("Result file modified time");
+    expect(selects[0]!.rows.join("\n")).not.toContain("SECRET_RESULT_BODY");
+    expect(selects[0]!.rows.join("\n")).not.toContain(f.task.sessionFile);
+    expect(f.calls).toEqual([]);
+    expect(f.launched).toEqual([]);
+    expect(f.snapshot()).toBe(before);
+    f.runtime.stop();
+  });
+
+  test("passes only the bound selection key to JIT launch", async () => {
+    const f = await commandFixture();
+    const before = f.snapshot();
+    await f.commands[0]!.options.handler("", {
+      mode: "tui", hasUI: true, sessionManager: { getSessionFile: () => f.parent },
+      ui: {
+        notify() { throw new Error("successful open must not notify"); },
+        async select(_title: string, rows: string[]) { return rows[0]; },
+      },
+    });
+    expect(f.launched).toEqual([{
+      scopeIdentity: f.runtime.listRetainedSessions(f.parent)[0]!.scopeIdentity,
+      subagentId: f.task.subagentId,
+      observedGeneration: 1,
+    }]);
+    expect(Object.keys(f.launched[0] as object).sort()).toEqual(["observedGeneration", "scopeIdentity", "subagentId"]);
+    expect(f.calls.map(call => (call as { op: string }).op)).toEqual(["create", "run"]);
+    expect(f.snapshot()).toBe(before);
+    f.runtime.stop();
+  });
+
+  test("README documents current retained-session open without excluded claims", () => {
+    const readme = readFileSync(join(import.meta.dir, "../README.md"), "utf8");
+    expect(readme).toContain("/subagent-open");
+    expect(readme).toContain("current generation as metadata, not historical transcript identity");
+    expect(readme).toContain("repeated opens create independent tabs");
+    expect(readme).toContain("not that Pi acknowledged loading it");
+    expect(readme).toContain("may be written or migrated by Pi");
+    expect(readme.toLowerCase()).not.toContain("read-only");
+    expect(readme).not.toContain("generation snapshot");
+    expect(readme).not.toMatch(/\[.*?\]\(.*?\)/);
+  });
+});
+
+
 test("passes pane commands as one quoted PowerShell invocation", async () => {
   const calls: string[][] = [];
   const client = createHerdrClient(async (_command, args) => { calls.push([...args]); return { code: 0, stdout: "", stderr: "" }; });
