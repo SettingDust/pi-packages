@@ -6,6 +6,14 @@
 - Authority: [#42 PRD](../prd/provider-model-thinking-capability-selection.md), [#42 ADR](../adr/0009-provider-model-thinking-capability-selection.md)
 - Reconciled dependencies: [ADR-0001](../adr/0001-router-resolver-handler-boundaries.md), [Router Delegation PRD](../prd/router-delegation.md), [Router Delegation Specification](router-delegation.md), [Protocol Prototype](protocol-prototype.md), [Backend Adaptation Specification](backend-adaptation.md), and the activated partial supersession in [ADR-0003](../adr/0003-user-model-roles.md); all #42 amendments are accepted. The canonical technical candidate is frozen and final T5/T6 are complete.
 
+## router-level-guidance clarification
+
+- Amendment date: 2026-09-11; accepted wording under existing user implementation acceptance recorded in the T1 Handoff, not a new acceptance or receipt.
+- Accepted tuple: [Work](../works/router-level-guidance/work.md), [Plan](../works/router-level-guidance/plan.md), [Tasks](../works/router-level-guidance/tasks.md); [Context](../works/router-level-guidance/context.md) completes the same-byte review set.
+- Review: `c:/Users/WINDOWS/.pi/agent/sessions/--E--Projects-pi-packages--/2026-08-16T11-58-37-784Z_01a00a70-28d7-789b-8c64-0d784f30d9b4/tasks/final-review-router-plan-history-artifacts/result-1.json`, generation 1, GO with P0-P3 zero for planning inputs only.
+- Clarification: §6 requires independent axes, least-sufficient uncapped integers, ordinary/simple/complex reasoning distinctions and independent impact examples, without automatic planning/review uplift or label mapping. §§3-4 and Resolver behavior remain unchanged.
+- Implementation status: prompt/test implementation verified by T3 technical checks and T4 GO with P0-P3 zero for pre-T5 bytes; [evidence and limitations](../works/router-level-guidance/context.md#t3-t4-evidence). T5 documentary reconciliation requires final same-byte review before selective-commit eligibility. Historical #42 completion is unchanged and is not clarification completion evidence.
+
 ## 1. Boundary and ownership
 
 The Router owns semantic request selection. The Resolver owns request/configuration validation and deterministic selection. Pi settings own candidate configuration. The model Registry is the source of current provider/model/thinking availability. The delegate backend consumes resolved metadata and owns no #42 selection policy.
@@ -93,14 +101,25 @@ Every configuration, legacy, availability, and qualification block includes expl
 
 ## 6. Router semantics
 
-The Router requests semantic integer values and may use this guidance:
+The Router must treat `reasoning` and `impact` as independent axes, not a total score, weighted score, priority, or phase level. For every delegation it must judge the concrete objective, ambiguity, reasoning needed for correctness, verification burden, and actual consequence, requesting the least sufficient value on each axis. A high requirement on one axis does not imply a high requirement on the other.
 
-- **0:** routine, bounded, low-consequence work; for example, a small documentation wording correction.
-- **1:** modest ambiguity or verification burden; for example, a contained bug fix with a focused regression check.
-- **2:** substantial ambiguity, interaction, or consequence; for example, a multi-file feature with integration risk.
-- **3:** exceptional uncertainty or consequence; for example, security-sensitive, migration, or architecture-defining work.
+Common `reasoning` guidance:
 
-These are examples, not fixed mappings. The Router must not assign levels by Skill name, document type, research phase, implementation phase, or another phase taxonomy. It makes a fresh request from the concrete objective, ambiguity, consequence, and verification burden.
+- **0:** mechanical work with clear boundaries and low ambiguity.
+- **1:** a small settled implementation or check, simple state reconciliation, or simple documentation reconciliation.
+- **2:** ordinary Plan or Tasks work, independent review, or multi-file impact analysis.
+- **3:** final review involving architecture, security, migration, authority conflict, a complex root cause, or unusually difficult uncertainty.
+
+Ordinary Plan, Tasks, and independent review work normally require at least reasoning `2` because of synthesis or independent judgment, not a Skill name, document type, planning/review phase, or other workflow label. Simple mechanical reconciliation may still require only `1`; clearly bounded, low-ambiguity mechanical work may use `0` when sufficient. No Skill/document/phase mapping or natural-language automatic classifier is introduced.
+
+Common `impact` guidance:
+
+- **0:** local, reversible, and without external impact.
+- **1:** bounded to one module.
+- **2:** cross-module or materially affects behavior or compatibility.
+- **3:** high-consequence, hard to reverse, or involves security, data, or external-system risk.
+
+Planning or review does not by itself increase impact. The `0..3` values are common guidance, not a protocol range or upper bound; any finite non-negative integer is valid.
 
 The Router supplies root requirements to resolve and passes the resolved model/thinking unchanged to the delegation tool. It does not put selection fields in the Handoff, select a candidate in prose, or substitute after resolution.
 
