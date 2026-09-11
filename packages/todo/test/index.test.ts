@@ -1,10 +1,13 @@
 import { describe, expect, it, vi } from "vitest";
 import todoExtension from "../src/index.js";
+import { Text } from "@earendil-works/pi-tui";
 
 type Tool = {
   name: string;
   parameters: { additionalProperties?: boolean };
   execute: (...args: any[]) => Promise<any>;
+  renderCall: (args: unknown, theme: any, context?: { isPartial?: boolean; isError?: boolean }) => { render: (width: number) => string[] };
+  renderResult: (result: unknown, options: { isPartial?: boolean; expanded?: boolean }, theme: any, context: { isError?: boolean }) => { render: (width: number) => string[] };
 };
 
 function setup(): { tools: Map<string, Tool>; handlers: Map<string, (...args: any[]) => unknown>; ctx: any; widgetCalls: any[] } {
@@ -176,4 +179,81 @@ describe("Todo four-tool coordinator", () => {
     expect(widgetCalls).toHaveLength(published);
     expect(published).toBe(3);
   });
+});
+
+describe("native renderCall identity", () => {
+  const contexts = [
+    {},
+    { isPartial: false },
+    { isPartial: true },
+    { isError: true },
+    { isError: false },
+    { isPartial: true, isError: true },
+    { isPartial: true, isError: false },
+    { isPartial: false, isError: true },
+    { isPartial: false, isError: false },
+  ];
+  const args = {
+    set: { tasks: [{ name: "Build", todos: [creation("Code")] }] },
+    add: { task: "Build", todos: [creation("Test")] },
+    transition: { transitions: [{ task: "Build", todo: "Code", status: "in_progress" }] },
+    view: {},
+  };
+
+  it("returns zero-padding identity Text for all four tools and call flags", async () => {
+    const { tools } = setup();
+    await run(tools.get("todo_set")!, args.set);
+
+    for (const action of ["set", "add", "transition", "view"] as const) {
+      const identity = `todo_${action} ${action}`;
+      for (const context of contexts) {
+        const colors: string[] = [];
+        const component = tools.get(`todo_${action}`)!.renderCall(args[action], {
+          fg(color: string, text: string) {
+            colors.push(color);
+            return text;
+          },
+        }, context);
+        expect(component).toBeInstanceOf(Text);
+        expect(component.constructor.name).not.toBe("Container");
+        expect(component.constructor.name).not.toBe("TodoToolFrame");
+        const lines = component.render(80);
+        expect(lines[0]?.startsWith(identity)).toBe(true);
+        expect(lines.join("\n")).toMatch(/\d+ tasks? · \d+ todos?/);
+        if (context.isPartial) expect(colors).toContain("muted");
+      }
+    }
+  });
+
+describe("native renderResult content", () => {
+  it("keeps result content, errors, and expanded rows independent of shell flags", async () => {
+    const { tools } = setup();
+    const set = tools.get("todo_set")!;
+    const seed = { tasks: [{ name: "Build", todos: [creation("Code")] }] };
+    const results = {
+      set: await run(set, seed),
+      add: await run(tools.get("todo_add")!, { task: "Build", todos: [creation("Test")] }),
+      transition: await run(tools.get("todo_transition")!, { transitions: [{ task: "Build", todo: "Code", status: "in_progress" }] }),
+      view: await run(tools.get("todo_view")!, {}),
+    };
+    const themes = { fg: (_color: string, text: string) => text };
+    for (const action of ["set", "add", "transition", "view"] as const) {
+      const tool = tools.get(`todo_${action}`)!;
+      for (const options of [{}, { expanded: true }, { isPartial: true }, { isPartial: true, expanded: true }]) {
+        for (const context of [{}, { isError: false }, { isError: true }]) {
+          const output = tool.renderResult(results[action], options, themes, context).render(80).join("\n");
+          if (options.isPartial && !context.isError) {
+            expect(output).toBe("");
+          } else if (options.expanded) {
+            expect(output).toContain("Code");
+          } else {
+            expect(output).toMatch(/\d+ tasks? · \d+ todos?/);
+          }
+        }
+      }
+    }
+    const error = await run(tools.get("todo_add")!, { task: "Missing", todos: [creation("Rejected")] });
+    expect(tools.get("todo_add")!.renderResult(error, {}, themes, {}).render(80).join("\n").replace(/\s+/g, "")).toContain("Todotaskdoesnotexist.");
+  });
+});
 });

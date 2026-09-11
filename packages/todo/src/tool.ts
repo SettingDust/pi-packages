@@ -1,4 +1,4 @@
-import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
+import type { ExtensionAPI, ExtensionContext, Theme } from "@earendil-works/pi-coding-agent";
 import { Container, Text } from "@earendil-works/pi-tui";
 import { formatTodoCompactionContext, formatTodoSize, todoTasks } from "./format.js";
 import { restoreTodoState } from "./persistence.js";
@@ -12,7 +12,6 @@ import {
 } from "./reminder-cadence.js";
 import { formatTodoReminder } from "./reminder.js";
 import { renderResult as renderTodoResult } from "./renderer.js";
-import { TodoToolFrame, type TodoToolFrameContent, type TodoToolFrameTheme } from "./tool-frame.js";
 import {
   TodoAddParamsSchema,
   TodoSetParamsSchema,
@@ -29,7 +28,6 @@ import {
   parseTodoViewRequest,
 } from "./state.js";
 import type { TodoState } from "./types.js";
-import { shouldRenderTodoAction } from "./visibility.js";
 import { resetTodoWidgetLifecycle, updateTodoWidget } from "./widget.js";
 
 type TodoResult = "set" | "add" | "transition" | "view";
@@ -98,10 +96,6 @@ function reminderConfig(settings: TodoSettings): ReminderCadenceConfig {
   };
 }
 
-function createTodoFrame(state: "pending" | "success" | "error", action: TodoResult | undefined, content: TodoToolFrameContent, theme: TodoToolFrameTheme): TodoToolFrame {
-  return new TodoToolFrame({ title: "todo", action, state, content, empty: "frame" }, theme);
-}
-
 function pendingSummary(args: unknown, state: TodoState): string {
   const input = args as { tasks?: unknown[]; todos?: unknown[] };
   if (Array.isArray(input.tasks)) {
@@ -119,7 +113,6 @@ function registerHandler(
   description: string,
   parameters: any,
   execute: (params: unknown, ctx: ExtensionContext) => Promise<TodoSuccess>,
-  getSettings: () => TodoSettings,
   onSuccess: (result: TodoResult) => void,
 ): void {
   pi.registerTool({
@@ -138,15 +131,15 @@ function registerHandler(
       }
       return { content: [{ type: "text" as const, text: JSON.stringify(details) }], details };
     },
-    renderCall(args: unknown, theme: TodoToolFrameTheme, context: { isPartial?: boolean; isError?: boolean }) {
-      if (!context.isPartial || context.isError) return new Container();
-      return createTodoFrame("pending", result, new Text(theme.fg?.("muted", pendingSummary(args, coordinator.snapshot())) ?? pendingSummary(args, coordinator.snapshot()), 0, 0), theme);
+    renderCall(args: unknown, theme: Partial<Pick<Theme, "fg">>, context: { isPartial?: boolean; isError?: boolean }) {
+      const identity = `todo_${result} ${result}`;
+      const summary = pendingSummary(args, coordinator.snapshot());
+      const counts = context.isPartial ? theme.fg?.("muted", summary) ?? summary : summary;
+      return new Text(`${identity} ${counts}`, 0, 0);
     },
     renderResult(resultValue: any, options: any, theme: any, context: any) {
-      if (!context.isError && !shouldRenderTodoAction(result, getSettings().toolVisibility)) return new Container();
       if (options.isPartial && !context.isError) return new Container();
-      const content = renderTodoResult(resultValue, options, theme);
-      return createTodoFrame(context.isError ? "error" : "success", resultValue.details?.result ?? result, content, theme);
+      return renderTodoResult(resultValue, options, theme);
     },
   });
 }
@@ -212,8 +205,8 @@ export function registerTodoTools(pi: ExtensionAPI): void {
   const markInteraction = (result: TodoResult): void => {
     if (result !== "view") interactedWithTodoThisTurn = true;
   };
-  registerHandler(pi, coordinator, "set", "Replace the complete Todo state.", TodoSetParamsSchema, (params, ctx) => coordinator.set(params, ctx, settings), () => settings, markInteraction);
-  registerHandler(pi, coordinator, "add", "Append pending todos to an existing task.", TodoAddParamsSchema, (params, ctx) => coordinator.add(params, ctx, settings), () => settings, markInteraction);
-  registerHandler(pi, coordinator, "transition", "Change Todo statuses by exact task and todo name.", TodoTransitionParamsSchema, (params, ctx) => coordinator.transition(params, ctx, settings), () => settings, markInteraction);
-  registerHandler(pi, coordinator, "view", "Return the complete Todo snapshot without mutation.", TodoViewParamsSchema, (params) => coordinator.view(params), () => settings, markInteraction);
+  registerHandler(pi, coordinator, "set", "Replace the complete Todo state.", TodoSetParamsSchema, (params, ctx) => coordinator.set(params, ctx, settings), markInteraction);
+  registerHandler(pi, coordinator, "add", "Append pending todos to an existing task.", TodoAddParamsSchema, (params, ctx) => coordinator.add(params, ctx, settings), markInteraction);
+  registerHandler(pi, coordinator, "transition", "Change Todo statuses by exact task and todo name.", TodoTransitionParamsSchema, (params, ctx) => coordinator.transition(params, ctx, settings), markInteraction);
+  registerHandler(pi, coordinator, "view", "Return the complete Todo snapshot without mutation.", TodoViewParamsSchema, (params) => coordinator.view(params), markInteraction);
 }
