@@ -12,6 +12,8 @@ import {
 } from "./reminder-cadence.js";
 import { formatTodoReminder } from "./reminder.js";
 import { renderResult as renderTodoResult } from "./renderer.js";
+import { renderTodoLine } from "./widget-layout.js";
+import type { TodoStatus } from "./types.js";
 import {
   TodoAddParamsSchema,
   TodoSetParamsSchema,
@@ -96,6 +98,51 @@ function reminderConfig(settings: TodoSettings): ReminderCadenceConfig {
   };
 }
 
+function renderCallContent(
+  action: TodoResult,
+  args: unknown,
+  state: TodoState,
+  theme: Partial<Pick<Theme, "bold" | "fg" | "strikethrough">>,
+  partial = false,
+): string {
+  const identity = `todo_${action} ${action}`;
+  const title = theme.bold ? theme.bold(identity) : identity;
+  const coloredTitle = theme.fg ? theme.fg("toolTitle", title) : title;
+  const summary = pendingSummary(args, state);
+  const lines = [coloredTitle, partial && theme.fg ? theme.fg("muted", summary) : summary];
+  const input = args as {
+    tasks?: readonly { name?: string; todos?: readonly { name?: string; description?: string }[] }[];
+    task?: string;
+    todos?: readonly { name?: string; description?: string }[];
+    transitions?: readonly { task?: string; todo?: string; status?: TodoStatus }[];
+  };
+
+  if (action === "set" && Array.isArray(input.tasks)) {
+    for (const task of input.tasks) {
+      if (typeof task?.name !== "string") continue;
+      lines.push(`  ${task.name}`);
+      for (const todo of task.todos ?? []) {
+        if (typeof todo?.name !== "string") continue;
+        lines.push(renderTodoLine({ name: todo.name, description: todo.description ?? "", status: "pending" }, theme));
+      }
+    }
+  } else if (action === "add" && typeof input.task === "string") {
+    lines.push(`  ${input.task}`);
+    for (const todo of input.todos ?? []) {
+      if (typeof todo?.name !== "string") continue;
+      lines.push(renderTodoLine({ name: todo.name, description: todo.description ?? "", status: "pending" }, theme));
+    }
+  } else if (action === "transition") {
+    for (const transition of input.transitions ?? []) {
+      if (typeof transition.todo !== "string" || !transition.status) continue;
+      const task = typeof transition.task === "string" ? `${transition.task}: ` : "";
+      lines.push(`${task}${renderTodoLine({ name: transition.todo, description: "", status: transition.status }, theme)}`);
+    }
+  }
+
+  return lines.join("\n");
+}
+
 function pendingSummary(args: unknown, state: TodoState): string {
   const input = args as { tasks?: unknown[]; todos?: unknown[] };
   if (Array.isArray(input.tasks)) {
@@ -132,10 +179,7 @@ function registerHandler(
       return { content: [{ type: "text" as const, text: JSON.stringify(details) }], details };
     },
     renderCall(args: unknown, theme: Partial<Pick<Theme, "fg">>, context: { isPartial?: boolean; isError?: boolean }) {
-      const identity = `todo_${result} ${result}`;
-      const summary = pendingSummary(args, coordinator.snapshot());
-      const counts = context.isPartial ? theme.fg?.("muted", summary) ?? summary : summary;
-      return new Text(`${identity} ${counts}`, 0, 0);
+      return new Text(renderCallContent(result, args, coordinator.snapshot(), theme, context.isPartial), 0, 0);
     },
     renderResult(resultValue: any, options: any, theme: any, context: any) {
       if (options.isPartial && !context.isError) return new Container();

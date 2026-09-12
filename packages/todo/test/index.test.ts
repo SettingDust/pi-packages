@@ -200,6 +200,32 @@ describe("native renderCall identity", () => {
     view: {},
   };
 
+  it("returns a colored native identity and renders concrete operation todos", async () => {
+    const { tools } = setup();
+    const colors: string[] = [];
+    const component = tools.get("todo_transition")!.renderCall({
+      transitions: [
+        { task: "Build", todo: "Code", status: "in_progress" },
+        { task: "Build", todo: "Done", status: "completed" },
+      ],
+    }, { bold: (text: string) => text, fg: (color: string, text: string) => { colors.push(color); return text; } }, {});
+
+    const output = component.render(120).join("\n");
+    expect(output).toContain("todo_transition transition");
+    expect(output).toContain("Build:     ");
+    expect(output).toContain("Code");
+    expect(output).toContain("Done");
+    expect(colors).toEqual(expect.arrayContaining(["toolTitle", "text", "success"]));
+  });
+
+  it("colors partial summaries even when the operation has no todo rows", () => {
+    const { tools } = setup();
+    const colors: string[] = [];
+    tools.get("todo_view")!.renderCall({}, { fg: (color: string, text: string) => { colors.push(color); return text; } }, { isPartial: true });
+    expect(colors).toContain("toolTitle");
+    expect(colors).toContain("muted");
+  });
+
   it("returns zero-padding identity Text for all four tools and call flags", async () => {
     const { tools } = setup();
     await run(tools.get("todo_set")!, args.set);
