@@ -72,7 +72,7 @@ describe("Pi Harness Extension", () => {
     expect(command).toBeDefined();
     await command!("config", context(modelRegistry));
     expect(configured).toBeTrue();
-    const first = await before!(event([skill("research"), skill("hidden", true)]), context(modelRegistry)) as { systemPrompt: string };
+    const first = await before!(event([skill("implement"), skill("hidden", true)]), context(modelRegistry)) as { systemPrompt: string };
     expect(first.systemPrompt).toStartWith("You are the Pi Harness Router.");
     expect(first.systemPrompt).not.toContain("default Pi prompt");
     expect(first.systemPrompt).toContain("finite non-negative reasoning and impact requirements");
@@ -105,15 +105,13 @@ describe("Pi Harness Extension", () => {
     expect(first.systemPrompt).toContain("Pass the returned prompt, model, and thinking exactly");
     expect(first.systemPrompt).toContain("without local selection, fallback, substitution, rewrite, or another Registry read");
     for (const phrase of [
-      "create the complete main-session coordination set immediately",
-      "Before every coordination action, project its Todo item as in_progress",
-      "After every terminal Handler Result notification, immediately project its status truthfully",
-      "Release dependencies only after that terminal projection",
-      "An identifiable equivalent duplicate or resend is idempotent",
-      "Malformed, structurally different, or conflicting input fails closed",
-      "clean up only a Todo proven stale",
-      "Dependencies, shared files, ownership, authority, and behavioral conflicts always serialize",
-      "use serial fallback",
+      "When a terminal Handler Result is already visible in the current Router context",
+      "read the complete Result, including its status, summary, report, and artifacts",
+      "Visibility is input to Router judgment only",
+      "independently decide whether to delegate another atomic outcome, delegate a review, ask for clarification or authorization, wait, stop, or report completion",
+      "Preserve completed, partial, blocked, and failed as distinct Handler Result input semantics",
+      "If Result context is missing, incomplete, malformed, or structurally ambiguous, fail closed",
+      "do not invent fields, status, identity, or outcome",
     ]) expect(first.systemPrompt).toContain(phrase);
     for (const phrase of [
       "inspect the complete objective, constraints, and deliverables as one semantic bundle",
@@ -136,27 +134,30 @@ describe("Pi Harness Extension", () => {
       "never silently replay completed durable side effects or independent outcomes",
       "Do not add a hidden scheduler, queue, retry engine, fixed Result-to-Todo mapping, Handler continuation, or automatic dispatch",
     ]) expect(first.systemPrompt).toContain(phrase);
+    expect(first.systemPrompt).not.toContain("After every terminal Handler Result notification");
+    expect(first.systemPrompt).not.toContain("Release dependencies only after that terminal projection");
+    expect(first.systemPrompt).not.toContain("schedule newly unblocked outcomes");
+    expect(first.systemPrompt).not.toContain("use serial fallback");
     expect(active).toEqual(["read", "resolve_delegation"]);
     expect(registryReads).toBe(0);
 
     const resolver = tools.get("resolve_delegation")!;
     expectClosedResolverSchema(resolver.parameters);
     const schema = JSON.stringify(resolver.parameters);
-    expect(schema).toContain("research");
+    expect(schema).toContain("implement");
     expect(schema).not.toContain("hidden");
     expect(schema).not.toContain("modelRole");
-    const rendered = resolver.renderCall!({ handoff: { objective: "Inspect implementation.", primarySkill: "research", context: [] }, reasoning: 2, impact: 3 }, { fg: (_color: string, text: string) => text, bold: (text: string) => text }, {}).render(120).join("\n");
+    const rendered = resolver.renderCall!({ handoff: { objective: "Inspect implementation.", primarySkill: "implement", context: [] }, reasoning: 2, impact: 3 }, { fg: (_color: string, text: string) => text, bold: (text: string) => text }, {}).render(120).join("\n");
     expect(rendered).toContain("resolve_delegation  reasoning 2, impact 3");
     expect(rendered).not.toContain("modelRole");
 
-    const invocation = await resolver.execute("call-1", { handoff: { objective: "Inspect implementation.", primarySkill: "research", context: [{ inline: "Supplied context.", purpose: "Boundary." }] }, admission: { path: "atomic", basis: ["Bounded."], verification: ["Check result."] }, reasoning: 1, impact: 2 }, undefined, undefined, context(modelRegistry));
+    const invocation = await resolver.execute("call-1", { handoff: { objective: "Inspect implementation.", primarySkill: "implement", context: [{ inline: "Supplied context.", purpose: "Boundary." }] }, admission: { path: "atomic", basis: ["Bounded."], verification: ["Check result."] }, reasoning: 1, impact: 2 }, undefined, undefined, context(modelRegistry));
     expect(invocation.details).toMatchObject({ status: "resolved", model: "test/reasoning/model", thinking: "medium" });
     expect(invocation.details).not.toHaveProperty("taskSlug");
     expect(registryReads).toBe(1);
     const handlerPrompt = Bun.YAML.parse(invocation.details.prompt) as Record<string, unknown>;
     for (const key of ["model", "modelRole", "thinking", "candidate", "reasoning", "impact"]) expect(handlerPrompt).not.toHaveProperty(key);
 
-    await before!(event([skill("implement")]), context(modelRegistry));
     expect(JSON.stringify(tools.get("resolve_delegation")!.parameters)).toContain("implement");
     expect(JSON.stringify(tools.get("resolve_delegation")!.parameters)).not.toContain("research");
     expect(await before!(event([skill("implement")], "# Pi Harness Handler"), context(modelRegistry))).toBeUndefined();
