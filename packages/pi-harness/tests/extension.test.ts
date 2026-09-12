@@ -115,6 +115,27 @@ describe("Pi Harness Extension", () => {
       "Dependencies, shared files, ownership, authority, and behavioral conflicts always serialize",
       "use serial fallback",
     ]) expect(first.systemPrompt).toContain(phrase);
+    for (const phrase of [
+      "inspect the complete objective, constraints, and deliverables as one semantic bundle",
+      "what one observable and verifiable terminal fact must be true",
+      "Multiple checks may support one outcome",
+      "independently meaningful completion or failure",
+      "retry or recovery boundary",
+      "user-authorization or confirmation boundary",
+      "durable side effect or persistent state change",
+      "audit or compliance fact",
+      "One decisive independent boundary is sufficient",
+      "not a fixed step, deliverable, file, phase, Skill, or Handler-call count",
+      "one Router-coordinated outcome per independent terminal predicate",
+      "unknown or ambiguous capability falls back to serial execution",
+      "decision authority returns to you",
+      "Read the full Result, truthfully project completed, partial, blocked, or failed",
+      "make a fresh Router-owned decision before releasing dependents",
+      "Do not let the Handler choose continuation",
+      "Retry only the failed outcome's boundary",
+      "never silently replay completed durable side effects or independent outcomes",
+      "Do not add a hidden scheduler, queue, retry engine, fixed Result-to-Todo mapping, Handler continuation, or automatic dispatch",
+    ]) expect(first.systemPrompt).toContain(phrase);
     expect(active).toEqual(["read", "resolve_delegation"]);
     expect(registryReads).toBe(0);
 
