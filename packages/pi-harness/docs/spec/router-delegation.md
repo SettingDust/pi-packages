@@ -38,6 +38,17 @@ Before delegation, the Router must establish one coordination outcome per indepe
 
 After each atomic Handler Result, terminal delivery returns decision authority to the Router. The Router must read the full Result, truthfully project `completed`, `partial`, `blocked`, or `failed`, and make a fresh decision before releasing dependents or scheduling another outcome. A Handler must not choose continuation, collapse a non-completed Result into success, or release a dependency whose predicate is unsatisfied. Retry is scoped to the failed outcome's boundary; it must not silently replay completed durable side effects or independent outcomes. Irreversible or externally high-impact actions retain confirmation at the applicable action-executor boundary; generic Handler admission does not replace that confirmation.
 
+### Handler failure without an adoptable Result
+
+When a Handler terminates without an adoptable Result, the Router must read the complete failure state before choosing an action. It must preserve the distinctions among `partial`, `failed`, and `blocked` evidence and must not treat missing or unusable Result data as success.
+
+After confirming that the failed execution is terminal and that the original atomic boundary remains valid, the Router should prefer resuming the same stable `subagentId` and failed `generation`. Resume-first keeps recovery within the original delegated outcome; it does not create a separate audit or retry outcome merely because the first execution produced no adoptable Result.
+
+Resume is fail-closed. The Router must not resume when a terminal Result already exists, an active execution remains, the `subagentId`/`generation` association is uncertain, replay safety cannot be established, the atomic boundary or authority has changed, or user authorization is required again. In those cases, the Router must make a fresh decision appropriate to the evidence, such as auditing, asking for authorization or clarification, retrying as a new bounded outcome, or stopping. Any new outcome retains its own dependency, serialization, authorization, and atomicity rules.
+
+Resume-first is Router judgment after failure evidence. It is not a hidden scheduler, queue, retry engine, fixed Result-to-action mapping, or Handler-owned continuation. A resume must never replay a completed durable side effect or an independently completed outcome.
+
+
 Observable equivalent duplicate terminal signals are idempotent. Malformed, structurally different, uncorrelatable, or conflicting signals fail closed, preserve the first established semantic state, do not update status or release or schedule dependencies, and report the limitation through existing visible surfaces. This contract introduces no fixed step, deliverable, file, phase, Skill, or Handler-call threshold, and implies no scheduler, queue, retry engine, continuation mechanism, or new persistence or identity infrastructure.
 
 Examples are explanatory rather than classifiers: repairing several defects and reporting one conformance fact may be one outcome when the repairs are only evidence for that fact; a separate verification or audit fact after repair is a dependent outcome; staging and signing a commit are separate outcomes because each has durable, authorization, audit, and retry boundaries; and researching alternatives with one requested recommendation is one outcome when the research is supporting evidence rather than an independently requested terminal result.
