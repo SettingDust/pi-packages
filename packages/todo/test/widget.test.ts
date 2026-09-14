@@ -20,7 +20,6 @@ const state: TodoState = {
     ] },
     { name: "Build", todos: [todo("Second pending todo")] },
   ],
-  workingOn: "Updating the todo widget",
 };
 
 test("todo widget shows only open todos from the selected task", () => {
@@ -28,7 +27,6 @@ test("todo widget shows only open todos from the selected task", () => {
   const output = lines.join("\n");
 
   assert.ok(output.indexOf("Active todo") < output.indexOf("First pending todo"));
-  assert.ok(output.includes(state.workingOn ?? ""));
   assert.doesNotMatch(output, /Detailed description|Second pending todo|Finished todo|Cancelled todo/);
 });
 
@@ -46,7 +44,6 @@ test("todo widget applies semantic colors to todo and secondary rows", () => {
   assert.equal(calls.find(({ text }) => text.includes("First pending todo"))?.color, "muted");
   assert.equal(calls.find(({ text }) => text.includes("complete todo"))?.color, "muted");
   assert.equal(calls.find(({ text }) => text.includes("Build"))?.color, "muted");
-  assert.equal(calls.find(({ text }) => text.includes(state.workingOn ?? ""))?.color, "muted");
   assert.ok(calls.every(({ color }) => color !== "dim"));
 });
 
@@ -59,7 +56,6 @@ test("todo widget prioritizes statuses stably and shows every active todo over t
       todo("active second", "in_progress"),
       todo("pending second"),
     ] }],
-    workingOn: "active first",
   };
   const lines = renderTodoWidgetLines(activeState, undefined, 80, { maxVisible: 1, fallbackGlyphs: true });
   const text = lines.join("\n");
@@ -76,7 +72,6 @@ test("todo widget expands every active task in canonical order with independent 
       { name: "Second", todos: [todo("second pending"), todo("second active", "in_progress"), todo("second done", "completed")] },
       { name: "Third", todos: [todo("third pending")] },
     ],
-    workingOn: "first active",
   };
   const lines = renderTodoWidgetLines(multiState, undefined, 80, { maxVisible: 1, fallbackGlyphs: true });
   const text = lines.join("\n");
@@ -86,10 +81,10 @@ test("todo widget expands every active task in canonical order with independent 
   assert.ok(text.indexOf("Second") < text.indexOf("second active"));
   assert.doesNotMatch(text, /third pending/);
   assert.equal((text.match(/\+1 more/g) ?? []).length, 2);
-  assert.equal((text.match(/1 complete todo/g) ?? []).length, 1);
+  assert.equal((text.match(/1 complete todo/g) ?? []).length, 2);
 });
 
-test("todo widget falls back to the first open task and renders terminal task summaries", () => {
+test("todo widget does not select a single task when no task is active", () => {
   const pendingState: TodoState = {
     tasks: [
       { name: "Done", todos: [todo("old", "completed")] },
@@ -98,8 +93,7 @@ test("todo widget falls back to the first open task and renders terminal task su
     ],
   };
   const pendingLines = renderTodoWidgetLines(pendingState, undefined, 80, { fallbackGlyphs: true });
-  assert.match(pendingLines.join("\n"), /  2\. Next[\s\S]*    ○ ready/);
-  assert.doesNotMatch(pendingLines.join("\n"), /    ○ later/);
+  assert.doesNotMatch(pendingLines.join("\n"), /    ○ ready|    ○ later/);
 
   const terminalLines = renderTodoWidgetLines({
     tasks: [{ name: "Done", todos: [
@@ -107,7 +101,7 @@ test("todo widget falls back to the first open task and renders terminal task su
       todo("cancelled", "cancelled"),
     ] }],
   }, undefined, 80, { fallbackGlyphs: true });
-  assert.match(terminalLines.join("\n"), /  1\. Done · 2\/2[\s\S]*1 complete todo · 1 cancelled todo/);
+  assert.doesNotMatch(terminalLines.join("\n"), /1 complete todo · 1 cancelled todo/);
 });
 
 test("todo widget remains safe at narrow widths", () => {
@@ -118,55 +112,6 @@ test("todo widget remains safe at narrow widths", () => {
   for (const line of component.render(1)) assert.ok(visibleWidth(line) <= 1);
 });
 
-test("todo widget keeps active markers static and animates the working line with pi's spinner", () => {
-  vi.useFakeTimers();
-  const requestRender = vi.fn();
-  const component = new TodoWidgetComponent(state, undefined, {}, { requestRender } as never);
-
-  const initial = component.render(80);
-  vi.advanceTimersByTime(199);
-  assert.equal(requestRender.mock.calls.length, 0);
-  vi.advanceTimersByTime(1);
-  const next = component.render(80);
-  assert.notDeepEqual(next, initial);
-  assert.equal(requestRender.mock.calls.length, 1);
-
-  component.dispose();
-  vi.advanceTimersByTime(1_000);
-  assert.equal(requestRender.mock.calls.length, 1);
-});
-
-test("todo widget keeps the working marker static while the agent is idle", () => {
-  vi.useFakeTimers();
-  const requestRender = vi.fn();
-  const theme = { fg: (color: string, text: string) => `<${color}>${text}</${color}>` } as never;
-  const component = new TodoWidgetComponent(state, theme, { animateWorkingMarker: false }, { requestRender } as never);
-
-  const initial = component.render(80);
-  vi.advanceTimersByTime(1_000);
-  assert.equal(requestRender.mock.calls.length, 0);
-  assert.deepEqual(component.render(80), initial);
-  component.dispose();
-});
-
-test("updateTodoWidget animates only while the agent is active", () => {
-  vi.useFakeTimers();
-
-  for (const [idle, expectedRenders] of [[true, 0], [false, 1]] as const) {
-    const calls: unknown[][] = [];
-    const requestRender = vi.fn();
-    updateTodoWidget({
-      hasUI: true,
-      isIdle: () => idle,
-      ui: { setWidget: (...args: unknown[]) => calls.push(args) },
-    }, state);
-    const component = (calls[0][1] as (tui: never, theme: never) => TodoWidgetComponent)({ requestRender } as never, undefined as never);
-
-    vi.advanceTimersByTime(200);
-    assert.equal(requestRender.mock.calls.length, expectedRenders);
-    component.dispose();
-  }
-});
 
 test("updateTodoWidget shows terminal state for five seconds before clearing", () => {
   vi.useFakeTimers();

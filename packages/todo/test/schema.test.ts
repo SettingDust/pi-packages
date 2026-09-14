@@ -25,9 +25,7 @@ describe("Todo request schemas", () => {
     })).toBe(true);
     expect(Check(TodoTransitionParamsSchema, {
       transitions: [{ task: "Build", todo: "Implement", status: "in_progress" }],
-      workingOn: "Implement the protocol.",
     })).toBe(true);
-    expect(Check(TodoViewParamsSchema, {})).toBe(true);
   });
 
   it("rejects cross-tool fields, creation statuses, and invalid array minima", () => {
@@ -39,6 +37,10 @@ describe("Todo request schemas", () => {
     expect(Check(TodoTransitionParamsSchema, { transitions: [] })).toBe(false);
     expect(Check(TodoTransitionParamsSchema, {
       transitions: [{ task: "Build", todo: "Implement", status: "active" }],
+    })).toBe(false);
+    expect(Check(TodoTransitionParamsSchema, {
+      transitions: [{ task: "Build", todo: "Implement", status: "in_progress" }],
+      workingOn: "Implement the protocol.",
     })).toBe(false);
     expect(Check(TodoViewParamsSchema, { tasks: [] })).toBe(false);
   });

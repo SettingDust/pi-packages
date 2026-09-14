@@ -29,7 +29,6 @@ export const TodoTransitionSchema = Type.Object({
 
 export const TodoTransitionParamsSchema = Type.Object({
   transitions: Type.Array(TodoTransitionSchema, { minItems: 1 }),
-  workingOn: Type.Optional(Type.String()),
 }, { additionalProperties: false });
 
 export const TodoViewParamsSchema = Type.Object({}, { additionalProperties: false });

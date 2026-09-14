@@ -18,7 +18,6 @@ const snapshot: TodoState = {
       todo("Publish package", "completed"),
     ] },
   ],
-  workingOn: "Implement renderer",
 };
 
 describe("todo renderer", () => {
@@ -65,7 +64,6 @@ describe("todo renderer", () => {
         { name: "Review", todos: [todo("Review pending")] },
         { name: "Empty", todos: [] },
       ],
-      workingOn: "Active",
     } } }, { expanded: true }, plainTheme, { fallbackGlyphs: true }).render(120).join("\n");
 
     expect(expanded.indexOf("Active")).toBeLessThan(expanded.indexOf("Pending first"));

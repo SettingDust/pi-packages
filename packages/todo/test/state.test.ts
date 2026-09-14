@@ -4,7 +4,6 @@ import {
   applyTodoSet,
   applyTodoTransition,
   cloneTodoState,
-  deriveActiveTask,
   isTodoState,
   parseTodoAddRequest,
   parseTodoSetRequest,
@@ -60,41 +59,32 @@ describe("canonical Todo state", () => {
     expect(state.tasks[0].todos).toHaveLength(2);
   });
 
-  it("derives the active task and workingOn from task then todo order", () => {
+  it("preserves every independently active task without a single-value summary", () => {
     const state = applyTodoTransition(build(), parseTodoTransitionRequest({
       transitions: [
         { task: "Release", todo: "Publish", status: "in_progress" },
         { task: "Build", todo: "Verify", status: "in_progress" },
         { task: "Build", todo: "Implement", status: "in_progress" },
       ],
-      workingOn: "Implement the protocol.",
     }));
-
-    expect(deriveActiveTask(state.tasks)?.name).toBe("Build");
-    expect(state.workingOn).toBe("Implement the protocol.");
-    expect(() => applyTodoTransition(state, parseTodoTransitionRequest({
+    expect(state.tasks.filter((task) => task.todos.some((todo) => todo.status === "in_progress")).map((task) => task.name))
+      .toEqual(["Build", "Release"]);
+    expect(state).not.toHaveProperty("workingOn");
+    expect(() => parseTodoTransitionRequest({
       transitions: [{ task: "Build", todo: "Implement", status: "completed" }],
       workingOn: "Wrong description.",
-    }))).toThrow(/does not match/);
-    expect(applyTodoTransition(state, parseTodoTransitionRequest({
-      transitions: [
-        { task: "Build", todo: "Implement", status: "completed" },
-        { task: "Build", todo: "Verify", status: "completed" },
-        { task: "Release", todo: "Publish", status: "completed" },
-      ],
-    }))).toEqual(expect.objectContaining({ tasks: expect.any(Array) }));
+    })).toThrow(/invalid shape/);
   });
 
   it("rejects invalid canonical snapshots and preserves the original after failed transitions", () => {
     expect(isTodoState({
       tasks: [{ name: "Build", todos: [{ name: "Implement", description: "Implement.", status: "in_progress" }] }],
+      workingOn: "Implement.",
     })).toBe(false);
     expect(isTodoState({
       tasks: [{ name: "Build", todos: [{ name: "Implement", description: "Implement.", status: "in_progress" }] }],
-      workingOn: "Implement.",
       extra: true,
     })).toBe(false);
-
     const state = build();
     expect(() => applyTodoTransition(state, parseTodoTransitionRequest({
       transitions: [
@@ -105,4 +95,5 @@ describe("canonical Todo state", () => {
     expect(state.tasks[0].todos[0].status).toBe("pending");
     expect(cloneTodoState(state)).not.toBe(state);
   });
+
 });

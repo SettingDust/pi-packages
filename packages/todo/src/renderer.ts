@@ -3,7 +3,7 @@ import { Text } from "@earendil-works/pi-tui";
 
 import { formatTodoSize, todoTasks } from "./format.js";
 import type { Todo, TodoState } from "./types.js";
-import { renderTodoLine, renderTodoTaskTitle, selectedTodoTaskIndex } from "./widget-layout.js";
+import { renderTodoLine, renderTodoTaskTitle } from "./widget-layout.js";
 
 type ThemeLike = Partial<Pick<Theme, "fg" | "bold" | "strikethrough">>;
 type ThemeColor = Parameters<Theme["fg"]>[0];
@@ -25,10 +25,9 @@ export function renderResult(
   }
   if (todos.length === 0) return new Text(paint(theme, "muted", "No todos."), 0, 0);
 
-  const selectedTask = selectedTodoTaskIndex(state.tasks);
   const lines: string[] = [];
   for (const [index, task] of state.tasks.entries()) {
-    lines.push(renderTodoTaskTitle(task, index, index === selectedTask, theme));
+    lines.push(renderTodoTaskTitle(task, index, false, theme));
     for (const todo of orderedTodos(task.todos)) {
       lines.push(renderTodoLine(todo, theme, rendererOptions.fallbackGlyphs));
     }

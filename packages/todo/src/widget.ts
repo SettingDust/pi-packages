@@ -5,10 +5,7 @@ import type { TodoSettings } from "./settings.js";
 import type { TodoState } from "./types.js";
 import { TodoWidgetComponent } from "./widget-component.js";
 
-export type TodoWidgetSettings = Partial<Pick<
-  TodoSettings,
-  "widgetPlacement" | "maxVisibleTasks" | "fallbackGlyphs"
->>;
+export type TodoWidgetSettings = Partial<Pick<TodoSettings, "widgetPlacement" | "maxVisibleTasks" | "fallbackGlyphs">>;
 
 type WidgetComponentFactory = (tui: TUI, theme: Theme) => Component & { dispose?(): void };
 type TodoWidgetUI = {
@@ -20,17 +17,10 @@ type TodoWidgetUI = {
 };
 
 const TERMINAL_WIDGET_DELAY_MS = 5_000;
-type TodoWidgetLifecycle = {
-  hadOpenTodos: boolean;
-  terminalClearTimer?: ReturnType<typeof setTimeout>;
-};
+type TodoWidgetLifecycle = { hadOpenTodos: boolean; terminalClearTimer?: ReturnType<typeof setTimeout> };
 const widgetLifecycles = new WeakMap<TodoWidgetUI, TodoWidgetLifecycle>();
 
-export type TodoWidgetContext = {
-  hasUI?: boolean;
-  isIdle?: () => boolean;
-  ui?: TodoWidgetUI;
-};
+export type TodoWidgetContext = { hasUI?: boolean; isIdle?: () => boolean; ui?: TodoWidgetUI };
 
 export function resetTodoWidgetLifecycle(ctx: TodoWidgetContext | undefined): void {
   if (!ctx?.hasUI || !ctx.ui?.setWidget) return;
@@ -58,15 +48,13 @@ export function updateTodoWidget(ctx: TodoWidgetContext | undefined, state: Todo
 
     const hasTodos = state?.tasks.some((task) => task.todos.length > 0) ?? false;
     const hasOpenTodos = state?.tasks.some((task) => task.todos.some((todo) => todo.status === "pending" || todo.status === "in_progress")) ?? false;
-    const showFinalState = hasTodos && !hasOpenTodos
-      && (lifecycle.hadOpenTodos || lifecycle.terminalClearTimer !== undefined);
+    const showFinalState = hasTodos && !hasOpenTodos && (lifecycle.hadOpenTodos || lifecycle.terminalClearTimer !== undefined);
     const visibleState = hasOpenTodos || showFinalState ? state : undefined;
     const factory: WidgetComponentFactory | undefined = visibleState
       ? (tui, theme) => new TodoWidgetComponent(visibleState, theme, {
           maxVisible: settings.maxVisibleTasks,
           fallbackGlyphs: settings.fallbackGlyphs,
           blankLineBelow: placement === "aboveEditor",
-          animateWorkingMarker: ctx.isIdle ? !ctx.isIdle() : true,
         }, tui)
       : undefined;
     ui.setWidget!("todo", factory, { placement });

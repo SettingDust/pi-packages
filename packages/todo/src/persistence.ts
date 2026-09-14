@@ -36,7 +36,7 @@ function exactObject(value: unknown, required: readonly string[], optional: read
 }
 
 function parseLegacyState(value: unknown): TodoState {
-  const root = exactObject(value, ["phases"], ["workingOn"]);
+  const root = exactObject(value, ["phases"]);
   if (!Array.isArray(root.phases)) throw new Error("Invalid legacy phases.");
 
   const tasks = root.phases.map((value) => {
@@ -56,10 +56,7 @@ function parseLegacyState(value: unknown): TodoState {
     };
   });
 
-  const canonical: unknown = {
-    tasks,
-    ...(root.workingOn === undefined ? {} : { workingOn: todoString(root.workingOn) }),
-  };
+  const canonical: unknown = { tasks };
   if (!isTodoState(canonical)) throw new Error("Invalid legacy state.");
   return cloneTodoState(canonical);
 }

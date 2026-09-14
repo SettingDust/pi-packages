@@ -10,12 +10,12 @@ Pi receives exactly four tools:
 
 - `todo_set { tasks }` replaces the plan. Each task is `{ name, todos }`; each creation is `{ name, description }` and starts `pending`.
 - `todo_add { task, todos }` appends one or more pending todos to an existing task.
-- `todo_transition { transitions, workingOn? }` is the only lifecycle operation. A transition is `{ task, todo, status }`.
+- `todo_transition { transitions }` is the only lifecycle operation. A transition is `{ task, todo, status }`; request-level `workingOn` is not accepted, and old requests carrying it fail closed as unknown input.
 - `todo_view {}` reads the current snapshot without changing it.
 
-A snapshot is `{ tasks, workingOn? }`. Every task has globally unique `name` and `todos`; every todo has a task-local unique `name`, `description`, and `status`. Status is `pending`, `in_progress`, `completed`, or `cancelled`. Names and descriptions are trimmed non-empty strings and matching is exact and case-sensitive.
+A snapshot is `{ tasks }`. Every task has globally unique `name` and `todos`; every todo has a task-local unique `name`, `description`, and `status`. Status is `pending`, `in_progress`, `completed`, or `cancelled`. Names and descriptions are trimmed non-empty strings and matching is exact and case-sensitive. Multiple task groups may contain `in_progress` todos simultaneously; each remains represented independently.
 
-`workingOn` is derived, not independently selected: it is the description of the first `in_progress` todo in task order and then todo order, and is absent when no todo is in progress. A supplied `workingOn` must equal that value. The widget's active task group follows the same derived todo.
+`workingOn` is not part of the state, request, result, restore, or widget contract. Old-version clients are unsupported; there is no compatibility parsing, dual-read, dual-write, or migration window.
 
 Todo state restores only from a successful complete Todo tool result already recorded in the current Pi session branch. This does not promise cross-branch restore, power-loss durability, or behavior on future Pi Host versions.
 
@@ -25,7 +25,7 @@ Todo state restores only from a successful complete Todo tool result already rec
 - **Session-aware state.** Recorded Todo results restore the plan associated with the current Pi session branch.
 - **Persistent widget.** Keep active work visible above or below the editor, with configurable placement, task limits, and status glyphs.
 - **Adaptive reminders.** System reminders refresh the model's awareness of stale plans during long runs and restore the full plan after context compaction.
-- **Native tool rendering.** Compact tool output summarizes active work and expands into task progress while respecting configurable visibility settings.
+- **Native tool rendering.** Compact tool output summarizes task progress and expands into task rows while respecting configurable visibility settings.
 
 ## Local development
 
@@ -66,4 +66,4 @@ Dynamic reminders keep the model aware of the plan during longer runs without ad
 
 After Pi compacts the context window, the extension supplies the full Todo plan once on the next turn so work can continue without losing task state. This does not alter Pi's compaction summary or session history.
 
-Settings load when a session starts. The widget refreshes after Todo changes and `/tree` navigation. Active todos keep their normal status glyph; when work is active, a separate indented current-work line below the plan uses Pi's standard spinner and dim text. After all todos become terminal, the widget shows the final task summary for five seconds before clearing. Set `widgetPlacement` to `"off"` to disable the widget.
+The widget refreshes after Todo changes and `/tree` navigation. Active todos keep their normal status glyph. After all todos become terminal, the widget shows the final task summary for five seconds before clearing. Set `widgetPlacement` to `"off"` to disable the widget.

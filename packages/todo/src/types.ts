@@ -20,10 +20,9 @@ export type TodoTask = {
   readonly todos: readonly Todo[];
 };
 
-/** The complete canonical snapshot. `workingOn` is derived, never chosen independently. */
+/** The complete canonical snapshot. */
 export type TodoState = {
   readonly tasks: readonly TodoTask[];
-  readonly workingOn?: string;
 };
 
 export type TodoCreation = {
@@ -53,7 +52,6 @@ export type TodoTransition = {
 
 export type TodoTransitionRequest = {
   readonly transitions: readonly TodoTransition[];
-  readonly workingOn?: string;
 };
 
 export type TodoViewRequest = Record<never, never>;

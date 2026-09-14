@@ -22,13 +22,6 @@ export function cloneTodoState(state: TodoState): TodoState {
   return canonicalState(state.tasks);
 }
 
-export function deriveActiveTask(tasks: readonly TodoTask[]): TodoTask | undefined {
-  return tasks.find((task) => task.todos.some((todo) => todo.status === "in_progress"));
-}
-
-export function deriveWorkingOn(tasks: readonly TodoTask[]): string | undefined {
-  return deriveActiveTask(tasks)?.todos.find((todo) => todo.status === "in_progress")?.description;
-}
 
 export function applyTodoSet(request: TodoSetRequest): TodoState {
   const parsed = parseTodoSetRequest(request);
@@ -69,17 +62,13 @@ export function applyTodoTransition(state: TodoState, request: TodoTransitionReq
     changes.set(key, transition.status);
   }
 
-  const next = canonicalState(state.tasks.map((task) => ({
+  return canonicalState(state.tasks.map((task) => ({
     ...task,
     todos: task.todos.map((todo) => {
       const status = changes.get(transitionKey(task.name, todo.name));
       return status === undefined ? todo : { ...todo, status };
     }),
   })));
-  if (parsed.workingOn !== undefined && parsed.workingOn !== next.workingOn) {
-    throw new Error("workingOn does not match the derived active todo.");
-  }
-  return next;
 }
 
 export function parseTodoSetRequest(value: unknown): TodoSetRequest {
@@ -99,16 +88,13 @@ export function parseTodoAddRequest(value: unknown): TodoAddRequest {
 }
 
 export function parseTodoTransitionRequest(value: unknown): TodoTransitionRequest {
-  const input = exactObject(value, ["transitions"], ["workingOn"]);
+  const input = exactObject(value, ["transitions"]);
   if (!Array.isArray(input.transitions) || input.transitions.length === 0) {
     throw new Error("transitions must be a non-empty array.");
   }
   const transitions = input.transitions.map(parseTodoTransition);
   assertUnique(transitions.map((transition) => transitionKey(transition.task, transition.todo)), "Duplicate transition target.");
-  return {
-    transitions,
-    ...(input.workingOn === undefined ? {} : { workingOn: todoString(input.workingOn) }),
-  };
+  return { transitions };
 }
 
 export function parseTodoViewRequest(value: unknown): TodoViewRequest {
@@ -126,7 +112,7 @@ export function isTodoState(value: unknown): value is TodoState {
 }
 
 export function assertTodoState(value: unknown): asserts value is TodoState {
-  const input = exactObject(value, ["tasks"], ["workingOn"]);
+  const input = exactObject(value, ["tasks"]);
   if (!Array.isArray(input.tasks)) throw new Error("tasks must be an array.");
 
   const tasks = input.tasks.map((task) => {
@@ -142,14 +128,6 @@ export function assertTodoState(value: unknown): asserts value is TodoState {
     };
   });
   assertTaskShape(tasks);
-
-  const derived = deriveWorkingOn(tasks);
-  if (input.workingOn !== undefined && todoString(input.workingOn) !== derived) {
-    throw new Error("workingOn does not match the derived active todo.");
-  }
-  if (input.workingOn === undefined && derived !== undefined) {
-    throw new Error("workingOn is required for an active todo.");
-  }
 }
 
 function canonicalState(tasks: readonly TodoTask[]): TodoState {
@@ -158,8 +136,7 @@ function canonicalState(tasks: readonly TodoTask[]): TodoState {
     todos: task.todos.map((todo) => ({ ...todo })),
   }));
   assertTaskShape(copied);
-  const workingOn = deriveWorkingOn(copied);
-  return workingOn === undefined ? { tasks: copied } : { tasks: copied, workingOn };
+  return { tasks: copied };
 }
 
 function parseTodoTaskCreation(value: unknown): TodoTaskCreation {
