@@ -14,7 +14,6 @@ const state: TodoState = {
       todo("Ship release", "completed"),
     ] },
   ],
-  workingOn: "Building the feature",
 };
 
 describe("todo formatting", () => {
@@ -26,7 +25,6 @@ describe("todo formatting", () => {
     expect(summary).toMatch(/✓ Ship release/);
     expect(summary).not.toContain("Detailed description");
     expect(summary).toContain("Todo: 1 active · 1 pending · 1 completed · 1 cancelled");
-    expect(summary).toContain("Working on: Building the feature");
     expect(formatTodoSummary(state, true)).toContain("Build feature — Detailed description for Build feature.");
   });
 
@@ -42,13 +40,11 @@ describe("todo formatting", () => {
         { name: "Empty task", todos: [] },
         state.tasks[1],
       ],
-      workingOn: state.workingOn,
     };
 
     expect(formatTodoCompactionContext(completeState)).toBe([
       "<system-reminder source=\"todo-post-compaction\">",
       "Todo list after compaction:",
-      "Current work: Building the feature",
       "Planning:",
       "  [pending] Plan release: Detailed description for Plan release.",
       "  [cancelled] Cancel old approach: Detailed description for Cancel old approach.",

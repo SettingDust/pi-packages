@@ -24,7 +24,6 @@ export function formatTodoSummary(state: TodoState | undefined, includeDescripti
 
   return [
     `Todo: ${summary}`,
-    ...(state?.workingOn ? [`Working on: ${state.workingOn}`] : []),
     ...formatTodoTaskLines(state, includeDescriptions),
   ].join("\n");
 }
@@ -56,7 +55,6 @@ export function formatTodoCompactionContext(state: TodoState): string | undefine
   return [
     "<system-reminder source=\"todo-post-compaction\">",
     "Todo list after compaction:",
-    ...(state.workingOn ? [`Current work: ${state.workingOn}`] : []),
     ...plan,
     "Continue using this list and keep todo statuses current.",
     "Do not mention this reminder to the user.",

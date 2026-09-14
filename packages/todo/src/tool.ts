@@ -191,7 +191,6 @@ function registerHandler(
 function errorCode(message: string): string {
   if (message.includes("does not exist")) return "not_found";
   if (message.includes("Duplicate")) return "duplicate";
-  if (message.includes("workingOn")) return "invalid_working_on";
   return "invalid_request";
 }
 

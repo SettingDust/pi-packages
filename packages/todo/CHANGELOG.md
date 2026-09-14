@@ -6,8 +6,11 @@ All notable changes to `@settingdust/pi-todo` will be documented in this file.
 ### Changed
 
 - Replace the phased Todo API with `todo_set`, `todo_add`, `todo_transition`, and `todo_view` over canonical `tasks[].todos[]` state.
-- Make creation pending by default and reserve lifecycle status changes for `todo_transition`; derive `workingOn` from the first in-progress todo.
+- Make creation pending by default and reserve lifecycle status changes for strict `todo_transition { transitions }`.
+- Remove the obsolete `workingOn` request, state, result, restore, formatter, reminder, renderer, and widget projections; multiple in-progress todos remain independently represented.
+- Reject request-level `workingOn` as unknown input, with no old-client compatibility parsing, dual-read, dual-write, or migration window.
 - Document the branch-local Host-recorded restore boundary and update public Todo terminology from phases/tasks to tasks/todos.
+
 ## [0.3.7] - 2026-08-03
 
 ### Changed
@@ -32,14 +35,12 @@ All notable changes to `@settingdust/pi-todo` will be documented in this file.
 ### Changed
 
 - Use the pending empty-circle glyph and normal text color for active tasks in expanded tool calls and the widget.
-- Slow the widget's `workingOn` spinner to 200 milliseconds per frame.
 - Strengthen tool guidance to prefer a few broad phases, cancel stale tasks, and add newly discovered work instead of expanding existing task scope.
 
 ## [0.3.3] - 2026-07-17
 
 ### Changed
 
-- Replace the working-line spinner with font-independent wave characters and update the in-progress Nerd Font task glyph.
 
 ## [0.3.2] - 2026-07-16
 
@@ -53,7 +54,6 @@ All notable changes to `@settingdust/pi-todo` will be documented in this file.
 
 ### Changed
 
-- Dim the active task's status icon while keeping its text at the normal color.
 - Refine the working indicator's styling and distinguish active and idle states.
 - Add a one-character outer margin to the widget.
 
@@ -62,10 +62,7 @@ All notable changes to `@settingdust/pi-todo` will be documented in this file.
 ### Changed
 
 - Require `set` and `add` to contain non-empty phases with described tasks, expose descriptions in full-plan `view` results and model reminders, and reject persisted phases or tasks that do not meet those requirements.
-- Require fresh `workingOn` text on every transition that leaves tasks `in_progress`, clear it when work becomes terminal, and include it in views and model reminders.
 - Change `view` to return only the full plan rather than filtering by phase.
-- Streamline the model-facing tool description and guidance around planning, status transitions, verification, and current-work summaries.
-- Simplify widget headings and phase progress, keep active-task status glyphs static, and show current-work text on a separate dimmed line with Pi's standard spinner.
 - Keep the final terminal widget summary visible for five seconds before clearing it, including across repeated terminal-state refreshes.
 - Refresh the README with a product screenshot and a concise, user-focused overview of features and settings.
 

@@ -60,7 +60,6 @@ describe("Todo four-tool coordinator", () => {
 
     const transition = await run(tools.get("todo_transition")!, {
       transitions: [{ task: "Build", todo: "Test", status: "in_progress" }],
-      workingOn: "Test description",
     });
     expect(transition.details).toEqual({
       result: "transition",
@@ -69,7 +68,6 @@ describe("Todo four-tool coordinator", () => {
           { name: "Build", todos: [{ ...creation("Code"), status: "pending" }, { ...creation("Test"), status: "in_progress" }] },
           { name: "build", todos: [] },
         ],
-        workingOn: "Test description",
       },
     });
 
@@ -83,6 +81,14 @@ describe("Todo four-tool coordinator", () => {
     await run(tools.get("todo_set")!, { tasks: [{ name: "Build", todos: [creation("Code")] }] });
     const before = (await run(tools.get("todo_view")!, {})).details.snapshot;
 
+    const oldTransition = await run(tools.get("todo_transition")!, {
+      transitions: [{ task: "Build", todo: "Code", status: "completed" }],
+      workingOn: "Code description",
+    });
+    expect(oldTransition.details).toEqual({
+      result: "error", error: { code: "invalid_request", message: "Object has an invalid shape." },
+    });
+
     for (const failure of [
       await run(tools.get("todo_set")!, { action: "set", tasks: [] }),
       await run(tools.get("todo_add")!, { task: "Build", todos: [creation("Bad")], workingOn: "Bad description" }),
@@ -94,7 +100,7 @@ describe("Todo four-tool coordinator", () => {
     expect((await run(tools.get("todo_view")!, {})).details.snapshot).toEqual(before);
   });
 
-  it("keeps failed multi-target transitions atomic and validates derived workingOn before publication", async () => {
+  it("keeps failed multi-target transitions atomic and rejects old transition requests before publication", async () => {
     const { tools } = setup();
     await run(tools.get("todo_set")!, {
       tasks: [{ name: "Build", todos: [creation("One"), creation("Two")] }],
@@ -109,12 +115,12 @@ describe("Todo four-tool coordinator", () => {
     expect(missing.details).toEqual({
       result: "error", error: { code: "not_found", message: "Todo transition target does not exist." },
     });
-    const wrongWorkingOn = await run(tools.get("todo_transition")!, {
+    const oldRequest = await run(tools.get("todo_transition")!, {
       transitions: [{ task: "Build", todo: "Two", status: "in_progress" }],
       workingOn: "wrong",
     });
-    expect(wrongWorkingOn.details).toEqual({
-      result: "error", error: { code: "invalid_working_on", message: "workingOn does not match the derived active todo." },
+    expect(oldRequest.details).toEqual({
+      result: "error", error: { code: "invalid_request", message: "Object has an invalid shape." },
     });
 
     expect((await run(tools.get("todo_view")!, {})).details.snapshot.tasks[0].todos.map((todo: any) => todo.status)).toEqual([
@@ -176,6 +182,10 @@ describe("Todo four-tool coordinator", () => {
     const published = widgetCalls.length;
     await run(tools.get("todo_view")!, {}, ctx);
     await run(tools.get("todo_add")!, { task: "Missing", todos: [creation("Rejected")] }, ctx);
+    await run(tools.get("todo_transition")!, {
+      transitions: [{ task: "Build", todo: "Code", status: "in_progress" }],
+      workingOn: "Code description",
+    }, ctx);
     expect(widgetCalls).toHaveLength(published);
     expect(published).toBe(3);
   });
