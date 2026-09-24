@@ -79,14 +79,14 @@ describe("Pi Harness Extension", () => {
     expect(first.systemPrompt).toContain("Treat reasoning and impact as independent axes");
     expect(first.systemPrompt).toContain("least sufficient finite non-negative reasoning and impact requirements");
     expect(first.systemPrompt).toContain("concrete objective, ambiguity, reasoning needed for correctness, verification burden, and actual consequence");
-    expect(first.systemPrompt).toContain("reasoning 0 is mechanical work with clear boundaries and low ambiguity");
+    expect(first.systemPrompt).toContain("Common reasoning guidance is 0 for mechanical work with clear boundaries and low ambiguity");
     expect(first.systemPrompt).toContain("not because of a Skill name, document type, or planning/review phase");
     expect(first.systemPrompt).toContain("1 for a small settled implementation or check, simple state reconciliation, or simple documentation reconciliation");
     expect(first.systemPrompt).toContain("2 for ordinary Plan or Tasks work, independent review, or multi-file impact analysis");
     expect(first.systemPrompt).toContain("Ordinary Plan, Tasks, and independent review work normally require at least reasoning 2");
     expect(first.systemPrompt).toContain("3 for final review involving architecture, security, migration, authority conflict, a complex root cause, or unusually difficult uncertainty");
     expect(first.systemPrompt).toContain("never combine them into a total score, weighted score, priority, or phase level");
-    expect(first.systemPrompt).toContain("impact 0 is local and reversible without external impact");
+    expect(first.systemPrompt).toContain("Common impact guidance is 0 for local, reversible work without external impact");
     expect(first.systemPrompt).toContain("1 for a consequence bounded to one module");
     expect(first.systemPrompt).toContain("2 for cross-module or materially behavior/compatibility-affecting work");
     expect(first.systemPrompt).toContain("3 for high-consequence, hard-to-reverse, or security, data, or external-system risk");
@@ -108,13 +108,13 @@ describe("Pi Harness Extension", () => {
       "When a terminal Handler Result is already visible in the current Router context",
       "read the complete Result, including its status, summary, report, and artifacts",
       "Visibility is input to Router judgment only",
-      "independently decide whether to delegate another atomic outcome, delegate a review, ask for clarification or authorization, wait, stop, or report completion",
-      "Preserve completed, partial, blocked, and failed as distinct Handler Result input semantics",
+      "Independently decide whether to delegate another atomic outcome, delegate a review, ask for clarification or authorization, wait, stop, or report completion",
+      "preserve completed, partial, blocked, and failed as distinct Handler Result input semantics",
       "If Result context is missing, incomplete, malformed, or structurally ambiguous, fail closed",
       "do not invent fields, status, identity, or outcome",
     ]) expect(first.systemPrompt).toContain(phrase);
     for (const phrase of [
-      "inspect the complete objective, constraints, and deliverables as one semantic bundle",
+      "Inspect the complete objective, constraints, and deliverables as one semantic bundle",
       "what one observable and verifiable terminal fact must be true",
       "Multiple checks may support one outcome",
       "independently meaningful completion or failure",
@@ -130,19 +130,72 @@ describe("Pi Harness Extension", () => {
       "A research conclusion is internal evidence",
       "official Scoop identity/version/hash/mapping",
       "independently consumed implementation dependency",
-      "unknown or ambiguous capability falls back to serial execution",
-      "decision authority returns to you",
-      "Read the full Result, truthfully project completed, partial, blocked, or failed",
-      "make a fresh Router-owned decision before releasing dependents",
+      "unsupported, stale, incompatible, or ambiguous capability requires serial scheduling",
+      "After projecting each Result, make a fresh Router-owned decision before releasing dependents",
+      "Immediately project completed, partial, blocked, or failed truthfully",
       "Do not let the Handler choose continuation",
       "Retry only the failed outcome's boundary",
-      "never silently replay completed durable side effects or independent outcomes",
+      "Never resume an active execution or one with a terminal Result; never silently replay completed durable side effects or independent outcomes",
       "Do not add a hidden scheduler, queue, retry engine, fixed Result-to-Todo mapping, Handler continuation, or automatic dispatch",
     ]) expect(first.systemPrompt).toContain(phrase);
     expect(first.systemPrompt).not.toContain("After every terminal Handler Result notification");
     expect(first.systemPrompt).not.toContain("Release dependencies only after that terminal projection");
     expect(first.systemPrompt).not.toContain("schedule newly unblocked outcomes");
     expect(first.systemPrompt).not.toContain("use serial fallback");
+    // Generated prompt contracts; these checks do not exercise Router decisions or Host parallelism.
+    const headings = [
+      "Phase 1 - Identify and present outcomes.",
+      "Phase 2 - Select executable work.",
+      "Phase 3 - Resolve and delegate the selected outcome.",
+      "Phase 4 - Receive and project Results.",
+    ];
+    const positions = headings.map((heading) => first.systemPrompt.indexOf(heading));
+    expect(positions.every((position) => position >= 0)).toBeTrue();
+    expect(positions).toEqual([...positions].sort((a, b) => a - b));
+    expect(first.systemPrompt.match(/Phase [1-4] - /g)).toHaveLength(4);
+    const phases = positions.map((position, index) => first.systemPrompt.slice(position, positions[index + 1]));
+    for (const phrase of [
+      "Before choosing Skills, capability requests, Handoffs, or report packaging",
+      "complete coordination set immediately for multi-step work",
+      "only total absence of a writable and visible coordination mechanism may block coordination",
+      "three independent user requests as three outcomes and three terminal states",
+      "reproducing, diagnosing, fixing, and checking one bug",
+      "investigating alternatives for one comparison decision",
+      "independently consumed Result or dependency",
+    ]) expect(phases[0]).toContain(phrase);
+    for (const phrase of [
+      "in_progress immediately before its coordination action",
+      "distinct even when they write the same file; serialize conflicting writes against the latest state",
+      "Shared read-only sources alone do not conflict",
+      "only when current Host/tool-call parallel capability is positively proven",
+      "unsupported, stale, incompatible, or ambiguous capability requires serial scheduling",
+      "select and dispatch their own chains without waiting for an unrelated Handler Result",
+      "only decisions depending on a Result wait for its projection",
+      "obtain one current-user confirmation before planned delegation",
+    ]) expect(phases[1]).toContain(phrase);
+    for (const phrase of [
+      "Keep Handoff fields limited to objective, primarySkill, optional companionSkills, context, constraints, and deliverables; keep Handoff and admission shapes closed",
+      "After a resolved response and compatible delegate capability, immediately launch this outcome's Handler as the next environment action",
+      "Pass the returned prompt, model, and thinking exactly",
+      "agent: \"handler\" with that resolved prompt, model, thinking, taskSlug",
+      "If resolution or delegate capability fails, report the block without spawning",
+    ]) expect(phases[2]).toContain(phrase);
+    for (const phrase of [
+      "read the complete Result, including its status, summary, report, and artifacts",
+      "Immediately project completed, partial, blocked, or failed truthfully",
+      "not fixed workflow-control instructions",
+      "Never mark partial, blocked, or failed as completed",
+      "duplicate notification is idempotent",
+      "preserve the first semantic state, leave status and dependencies unchanged",
+      "On restart or replay, reapply only when available identity and visible state make that safe",
+      "prefer resuming that same execution",
+      "After projecting each Result, make a fresh Router-owned decision before releasing dependents",
+      "release only satisfied dependencies",
+      "A combined final report does not merge independent execution or completion states",
+      "terminal Result was applied, identity and required fields are known and non-contradictory",
+      "record is neither current nor needed by unresolved dependents",
+      "Never use subagent_remove for cleanup or delete Results, sessions, manifests, or artifacts",
+    ]) expect(phases[3]).toContain(phrase);
     expect(active).toEqual(["read", "resolve_delegation"]);
     expect(registryReads).toBe(0);
 

@@ -18,8 +18,16 @@ The draft host authority assigns host-observed effective-tool preparation, exact
 The Router adapts a resolved invocation directly to a compatible environment delegate tool. `@settingdust/pi-harness` does not register a delegate wrapper, callback interface, backend registry, or backend-specific adapter.
 
 A compatible backend must start an independent Handler, guarantee exact resolved model/thinking, apply the fixed `handler` Agent, preserve normal Skill/reference access, return stable task identity, and preserve the Handler YAML Result.
-The Pi host effective-inventory module owns host-observed effective-tool preparation, active winner selection, exact per-turn `context.tools` snapshots, compatibility-profile evaluation, runtime-generation validity, and dispatch pinning.
+
+### Accepted Router Workflow Clarification
+
+The user-approved workflow orders Router coordination by visible outcome: (1) identify and present independently observable user-requested outcomes and completion predicates using existing visible coordination surfaces before Skill or Handoff selection; (2) select one executable outcome; (3) resolve its exact one-result Handoff and directly launch the compatible delegate with the unchanged resolved prompt, model, and thinking as the next environment action after `resolved`; (4) receive and truthfully project its Result before deciding on subsequent work. The Router keeps separate execution and terminal states for independent user results even if it later combines reporting. Internal checks for one bug or alternatives for one comparison may share one outcome when they serve one terminal predicate. This does not alter authorization, the fixed `handler` Agent, closed Handoff/admission schemas, Result ownership, or failure recovery. See the [Router Delegation Specification](../spec/router-delegation.md#11-generic-single-result-delegation-contract) and [PRD](../prd/router-delegation.md).
+
+Independent outcomes may run concurrent resolve-to-spawn chains only on positively proven current Host/tool-call parallel capability and without conflicting inputs, outputs, writes, dependencies, ownership, authority, behavioral contracts, or side effects. Shared read-only sources alone are not a conflict. Distinct outcomes writing the same file remain distinct and serialize; unavailable, stale, incompatible, or ambiguous capability also falls back to serial execution. This remains a Router judgment, not a new scheduler or Host capability claim.
+
 ## Draft Amendment: Consume Host-Issued Compatibility
+
+If accepted and implemented, the proposed Pi host effective-inventory module would own host-observed effective-tool preparation, active winner selection, exact per-turn `context.tools` snapshots, compatibility-profile evaluation, runtime-generation validity, and dispatch pinning. Neither the accepted workflow clarification nor the current base decision establishes that Host capability.
 
 For each Router pass, Harness and Router must consume the compatibility outcome issued by the host effective-inventory snapshot for the selected backend profile. They must not independently authenticate provenance from model-visible name/schema/description, package/version, a source path supplied by the model, or historical research.
 
@@ -31,18 +39,26 @@ After compatibility is established and `resolve_delegation` returns `resolved`, 
 
 ## Consequences
 
+For the accepted workflow clarification, independent results and their terminal states remain visible before combined reporting, while direct delegation stays unchanged. The Router must track and serialize conflicting outcomes even when one final response reports them together.
+
+The following consequences apply only to the unaccepted host-consumer amendment:
+
 Positive:
 
-- Harness stays independent of delegate implementation code.
-- Compatibility assessment and dispatch refer to one exact host-pinned winner.
-- The Router has less interface to reason about: consume a coded host outcome, then perform one exact mapping.
-- T1 backend research remains useful without being overstated as provenance.
+- Harness would stay independent of delegate implementation code.
+- Compatibility assessment and dispatch would refer to one exact host-pinned winner.
+- The Router would consume a coded host outcome before one exact mapping.
+- T1 backend research would remain useful without being overstated as provenance.
 
 Negative:
 
-- The amended behavior depends on host support from ADR-0008.
-- A missing, stale, incompatible, or malformed host outcome blocks before resolution even when the visible schema appears suitable.
-- A different backend needs an approved host compatibility profile before use.
+- The amended behavior would depend on host support from ADR-0008.
+- A missing, stale, incompatible, or malformed host outcome would block before resolution even when the visible schema appears suitable.
+- A different backend would need an approved host compatibility profile before use.
+
+## Revisit
+
+Revisit the accepted workflow if direct delegation can no longer preserve exact resolved invocation or visible outcome/Result correspondence; any Host-issued compatibility requirement remains a separate draft decision until accepted.
 
 ## Non-Goals
 
