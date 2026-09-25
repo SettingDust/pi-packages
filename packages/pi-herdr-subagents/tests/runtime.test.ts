@@ -4,7 +4,7 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, writeFil
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { createHerdrClient } from "@settingdust/pi-herdr";
-import activateSubagents, { AgentRegistry, SubagentRuntime, createHerdrTransport, createSubagentTools, validateExplicitSpawnModel, type CompletionNotification, type HerdrTransport } from "../src/index.js";
+import activateSubagents, { AgentRegistry, SubagentRuntime, createHerdrTransport, createSubagentTools, paneChildExtensionPath, validateExplicitSpawnModel, type CompletionNotification, type HerdrTransport } from "../src/index.js";
 
 function fakeTransport(paneExists: boolean | (() => boolean) = true) {
   const calls: unknown[] = [];
@@ -24,6 +24,8 @@ function handlerRegistry(body = "Handler"): AgentRegistry {
   registry.setFiles([{ path: "/handler.md", content: `---\nname: handler\n---\n${body}` }]);
   return registry;
 }
+
+const childToolExclusions = "subagent_spawn,subagent_resume,subagent_inspect,subagent_join,subagent_steer,subagent_cancel,subagent_remove";
 
 async function waitFor(predicate: () => boolean, timeout = 2500): Promise<void> {
   const deadline = Date.now() + timeout;
@@ -85,6 +87,12 @@ describe("pi-herdr-subagents runtime", () => {
     const spec = JSON.parse(Buffer.from(encoded!, "base64").toString("utf8")) as { command: string; args: string[] };
     expect(spec.command).toBe(process.execPath);
     expect(spec.args[0]).toBe(process.argv[1]);
+    expect(spec.args.slice(1)).toEqual([
+      "--session", task.sessionFile, "-e", paneChildExtensionPath, "--system-prompt", "Execute the Handoff.",
+      "--exclude-tools", childToolExclusions, "--model", "test/model", "--thinking", "high",
+      "Do\nthe work\n\nReturn the Handler Result as YAML, then call subagent_done with that exact YAML string.",
+    ]);
+    expect(spec.args).not.toContain("--tools");
     expect(spec.args).toContain("Execute the Handoff.");
     expect(spec.args).toContain("--model");
     expect(spec.args).toContain("test/model");
@@ -2746,6 +2754,12 @@ test("resume preserves the persisted generation-2 combined argv", async () => {
   const encoded = bootstrap.match(/Buffer.from\("([^"]+)"/)?.[1];
   const spec = JSON.parse(Buffer.from(encoded!, "base64").toString("utf8")) as { args: string[] };
   const modelIndex = spec.args.indexOf("--model");
+  expect(spec.args.slice(1)).toEqual([
+    "--session", first.sessionFile, "-e", paneChildExtensionPath, "--system-prompt", "Handler",
+    "--exclude-tools", childToolExclusions, "--model", "test/family/model:high",
+    "two\n\nReturn the Handler Result as YAML, then call subagent_done with that exact YAML string.",
+  ]);
+  expect(spec.args).not.toContain("--tools");
   expect(spec.args.slice(modelIndex, modelIndex + 2)).toEqual(["--model", "test/family/model:high"]);
   expect(spec.args).not.toContain("--thinking");
   writeFileSync(resumed.resultPath, JSON.stringify({ subagentId: resumed.subagentId, generation: 2, status: "completed", result: "done" }));

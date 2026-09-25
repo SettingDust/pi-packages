@@ -117,7 +117,7 @@ test("nudges one unfinished turn and deduplicates repeated agent_end events", ()
     expect(clock.timers.pending).toBe(1);
     clock.timers.runAll();
     expect(child.messages).toEqual([{
-      text: "Your task is still active. Call subagent_done when finished.",
+      text: "No terminal result has been recorded yet. If your work is finished, call subagent_done with its outcome; otherwise, continue the remaining work.",
       options: { deliverAs: "followUp" },
     }]);
   } finally {

@@ -32,7 +32,7 @@ export default function paneChild(
     nudgeTimer = setTimeout(() => {
       nudgeTimer = undefined;
       if (completionState === "active" && !inputAfterAgentEnd) {
-        pi.sendUserMessage("Your task is still active. Call subagent_done when finished.", { deliverAs: "followUp" });
+        pi.sendUserMessage("No terminal result has been recorded yet. If your work is finished, call subagent_done with its outcome; otherwise, continue the remaining work.", { deliverAs: "followUp" });
       }
     }, nudgeDelay);
   };

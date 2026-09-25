@@ -111,7 +111,7 @@ Notification send or branch-inspection failure must not change task status, Resu
 
 For a child generation with a valid pane-child environment, each `agent_end` that leaves the execution unfinished must schedule one delayed continuation check. The check must send exactly the fixed follow-up user message:
 
-`Your task is still active. Call subagent_done when finished.`
+`No terminal result has been recorded yet. If your work is finished, call subagent_done with its outcome; otherwise, continue the remaining work.`
 
 The follow-up must use Pi's `deliverAs: "followUp"` behavior and must execute in the same child session and generation. It must not create a parent task, increment generation, open a pane, or write a terminal Result.
 
@@ -176,7 +176,8 @@ Focused checks must demonstrate:
 9. child continuation deduplicates `agent_end` timers, clears on input/start/shutdown, supports another unfinished turn without a retry limit, and stops after `subagent_done`; focused checks must separately verify input cleanup, `agent_start` reset, shutdown after a nudge has fired, and at least two successive unfinished continuation cycles;
 10. package typecheck, the full package tests, and a fresh independent review pass against this Spec and the applicable Work;
 11. an aborted `subagent_join` stops promptly while the task remains running, with no Result, notification, manifest, generation, or pane mutation until an explicit lifecycle operation; and
-12. section 10's acceptance matrix is satisfied by focused fake-transport checks plus a disposable real Herdr tab-close acceptance check.
+12. section 10's acceptance matrix is satisfied by focused fake-transport checks plus a disposable real Herdr tab-close acceptance check; and
+13. generation-one and resumed generation-two launch argv exclude exactly the seven parent-management tools (`subagent_spawn`, `subagent_resume`, `subagent_inspect`, `subagent_join`, `subagent_steer`, `subagent_cancel`, `subagent_remove`) via `--exclude-tools`, omit `--tools`, and retain session, pane-child extension, system prompt, task prompt, and ordinary extension eligibility including `subagent_done`.
 
 ## 8. Known Verification Limit
 

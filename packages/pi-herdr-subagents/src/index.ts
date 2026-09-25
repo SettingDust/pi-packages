@@ -781,7 +781,7 @@ export class SubagentRuntime {
       task.updatedAt = task.startedAt;
       await this.persist(task);
       this.notifyTaskUpdate();
-      const args = ["--session", sessionFile, "-e", paneChildExtensionPath, "--system-prompt", agent.body, "--tools", "read,bash,edit,write,subagent_done", ...input.launchArgs];
+      const args = ["--session", sessionFile, "-e", paneChildExtensionPath, "--system-prompt", agent.body, "--exclude-tools", "subagent_spawn,subagent_resume,subagent_inspect,subagent_join,subagent_steer,subagent_cancel,subagent_remove", ...input.launchArgs];
       args.push(`${input.prompt}\n\nReturn the Handler Result as YAML, then call subagent_done with that exact YAML string.`);
       const launchScript = join(artifactDir, `launch-${input.generation}.ps1`);
       const bootstrapScript = join(artifactDir, `launch-${input.generation}.cjs`);
