@@ -22,15 +22,17 @@ const state: TodoState = {
   ],
 };
 
-test("todo widget shows only open todos from the selected task", () => {
-  const lines = renderTodoWidgetLines(state, undefined, 80, { maxVisible: 2, fallbackGlyphs: true });
-  const output = lines.join("\n");
-
-  assert.ok(output.indexOf("Active todo") < output.indexOf("First pending todo"));
-  assert.doesNotMatch(output, /Detailed description|Second pending todo|Finished todo|Cancelled todo/);
+test("todo widget keeps fixed-order counts and a canonical active anchor in two rows", () => {
+  const before = structuredClone(state);
+  const lines = renderTodoWidgetLines(state, undefined, 80, { maxVisible: 1, fallbackGlyphs: true });
+  assert.equal(lines.length, 2);
+  assert.match(lines[0]!, /Todos  in_progress:1 · pending:2 · completed:1 · cancelled:1/);
+  assert.match(lines[1]!, /○ Plan \/ Active todo$/);
+  assert.doesNotMatch(lines.join("\n"), /Detailed description|First pending todo|Second pending todo|Finished todo|Cancelled todo/);
+  assert.deepEqual(state, before);
 });
 
-test("todo widget applies semantic colors to todo and secondary rows", () => {
+test("todo widget uses semantic colors for title, counts and anchor", () => {
   const calls: { color: string; text: string }[] = [];
   renderTodoWidgetLines(state, {
     bold: (text: string) => text,
@@ -38,53 +40,31 @@ test("todo widget applies semantic colors to todo and secondary rows", () => {
       calls.push({ color, text });
       return text;
     },
-  } as never, 80, { maxVisible: 10, fallbackGlyphs: true });
+  } as never, 80, { fallbackGlyphs: true });
 
-  assert.equal(calls.find(({ text }) => text.includes("Active todo"))?.color, "text");
-  assert.equal(calls.find(({ text }) => text.includes("First pending todo"))?.color, "muted");
-  assert.equal(calls.find(({ text }) => text.includes("complete todo"))?.color, "muted");
-  assert.equal(calls.find(({ text }) => text.includes("Build"))?.color, "muted");
+  assert.equal(calls.find(({ text }) => text === "Todos")?.color, "toolTitle");
+  assert.equal(calls.find(({ text }) => text.includes("in_progress:1"))?.color, "muted");
+  assert.equal(calls.find(({ text }) => text.includes("Plan / Active todo"))?.color, "text");
   assert.ok(calls.every(({ color }) => color !== "dim"));
 });
 
-test("todo widget prioritizes statuses stably and shows every active todo over the limit", () => {
-  const activeState: TodoState = {
-    tasks: [{ name: "Work", todos: [
-      todo("pending first"),
-      todo("active first", "in_progress"),
-      todo("completed", "completed"),
-      todo("active second", "in_progress"),
-      todo("pending second"),
-    ] }],
-  };
-  const lines = renderTodoWidgetLines(activeState, undefined, 80, { maxVisible: 1, fallbackGlyphs: true });
-  const text = lines.join("\n");
-  assert.ok(text.indexOf("active first") < text.indexOf("active second"));
-  assert.doesNotMatch(lines.slice(2).join("\n"), /pending first|completed|pending second/);
-  assert.match(text, /\+2 more/);
-  assert.match(text, /1 complete todo/);
-});
-
-test("todo widget expands every active task in canonical order with independent limits", () => {
+test("todo widget anchors the first active across groups and bounds remaining work to +N", () => {
   const multiState: TodoState = {
     tasks: [
-      { name: "First", todos: [todo("first active", "in_progress"), todo("first pending"), todo("first done", "completed")] },
-      { name: "Second", todos: [todo("second pending"), todo("second active", "in_progress"), todo("second done", "completed")] },
-      { name: "Third", todos: [todo("third pending")] },
+      { name: "Pending first", todos: [todo("first pending")] },
+      { name: "First", todos: [todo("first active", "in_progress"), todo("another active", "in_progress")] },
+      { name: "Second", todos: [todo("second active", "in_progress"), todo("last pending")] },
     ],
   };
   const lines = renderTodoWidgetLines(multiState, undefined, 80, { maxVisible: 1, fallbackGlyphs: true });
-  const text = lines.join("\n");
-
-  assert.ok(text.indexOf("First") < text.indexOf("first active"));
-  assert.ok(text.indexOf("first active") < text.indexOf("Second"));
-  assert.ok(text.indexOf("Second") < text.indexOf("second active"));
-  assert.doesNotMatch(text, /third pending/);
-  assert.equal((text.match(/\+1 more/g) ?? []).length, 2);
-  assert.equal((text.match(/1 complete todo/g) ?? []).length, 2);
+  assert.equal(lines.length, 2);
+  assert.match(lines[0]!, /in_progress:3 · pending:2 · completed:0 · cancelled:0/);
+  assert.match(lines[1]!, /First \/ first active \+2$/);
+  assert.doesNotMatch(lines[1]!, /Pending first|Second|another active|second active/);
+  assert.equal(multiState.tasks[2]?.todos[0]?.status, "in_progress");
 });
 
-test("todo widget does not select a single task when no task is active", () => {
+test("todo widget uses first pending only without active work and omits terminal anchor", () => {
   const pendingState: TodoState = {
     tasks: [
       { name: "Done", todos: [todo("old", "completed")] },
@@ -93,23 +73,35 @@ test("todo widget does not select a single task when no task is active", () => {
     ],
   };
   const pendingLines = renderTodoWidgetLines(pendingState, undefined, 80, { fallbackGlyphs: true });
-  assert.doesNotMatch(pendingLines.join("\n"), /    ○ ready|    ○ later/);
+  assert.match(pendingLines[0]!, /in_progress:0 · pending:2 · completed:1 · cancelled:0/);
+  assert.match(pendingLines[1]!, /Next \/ ready \+1$/);
 
   const terminalLines = renderTodoWidgetLines({
-    tasks: [{ name: "Done", todos: [
-      todo("finished", "completed"),
-      todo("cancelled", "cancelled"),
-    ] }],
+    tasks: [{ name: "Done", todos: [todo("finished", "completed"), todo("cancelled", "cancelled")] }],
   }, undefined, 80, { fallbackGlyphs: true });
-  assert.doesNotMatch(terminalLines.join("\n"), /1 complete todo · 1 cancelled todo/);
+  assert.equal(terminalLines.length, 1);
+  assert.match(terminalLines[0]!, /in_progress:0 · pending:0 · completed:1 · cancelled:1/);
+  assert.deepEqual(renderTodoWidgetLines({ tasks: [] }, undefined, 80), [
+    " Todos  in_progress:0 · pending:0 · completed:0 · cancelled:0",
+  ]);
 });
 
-test("todo widget remains safe at narrow widths", () => {
-  const lines = renderTodoWidgetLines(state, undefined, 4, { maxVisible: 10 });
-  for (const line of lines) assert.ok(visibleWidth(line) <= 4);
-
-  const component = new TodoWidgetComponent(state, undefined, { maxVisible: 1 });
-  for (const line of component.render(1)) assert.ok(visibleWidth(line) <= 1);
+test("todo widget row count and width are stable for large and narrow snapshots", () => {
+  const large: TodoState = { tasks: Array.from({ length: 100 }, (_, index) => ({
+    name: `Task ${index} ${"Long".repeat(30)}`,
+    todos: Array.from({ length: 10 }, (_, item) => todo(`Todo ${item} ${"界".repeat(30)}`, item ? "pending" : "in_progress")),
+  })) };
+  for (const snapshot of [undefined, { tasks: [] }, state, large]) {
+    for (const width of [1, 4, 20, 80]) {
+      const lines = renderTodoWidgetLines(snapshot, undefined, width, { fallbackGlyphs: true });
+      assert.ok(lines.length >= 1 && lines.length <= 2);
+      assert.ok(lines.every((line) => visibleWidth(line) <= width));
+    }
+  }
+  assert.match(renderTodoWidgetLines(large, undefined, 80, { fallbackGlyphs: true })[1]!, /\+99$/);
+  const component = new TodoWidgetComponent(large, undefined, { blankLineBelow: true });
+  assert.equal(component.render(20).length, 3);
+  assert.equal(component.render(1).length, 3);
 });
 
 
