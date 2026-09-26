@@ -171,8 +171,51 @@ describe("Pi Harness Extension", () => {
       "unsupported, stale, incompatible, or ambiguous capability requires serial scheduling",
       "select and dispatch their own chains without waiting for an unrelated Handler Result",
       "only decisions depending on a Result wait for its projection",
-      "obtain one current-user confirmation before planned delegation",
+      "Select the exact same-directory Work/Plan/Tasks tuple for each planned invocation",
     ]) expect(phases[1]).toContain(phrase);
+    // Static contract contrasts for S1-S19; this synthetic event cannot establish live Router decisions.
+    for (const phrase of [
+      "settle intended outcomes, boundaries, constraints, and success criteria with the user",
+      "surface material alternatives rather than assuming agreement from silence",
+      "Reuse the owning PRD/ADR/Spec where it already covers the intent",
+      "express new behavior verifiably in the owning Spec before deriving an implementation Plan",
+      "do not wait for confirmation of a not-yet-ready implementation Plan",
+    ]) expect(phases[0]).toContain(phrase); // S1-S2: intent and authority before planning, preparation unblocked.
+    for (const phrase of [
+      "simple coherent deliverable, use one Spec-derived implementation Plan even across multiple files",
+      "genuinely complex staged delivery",
+      "overview of stages, dependencies, and incremental outcomes",
+      "route approval authorizes no stage",
+      "defer future-stage details only when they do not invalidate the route or hide a current-stage decision",
+      "Each implementation Plan identifies its Spec-derived scope and relationship to the overview, if any",
+      "outcome and important exclusions",
+      "behavior or artifact changes and owners",
+      "steps and material dependencies",
+      "verification and completion criteria",
+      "important tradeoffs, risks, and key decisions",
+      "explicit current-user confirmation of this disclosed implementation scope",
+      "A path, readiness claim, intent agreement, overview approval, document status, silence, ambiguous or declined response, Handoff, or successful Resolver admission is not confirmation",
+    ]) expect(phases[1]).toContain(phrase); // S3-S8/S13: route-only versus each ready scope.
+    for (const phrase of [
+      "refine Tasks, implement, repair defects, and verify across bounded Handler outcomes without per-task approval",
+      "confirm the affected portion before executing it",
+      "Unchanged work needs no reapproval; current-call byte drift can fail legality without itself requiring renewed confirmation",
+      "report failed or partial verification truthfully, and repair and recheck within scope",
+    ]) expect(phases[1]).toContain(phrase); // S9-S12: in-scope autonomy, drift and material changes.
+    for (const phrase of [
+      "Under existing explicit authorization only",
+      "bounded defect repair may restore established behavior without new Spec or implementation-plan confirmation by identifying authority and observed divergence, running focused checks, and reporting",
+      "minimum scoped containment action needed to limit ongoing harm even when normal planning or authority updates cannot precede it",
+      "check its effect as practicable, report it as temporary, and reconcile authority afterward",
+      "small behavior-neutral maintenance may proceed without new Spec or plan confirmation after a focused unchanged-behavior check and report",
+      "do not authorize new behavior or broader follow-on repair; route such changes through normal authority and scope confirmation, and clarify ambiguous target authority before claiming an exception",
+      "Destructive or externally high-impact incident actions",
+      "separate action-executor authorization boundary",
+    ]) expect(phases[1]).toContain(phrase); // S14-S19: narrow exceptions do not bypass authorization.
+    expect(phases[1]).not.toContain("reconfirm on substantive authority or Plan drift");
+    expect(phases[1]).not.toContain("Complete applicable planned Work/Plan/Tasks, disclose the exact selected Plan");
+    expect(phases[0].indexOf("settle intended outcomes")).toBeLessThan(phases[0].indexOf("express new behavior verifiably"));
+    expect(phases[1].indexOf("route approval authorizes no stage")).toBeLessThan(phases[1].indexOf("explicit current-user confirmation of this disclosed implementation scope"));
     for (const phrase of [
       "Keep Handoff fields limited to objective, primarySkill, optional companionSkills, context, constraints, and deliverables; keep Handoff and admission shapes closed",
       "After a resolved response and compatible delegate capability, immediately launch this outcome's Handler as the next environment action",

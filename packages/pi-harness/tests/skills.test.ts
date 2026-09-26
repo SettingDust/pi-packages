@@ -72,6 +72,21 @@ describe("built-in Skill library", () => {
     (name) => expect(readSkill(name).body).toContain("research-source-grounded"),
   );
 
+  test.each(["plan-implementation", "documentation-tasks-writing"])(
+    "%s separates independent outcomes despite execution conflicts",
+    (name) => {
+      const { body } = readSkill(name);
+      expect(body).toContain("Keep independently valuable outcomes separate even when their writes or other effects conflict");
+      expect(body).toContain("serialize conflicting tasks and dependencies");
+    },
+  );
+
+  test("spec-driven preparation completes without implementation checks", () => {
+    const { body } = readSkill("spec-driven-development");
+    expect(body).toContain("Complete each delegated outcome against its own authority and evidence checks");
+    expect(body).toContain("Require implementation checks and resolve unexplained implementation drift only when implementation is the delegated outcome");
+  });
+
   test("package metadata exposes the Skill directory", () => {
     const manifest = JSON.parse(readFileSync(join(root, "package.json"), "utf8"));
     expect(manifest.files).toContain("skills");
