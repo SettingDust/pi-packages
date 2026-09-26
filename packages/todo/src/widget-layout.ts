@@ -1,9 +1,9 @@
-import { truncateToWidth, visibleWidth } from "@earendil-works/pi-tui";
+import { truncateToWidth, visibleWidth, wrapTextWithAnsi } from "@earendil-works/pi-tui";
 import type { Theme } from "@earendil-works/pi-coding-agent";
 
 import { TODO_SEPARATOR_GLYPH, TODO_TRUNCATION_GLYPH, todoGlyph } from "./glyphs.js";
 import { countTodoStatuses, todoTasks } from "./format.js";
-import type { Todo, TodoState, TodoTask } from "./types.js";
+import type { Todo, TodoState, TodoStatus, TodoTask } from "./types.js";
 
 export type TodoWidgetLayoutOptions = {
   maxVisible?: number;
@@ -23,18 +23,42 @@ export function renderTodoWidgetLines(
   const tasks = state?.tasks ?? [];
   const counts = countTodoStatuses(todoTasks(state));
   const summary = (["in_progress", "pending", "completed", "cancelled"] as const)
-    .map((status) => `${status === "in_progress" ? (options.fallbackGlyphs ? "◔" : "󰦖") : todoGlyph(status, options.fallbackGlyphs)} ${counts[status]}`)
+    .map((status) => `${todoGlyph(status, options.fallbackGlyphs)} ${counts[status]}`)
     .join(` ${TODO_SEPARATOR_GLYPH} `);
   const title = toolTitle("Todos", theme);
   const lines = [fit(` ${title}  ${tasks.length} ${tasks.length === 1 ? "task" : "tasks"} ${TODO_SEPARATOR_GLYPH} ${theme?.fg ? theme.fg("muted", summary) : summary}`, safeWidth)];
 
-  for (const task of tasks) {
-    const todo = task.todos.find((item) => item.status === "in_progress") ?? task.todos[0];
-    const text = fit(todo ? `   ${todoGlyph(todo.status, options.fallbackGlyphs)} ${task.name} / ${todo.name}` : `   ${task.name}`, safeWidth);
-    lines.push(theme?.fg ? theme.fg(todo?.status === "in_progress" ? "text" : "muted", text) : text);
-  }
+  for (const task of tasks) lines.push(renderTodoWidgetTaskRow(task, theme, safeWidth, options));
 
   return lines;
+}
+
+function statusColor(status: TodoStatus): "accent" | "text" | "success" | "error" {
+  return ({ in_progress: "accent", pending: "text", completed: "success", cancelled: "error" } as const)[status];
+}
+
+function taskColor(task: TodoTask): "accent" | "text" | "success" | "error" | "muted" {
+  const todos = task.todos;
+  if (todos.some((todo) => todo.status === "in_progress")) return "accent";
+  if (todos.some((todo) => todo.status === "pending")) return "text";
+  if (todos.some((todo) => todo.status === "completed")) return "success";
+  return todos.length ? "error" : "muted";
+}
+
+export function renderTodoWidgetTaskRow(
+  task: TodoTask, theme: ThemeLike | undefined, width: number, options: TodoWidgetLayoutOptions = {}, prefix = "  ",
+): string {
+  const todo = task.todos.find((item) => item.status === "in_progress") ?? task.todos[0];
+  const color = (text: string, token: ReturnType<typeof taskColor>) => theme?.fg ? theme.fg(token, text) : text;
+  const title = color(task.name, taskColor(task));
+  const text = todo
+    ? `${prefix}${color(todoGlyph(todo.status, options.fallbackGlyphs), statusColor(todo.status))} ${title} ${options.fallbackGlyphs ? "›" : "󰄾"} ${color(todo.name, statusColor(todo.status))}`
+    : `${prefix}${title}`;
+  return fit(text, width);
+}
+
+export function renderTodoWidgetTaskName(task: TodoTask, theme: ThemeLike | undefined): string {
+  return theme?.fg ? theme.fg(taskColor(task), task.name) : task.name;
 }
 
 export function renderTodoTaskTitle(task: TodoTask, taskIndex: number, selected: boolean, theme: ThemeLike | undefined): string {
@@ -62,10 +86,22 @@ export function renderTodoLine(todo: Todo, theme: ThemeLike | undefined, fallbac
   return theme?.fg ? theme.fg(color, line) : line;
 }
 
+export function renderTodoWidgetDetailLines(todo: Todo, theme: ThemeLike | undefined, width: number, fallbackGlyphs = false): string[] {
+  const glyph = todoGlyph(todo.status, fallbackGlyphs);
+  const marker = `    ${glyph} `;
+  const label = width > visibleWidth(marker) ? marker : width > 2 ? `${glyph} ` : "";
+  const indent = " ".repeat(Math.min(visibleWidth(label), Math.max(0, width - 1)));
+  return [
+    ...(label ? [] : [fit(glyph, width)]),
+    ...wrapTextWithAnsi(todo.name, Math.max(1, width - visibleWidth(label))).map((part, index) => fit(`${index === 0 ? label : indent}${theme?.fg ? theme.fg(statusColor(todo.status), part) : part}`, width)),
+    ...wrapTextWithAnsi(todo.description, Math.max(1, width - visibleWidth(indent))).map((part) => fit(`${indent}${theme?.fg ? theme.fg("muted", part) : part}`, width)),
+  ];
+}
+
 function isTerminal(todo: Todo): boolean {
   return todo.status === "completed" || todo.status === "cancelled";
 }
 
-function fit(line: string, width: number): string {
+export function fit(line: string, width: number): string {
   return visibleWidth(line) <= width ? line : truncateToWidth(line, width, TODO_TRUNCATION_GLYPH);
 }

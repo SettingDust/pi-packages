@@ -1,5 +1,5 @@
-import type { Component, TUI } from "@earendil-works/pi-tui";
-import type { Theme } from "@earendil-works/pi-coding-agent";
+import { isKeyRelease, Key, matchesKey, type Component, type TUI } from "@earendil-works/pi-tui";
+import type { TerminalInputHandler, Theme } from "@earendil-works/pi-coding-agent";
 
 import type { TodoSettings } from "./settings.js";
 import type { TodoState } from "./types.js";
@@ -10,6 +10,7 @@ export type TodoWidgetSettings = Partial<Pick<TodoSettings, "widgetPlacement" | 
 type WidgetComponentFactory = (tui: TUI, theme: Theme) => Component & { dispose?(): void };
 type TodoWidgetUI = {
   notify?: (message: string, level?: "info" | "warning" | "error") => void;
+  onTerminalInput?: (handler: TerminalInputHandler) => () => void;
   setWidget?: {
     (id: string, content: string[] | undefined, options?: { placement?: "belowEditor" | "aboveEditor" }): void;
     (id: string, content: WidgetComponentFactory | undefined, options?: { placement?: "belowEditor" | "aboveEditor" }): void;
@@ -17,30 +18,97 @@ type TodoWidgetUI = {
 };
 
 const TERMINAL_WIDGET_DELAY_MS = 5_000;
-type TodoWidgetLifecycle = { hadOpenTodos: boolean; terminalClearTimer?: ReturnType<typeof setTimeout> };
+export type TodoWidgetLifecycle = {
+  hadOpenTodos: boolean;
+  terminalClearTimer?: ReturnType<typeof setTimeout>;
+  component?: TodoWidgetComponent;
+  unsubscribe?: () => void;
+};
 const widgetLifecycles = new WeakMap<TodoWidgetUI, TodoWidgetLifecycle>();
+export const createTodoWidgetLifecycle = (): TodoWidgetLifecycle => ({ hadOpenTodos: false });
 
-export type TodoWidgetContext = { hasUI?: boolean; isIdle?: () => boolean; ui?: TodoWidgetUI };
+export type TodoWidgetContext = { mode?: string; hasUI?: boolean; isIdle?: () => boolean; ui?: TodoWidgetUI };
 
-export function resetTodoWidgetLifecycle(ctx: TodoWidgetContext | undefined): void {
-  if (!ctx?.hasUI || !ctx.ui?.setWidget) return;
-  const ui = ctx.ui;
-  const lifecycle = widgetLifecycles.get(ui);
+function exit(lifecycle: TodoWidgetLifecycle): void {
+  const unsubscribe = lifecycle.unsubscribe;
+  lifecycle.unsubscribe = undefined;
+  unsubscribe?.();
+  lifecycle.component?.end();
+}
+
+function retire(lifecycle: TodoWidgetLifecycle): void {
+  exit(lifecycle);
+  lifecycle.component = undefined;
+}
+
+export function resetTodoWidgetLifecycle(ctx: TodoWidgetContext | undefined, owned?: TodoWidgetLifecycle): void {
+  const lifecycle = owned ?? (ctx?.ui ? widgetLifecycles.get(ctx.ui) : undefined);
   if (!lifecycle) return;
+  retire(lifecycle);
   cancelTerminalClear(lifecycle);
-  widgetLifecycles.delete(ui);
+  lifecycle.hadOpenTodos = false;
+  if (ctx?.ui) widgetLifecycles.delete(ctx.ui);
+}
+
+/** Enter only the currently mounted above-editor widget; no other surface is created. */
+export function enterTodoWidget(ctx: TodoWidgetContext | undefined, settings: TodoWidgetSettings, owned?: TodoWidgetLifecycle): void {
+  const ui = ctx?.ui;
+  const lifecycle = owned ?? (ui ? widgetLifecycles.get(ui) : undefined);
+  if (ctx?.mode !== "tui") {
+    ui?.notify?.("Todo details require the interactive TUI.", "warning");
+    return;
+  }
+  if (!ctx.hasUI || settings.widgetPlacement === "off" || settings.widgetPlacement === "belowEditor" || !lifecycle?.component || !ui?.onTerminalInput) {
+    ui?.notify?.("Todo details require a visible above-editor widget.", "warning");
+    return;
+  }
+  if (lifecycle.unsubscribe) return;
+  const component = lifecycle.component;
+  if (!component.start()) {
+    ui.notify?.("Todo details need more terminal space.", "warning");
+    return;
+  }
+  let pasting = false;
+  const listener: TerminalInputHandler = (data) => {
+    if (lifecycle.component !== component || !lifecycle.unsubscribe) return;
+    if (data.includes("\x1b[200~")) pasting = true;
+    if (pasting) {
+      if (data.includes("\x1b[201~")) pasting = false;
+      return;
+    }
+    if (isKeyRelease(data)) return;
+    try {
+      if (matchesKey(data, Key.escape)) {
+        exit(lifecycle);
+        return { consume: true };
+      }
+      if (component.handleKey(data)) return { consume: true };
+    } catch (error) {
+      exit(lifecycle);
+      notifyWidgetError(ui, error);
+    }
+  };
+  try {
+    lifecycle.unsubscribe = ui.onTerminalInput(listener);
+  } catch (error) {
+    component.end();
+    notifyWidgetError(ui, error);
+  }
 }
 
 /** Update (or clear) the persistent todo widget without requiring the host UI at runtime. */
-export function updateTodoWidget(ctx: TodoWidgetContext | undefined, state: TodoState | undefined, settings: TodoWidgetSettings = {}): void {
+export function updateTodoWidget(ctx: TodoWidgetContext | undefined, state: TodoState | undefined, settings: TodoWidgetSettings = {}, owned?: TodoWidgetLifecycle): void {
   if (!ctx?.hasUI || !ctx.ui?.setWidget) return;
   const ui = ctx.ui;
-  const lifecycle = widgetLifecycles.get(ui) ?? { hadOpenTodos: false };
+  const lifecycle = owned ?? widgetLifecycles.get(ui) ?? createTodoWidgetLifecycle();
+  const expandedTasks = lifecycle.component?.expandedTasks();
+  retire(lifecycle);
 
   try {
     const placement = settings.widgetPlacement ?? "aboveEditor";
     if (placement === "off") {
       cancelTerminalClear(lifecycle);
+      lifecycle.hadOpenTodos = false;
       widgetLifecycles.delete(ui);
       ui.setWidget!("todo", undefined);
       return;
@@ -51,11 +119,16 @@ export function updateTodoWidget(ctx: TodoWidgetContext | undefined, state: Todo
     const showFinalState = hasTodos && !hasOpenTodos && (lifecycle.hadOpenTodos || lifecycle.terminalClearTimer !== undefined);
     const visibleState = hasOpenTodos || showFinalState ? state : undefined;
     const factory: WidgetComponentFactory | undefined = visibleState
-      ? (tui, theme) => new TodoWidgetComponent(visibleState, theme, {
-          maxVisible: settings.maxVisibleTasks,
-          fallbackGlyphs: settings.fallbackGlyphs,
-          blankLineBelow: placement === "aboveEditor",
-        }, tui)
+      ? (tui, theme) => {
+          const component = new TodoWidgetComponent(visibleState, theme, {
+            maxVisible: settings.maxVisibleTasks,
+            fallbackGlyphs: settings.fallbackGlyphs,
+            blankLineBelow: placement === "aboveEditor",
+            expandedTasks: placement === "aboveEditor" ? expandedTasks : undefined,
+          }, tui, () => { if (lifecycle.component === component) retire(lifecycle); }, () => exit(lifecycle));
+          if (placement === "aboveEditor") lifecycle.component = component;
+          return component;
+        }
       : undefined;
     ui.setWidget!("todo", factory, { placement });
 
@@ -67,8 +140,12 @@ export function updateTodoWidget(ctx: TodoWidgetContext | undefined, state: Todo
       lifecycle.hadOpenTodos = false;
       if (!lifecycle.terminalClearTimer) {
         const timer = setTimeout(() => {
-          widgetLifecycles.delete(ui);
-          clearWidget(ui);
+          if (owned ? owned === lifecycle : widgetLifecycles.get(ui) === lifecycle) {
+            retire(lifecycle);
+            widgetLifecycles.delete(ui);
+            clearWidget(ui);
+          }
+          delete lifecycle.terminalClearTimer;
         }, TERMINAL_WIDGET_DELAY_MS);
         timer.unref?.();
         lifecycle.terminalClearTimer = timer;
@@ -76,9 +153,14 @@ export function updateTodoWidget(ctx: TodoWidgetContext | undefined, state: Todo
       widgetLifecycles.set(ui, lifecycle);
     } else {
       cancelTerminalClear(lifecycle);
+      lifecycle.hadOpenTodos = false;
       widgetLifecycles.delete(ui);
     }
   } catch (error) {
+    retire(lifecycle);
+    cancelTerminalClear(lifecycle);
+    lifecycle.hadOpenTodos = false;
+    widgetLifecycles.delete(ui);
     notifyWidgetError(ui, error);
   }
 }

@@ -1,6 +1,5 @@
 import type { ExtensionAPI, ExtensionContext, Theme } from "@earendil-works/pi-coding-agent";
 import { Container, Key, Text } from "@earendil-works/pi-tui";
-import { TodoDetailOverlay } from "./detail-overlay.js";
 import { formatTodoCompactionContext, formatTodoSize, todoTasks } from "./format.js";
 import { restoreTodoState } from "./persistence.js";
 import {
@@ -31,7 +30,7 @@ import {
   parseTodoViewRequest,
 } from "./state.js";
 import type { TodoState } from "./types.js";
-import { resetTodoWidgetLifecycle, updateTodoWidget } from "./widget.js";
+import { createTodoWidgetLifecycle, enterTodoWidget, resetTodoWidgetLifecycle, updateTodoWidget } from "./widget.js";
 
 type TodoResult = "set" | "add" | "transition" | "view";
 type TodoSuccess = { result: TodoResult; snapshot: TodoState };
@@ -41,11 +40,16 @@ type TodoResponse = TodoSuccess | TodoFailure;
 class TodoCoordinator {
   private state = createTodoState();
   private queue: Promise<void> = Promise.resolve();
+  readonly widgetLifecycle = createTodoWidgetLifecycle();
 
   restore(ctx: ExtensionContext, settings: TodoSettings): void {
-    resetTodoWidgetLifecycle(ctx);
+    resetTodoWidgetLifecycle(ctx, this.widgetLifecycle);
     this.state = restoreTodoState(ctx);
-    updateTodoWidget(ctx, this.state, settings);
+    updateTodoWidget(ctx, this.state, settings, this.widgetLifecycle);
+  }
+
+  shutdown(): void {
+    resetTodoWidgetLifecycle(undefined, this.widgetLifecycle);
   }
 
   snapshot(): TodoState {
@@ -78,9 +82,10 @@ class TodoCoordinator {
   }
 
   private commit(result: TodoResult, candidate: TodoState, ctx: ExtensionContext, settings: TodoSettings): TodoSuccess {
+    if (result === "set") resetTodoWidgetLifecycle(ctx, this.widgetLifecycle);
     this.state = candidate;
     const snapshot = cloneTodoState(this.state);
-    updateTodoWidget(ctx, snapshot, settings);
+    updateTodoWidget(ctx, snapshot, settings, this.widgetLifecycle);
     return { result, snapshot };
   }
 }
@@ -226,9 +231,10 @@ export function registerTodoTools(pi: ExtensionAPI): void {
     pendingCompactionContext = formatTodoCompactionContext(coordinator.snapshot());
     if (pendingCompactionContext) reminderCadence = noteTodoInteraction(reminderCadence);
   });
+  pi.on("session_shutdown", () => coordinator.shutdown());
   pi.on("before_agent_start", () => { reminderCadence = beginReminderAgentRun(reminderCadence); });
-  pi.on("agent_start", (_event, ctx) => updateTodoWidget(ctx, coordinator.snapshot(), settings));
-  pi.on("agent_settled", (_event, ctx) => updateTodoWidget(ctx, coordinator.snapshot(), settings));
+  pi.on("agent_start", (_event, ctx) => updateTodoWidget(ctx, coordinator.snapshot(), settings, coordinator.widgetLifecycle));
+  pi.on("agent_settled", (_event, ctx) => updateTodoWidget(ctx, coordinator.snapshot(), settings, coordinator.widgetLifecycle));
   pi.on("turn_end", (event) => {
     reminderCadence = interactedWithTodoThisTurn ? noteTodoInteraction(reminderCadence) : noteReminderTurn(reminderCadence, event.message.role === "assistant" ? event.message.usage?.output ?? 0 : 0);
     interactedWithTodoThisTurn = false;
@@ -248,18 +254,7 @@ export function registerTodoTools(pi: ExtensionAPI): void {
     return { messages: [...event.messages, { role: "user", content: reminder, timestamp: Date.now() }] };
   });
 
-  const openTodoDetails = (ctx: ExtensionContext): void => {
-    if (ctx.mode !== "tui") {
-      ctx.ui.notify("Todo details require the interactive TUI.", "warning");
-      return;
-    }
-    const snapshot = coordinator.snapshot();
-    ctx.ui.custom((tui, theme, keybindings, done) =>
-      new TodoDetailOverlay(snapshot, tui, theme, keybindings, done, settings.fallbackGlyphs), {
-      overlay: true,
-      overlayOptions: { width: "90%", maxHeight: "80%", margin: 1 },
-    });
-  };
+  const openTodoDetails = (ctx: ExtensionContext): void => enterTodoWidget(ctx, settings, coordinator.widgetLifecycle);
   pi.registerCommand("todo-details", { description: "Open Todo details", handler: async (_args, ctx) => openTodoDetails(ctx) });
   pi.registerShortcut(Key.ctrlShift("t"), { description: "Open Todo details", handler: openTodoDetails });
 

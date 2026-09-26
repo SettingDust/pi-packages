@@ -41,10 +41,10 @@ describe("Todo four-tool coordinator", () => {
     expect([...tools.keys()]).toEqual(["todo_set", "todo_add", "todo_transition", "todo_view"]);
     expect(tools.has("todo")).toBe(false);
     for (const tool of tools.values()) expect(tool.parameters.additionalProperties).toBe(false);
-    expect([...handlers.keys()]).toEqual(["session_start", "session_tree", "session_compact", "before_agent_start", "agent_start", "agent_settled", "turn_end", "context"]);
+    expect([...handlers.keys()]).toEqual(["session_start", "session_tree", "session_compact", "session_shutdown", "before_agent_start", "agent_start", "agent_settled", "turn_end", "context"]);
   });
 
-  it("opens current Todo details through the command and shortcut without touching non-TUI contexts", async () => {
+  it("enters the mounted widget through command and shortcut and declines unavailable contexts", async () => {
     const { tools, commands, shortcuts } = setup();
     expect([...commands.keys()]).toEqual(["todo-details"]);
     expect([...shortcuts.keys()]).toEqual([Key.ctrlShift("t")]);
@@ -52,27 +52,55 @@ describe("Todo four-tool coordinator", () => {
     const shortcut = shortcuts.get(Key.ctrlShift("t"));
     expect(command.description).toBe("Open Todo details");
     expect(shortcut.description).toBe(command.description);
-    const custom = vi.fn();
     const notify = vi.fn();
-    const ctx = { mode: "tui", hasUI: true, ui: { custom, notify, setWidget: vi.fn() }, sessionManager: { getBranch: () => [] } };
+    const unsubscribe = vi.fn();
+    const subscribe = vi.fn((_listener: (data: string) => unknown) => unsubscribe);
+    let component: any;
+    const tui = { terminal: { rows: 20 }, requestRender: vi.fn() };
+    const ctx = { mode: "tui", hasUI: true, ui: {
+      notify, onTerminalInput: subscribe,
+      setWidget: (_id: string, factory: any) => { component?.dispose(); component = factory?.(tui, undefined); },
+    }, sessionManager: { getBranch: () => [] } };
+    await command.handler("", ctx);
+    expect(notify).toHaveBeenCalledWith("Todo details require a visible above-editor widget.", "warning");
+    await run(tools.get("todo_set")!, { tasks: [{ name: "Build", todos: [creation("Code")] }] }, ctx);
     await command.handler("", ctx);
     await shortcut.handler(ctx);
-    expect(custom).toHaveBeenCalledTimes(2);
-    const theme = { fg: (_color: string, text: string) => text, bold: (text: string) => text };
-    const tui = { terminal: { rows: 20 }, requestRender: vi.fn() };
-    const initial = custom.mock.calls[0][0](tui, theme, {}, vi.fn());
-    expect(initial.render(80).join(" ")).toContain("No todos");
-
-    await run(tools.get("todo_set")!, { tasks: [{ name: "Build", todos: [creation("Code")] }] }, ctx);
+    expect(subscribe).toHaveBeenCalledOnce();
+    expect(component.render(80).join(" ")).toContain("Build");
+    expect(subscribe.mock.calls[0]![0]("\x1b")).toEqual({ consume: true });
+    expect(unsubscribe).toHaveBeenCalledOnce();
     await shortcut.handler(ctx);
-    const current = custom.mock.calls[2][0](tui, theme, {}, vi.fn());
-    expect(current.render(80).join(" ")).toContain("Build");
-    expect(initial.render(80).join(" ")).not.toContain("Build");
+    expect(subscribe).toHaveBeenCalledTimes(2);
     await command.handler("", { ...ctx, mode: "rpc" });
     await shortcut.handler({ ...ctx, mode: "print" });
-    expect(notify).toHaveBeenCalledTimes(2);
     expect(notify).toHaveBeenCalledWith("Todo details require the interactive TUI.", "warning");
-    expect(custom).toHaveBeenCalledTimes(3);
+  });
+
+  it("preserves expansion across add/transition but resets it on complete set", async () => {
+    const { tools, commands } = setup();
+    let mounted: any;
+    const subscribe = vi.fn((_handler: (data: string) => unknown) => vi.fn());
+    const ui = {
+      onTerminalInput: subscribe,
+      setWidget: (_id: string, factory: any) => {
+        mounted?.dispose();
+        mounted = factory?.({ terminal: { rows: 20 }, requestRender: vi.fn() }, undefined);
+      },
+    };
+    const ctx = { mode: "tui", hasUI: true, ui, sessionManager: { getBranch: () => [] } };
+    await run(tools.get("todo_set")!, { tasks: [{ name: "Build", todos: [creation("Code")] }] }, ctx);
+    await commands.get("todo-details").handler("", ctx);
+    const input = subscribe.mock.calls[0]![0];
+    input("\x1b[C");
+    input("\x1b");
+    await run(tools.get("todo_add")!, { task: "Build", todos: [creation("Test")] }, ctx);
+    expect(mounted.render(80).join("\n")).toContain("Code description");
+    await run(tools.get("todo_transition")!, { transitions: [{ task: "Build", todo: "Code", status: "completed" }] }, ctx);
+    expect(mounted.render(80).join("\n")).toContain("Code description");
+    await run(tools.get("todo_set")!, { tasks: [{ name: "Build", todos: [creation("New")] }] }, ctx);
+    expect(mounted.render(80).join("\n")).not.toContain("New description");
+    expect(mounted.render(80)).toHaveLength(3);
   });
 
   it("discovers qualified Todo commands via public Pi loading in either order and fails ambiguous attribution", async () => {
@@ -87,9 +115,9 @@ describe("Todo four-tool coordinator", () => {
         const other = { name: ambiguous ? "todo" : "other", factory: (pi: ExtensionAPI) => pi.registerCommand("todo-details", { description: ambiguous ? "Open Todo details" : "Other details", handler: async () => {} }) };
         const loader = new DefaultResourceLoader({ cwd: agentDir, agentDir, noSkills: true, noPromptTemplates: true, noThemes: true, noContextFiles: true, extensionFactories: reverse ? [other, todo] : [todo, other] });
         await loader.reload();
-        const custom = vi.fn();
+        const notify = vi.fn();
         const { session, extensionsResult } = await createAgentSession({ cwd: agentDir, agentDir, resourceLoader: loader, sessionManager: SessionManager.inMemory(agentDir) });
-        await session.bindExtensions({ mode: "tui", uiContext: { custom, notify: vi.fn(), setWidget: vi.fn() } as never });
+        await session.bindExtensions({ mode: "tui", uiContext: { notify, setWidget: vi.fn() } as never });
         expect(extensionsResult.errors).toEqual([]);
         expect(extensionsResult.extensions.map(({ path, commands }) => [path, [...commands.keys()]])).toEqual(reverse
           ? [["<inline:other>", ["todo-details"]], ["<inline:todo>", ["todo-details"]]]
@@ -108,7 +136,7 @@ describe("Todo four-tool coordinator", () => {
           const name = discover(commands);
           expect(name).toBe(reverse ? "todo-details:2" : "todo-details:1");
           await expect(session.prompt(`/${name}`)).resolves.toBeUndefined();
-          expect(custom).toHaveBeenCalledTimes(1);
+          expect(notify).toHaveBeenCalledWith("Todo details require a visible above-editor widget.", "warning");
         }
       }
     } finally {
@@ -254,6 +282,32 @@ describe("Todo four-tool coordinator", () => {
     expect(widgetCalls[1]).toEqual({ id: "todo", content: undefined });
   });
 
+  it("retains interaction ownership across ExtensionContext instances and tears down on shutdown", async () => {
+    const { tools, handlers, commands } = setup();
+    let component: any;
+    const unsubscribe = vi.fn();
+    const subscribe = vi.fn((_handler: (data: string) => unknown) => unsubscribe);
+    const ui = {
+      onTerminalInput: subscribe,
+      setWidget: (_id: string, factory: any) => {
+        component?.dispose();
+        component = factory?.({ terminal: { rows: 20 }, requestRender: vi.fn() }, undefined);
+      },
+    };
+    const ctx = { mode: "tui", hasUI: true, ui, sessionManager: { getBranch: () => [] } };
+    await run(tools.get("todo_set")!, { tasks: [{ name: "Build", todos: [creation("Code")] }] }, ctx);
+    await commands.get("todo-details").handler("", { ...ctx, ui: { ...ui } });
+    expect(subscribe).toHaveBeenCalledOnce();
+    await handlers.get("session_start")?.({}, { ...ctx, ui: { ...ui } });
+    expect(unsubscribe).toHaveBeenCalledOnce();
+    await run(tools.get("todo_set")!, { tasks: [{ name: "Build", todos: [creation("Code")] }] }, ctx);
+    await commands.get("todo-details").handler("", { ...ctx, ui: { ...ui } });
+    expect(subscribe).toHaveBeenCalledTimes(2);
+    await handlers.get("session_shutdown")?.({}, { ...ctx, ui: { ...ui } });
+    expect(unsubscribe).toHaveBeenCalledTimes(2);
+    expect(component.render(80)).toContain("");
+  });
+
   it("publishes committed snapshots once for each successful mutation only", async () => {
     const { tools, ctx, widgetCalls } = setup();
     await run(tools.get("todo_set")!, { tasks: [{ name: "Build", todos: [creation("Code")] }] }, ctx);
@@ -364,9 +418,9 @@ describe("native renderCall identity", () => {
   });
 
   it.each([
-    { fallbackGlyphs: true, expected: FALLBACK_TODO_GLYPHS.pending, opposite: NERD_FONT_TODO_GLYPHS.pending },
-    { fallbackGlyphs: false, expected: NERD_FONT_TODO_GLYPHS.pending, opposite: FALLBACK_TODO_GLYPHS.pending },
-  ])("uses live fallbackGlyphs=$fallbackGlyphs across registered calls, results, and widget", async ({ fallbackGlyphs, expected, opposite }) => {
+    { fallbackGlyphs: true, pending: FALLBACK_TODO_GLYPHS.pending, progress: FALLBACK_TODO_GLYPHS.in_progress, opposite: NERD_FONT_TODO_GLYPHS.pending },
+    { fallbackGlyphs: false, pending: NERD_FONT_TODO_GLYPHS.pending, progress: NERD_FONT_TODO_GLYPHS.in_progress, opposite: FALLBACK_TODO_GLYPHS.pending },
+  ])("uses live fallbackGlyphs=$fallbackGlyphs across registered calls, results, and widget", async ({ fallbackGlyphs, pending, progress, opposite }) => {
     const root = await mkdtemp(join(tmpdir(), "todo-renderer-glyphs-"));
     try {
       const project = join(root, "project");
@@ -385,7 +439,7 @@ describe("native renderCall identity", () => {
       ] as const;
       for (const [name, args, todo] of calls) {
         const output = tools.get(name)!.renderCall(args, {}, {}).render(120).join("\n");
-        expect(output).toContain(expected);
+        expect(output).toContain(name === "todo_transition" ? progress : pending);
         expect(output).not.toContain(opposite);
         expect(output).toContain(todo);
       }
@@ -394,14 +448,14 @@ describe("native renderCall identity", () => {
       await run(tools.get("todo_add")!, calls[1][1], liveCtx);
       const transition = await run(tools.get("todo_transition")!, calls[2][1], liveCtx);
       const result = tools.get("todo_transition")!.renderResult(transition, { expanded: true }, {}, {}).render(120).join("\n");
-      expect(result).toContain(expected);
+      expect(result).toContain(progress);
       expect(result).not.toContain(opposite);
       expect(result).toContain("Code");
 
       const factory = widgetCalls.at(-1)?.content;
       expect(factory).toBeTypeOf("function");
       const widget = factory({}, {}).render(120).join("\n");
-      expect(widget).toContain(expected);
+      expect(widget).toContain(progress);
       expect(widget).not.toContain(opposite);
       expect(widget).toContain("Code");
     } finally {

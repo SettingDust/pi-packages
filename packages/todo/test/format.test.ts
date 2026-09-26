@@ -21,7 +21,7 @@ describe("todo formatting", () => {
     const summary = formatTodoSummary(state);
     expect(summary).toMatch(/○ Plan release/);
     expect(summary).toMatch(/× Cancel old approach/);
-    expect(summary).toMatch(/○ Build feature/);
+    expect(summary).toMatch(/◔ Build feature/);
     expect(summary).toMatch(/✓ Ship release/);
     expect(summary).not.toContain("Detailed description");
     expect(summary).toContain("Todo: 1 active · 1 pending · 1 completed · 1 cancelled");
