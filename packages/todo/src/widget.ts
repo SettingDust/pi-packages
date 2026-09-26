@@ -97,5 +97,9 @@ function clearWidget(ui: TodoWidgetUI): void {
 }
 
 function notifyWidgetError(ui: TodoWidgetUI, error: unknown): void {
-  ui.notify?.(`Todo widget update failed: ${error instanceof Error ? error.message : String(error)}`, "warning");
+  try {
+    ui.notify?.(`Todo widget update failed: ${error instanceof Error ? error.message : String(error)}`, "warning");
+  } catch {
+    return;
+  }
 }

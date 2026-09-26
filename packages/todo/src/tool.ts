@@ -1,5 +1,6 @@
 import type { ExtensionAPI, ExtensionContext, Theme } from "@earendil-works/pi-coding-agent";
-import { Container, Text } from "@earendil-works/pi-tui";
+import { Container, Key, Text } from "@earendil-works/pi-tui";
+import { TodoDetailOverlay } from "./detail-overlay.js";
 import { formatTodoCompactionContext, formatTodoSize, todoTasks } from "./format.js";
 import { restoreTodoState } from "./persistence.js";
 import {
@@ -103,6 +104,7 @@ function renderCallContent(
   args: unknown,
   state: TodoState,
   theme: Partial<Pick<Theme, "bold" | "fg" | "strikethrough">>,
+  fallbackGlyphs: boolean,
   partial = false,
 ): string {
   const identity = `todo_${action} ${action}`;
@@ -123,20 +125,20 @@ function renderCallContent(
       lines.push(`  ${task.name}`);
       for (const todo of task.todos ?? []) {
         if (typeof todo?.name !== "string") continue;
-        lines.push(renderTodoLine({ name: todo.name, description: todo.description ?? "", status: "pending" }, theme));
+        lines.push(renderTodoLine({ name: todo.name, description: todo.description ?? "", status: "pending" }, theme, fallbackGlyphs));
       }
     }
   } else if (action === "add" && typeof input.task === "string") {
     lines.push(`  ${input.task}`);
     for (const todo of input.todos ?? []) {
       if (typeof todo?.name !== "string") continue;
-      lines.push(renderTodoLine({ name: todo.name, description: todo.description ?? "", status: "pending" }, theme));
+      lines.push(renderTodoLine({ name: todo.name, description: todo.description ?? "", status: "pending" }, theme, fallbackGlyphs));
     }
   } else if (action === "transition") {
     for (const transition of input.transitions ?? []) {
       if (typeof transition.todo !== "string" || !transition.status) continue;
       const task = typeof transition.task === "string" ? `${transition.task}: ` : "";
-      lines.push(`${task}${renderTodoLine({ name: transition.todo, description: "", status: transition.status }, theme)}`);
+      lines.push(`${task}${renderTodoLine({ name: transition.todo, description: "", status: transition.status }, theme, fallbackGlyphs)}`);
     }
   }
 
@@ -160,6 +162,7 @@ function registerHandler(
   description: string,
   parameters: any,
   execute: (params: unknown, ctx: ExtensionContext) => Promise<TodoSuccess>,
+  getSettings: () => Readonly<TodoSettings>,
   onSuccess: (result: TodoResult) => void,
 ): void {
   pi.registerTool({
@@ -179,11 +182,11 @@ function registerHandler(
       return { content: [{ type: "text" as const, text: JSON.stringify(details) }], details };
     },
     renderCall(args: unknown, theme: Partial<Pick<Theme, "fg">>, context: { isPartial?: boolean; isError?: boolean }) {
-      return new Text(renderCallContent(result, args, coordinator.snapshot(), theme, context.isPartial), 0, 0);
+      return new Text(renderCallContent(result, args, coordinator.snapshot(), theme, getSettings().fallbackGlyphs, context.isPartial), 0, 0);
     },
     renderResult(resultValue: any, options: any, theme: any, context: any) {
       if (options.isPartial && !context.isError) return new Container();
-      return renderTodoResult(resultValue, options, theme);
+      return renderTodoResult(resultValue, options, theme, { fallbackGlyphs: getSettings().fallbackGlyphs });
     },
   });
 }
@@ -245,11 +248,27 @@ export function registerTodoTools(pi: ExtensionAPI): void {
     return { messages: [...event.messages, { role: "user", content: reminder, timestamp: Date.now() }] };
   });
 
+  const openTodoDetails = (ctx: ExtensionContext): void => {
+    if (ctx.mode !== "tui") {
+      ctx.ui.notify("Todo details require the interactive TUI.", "warning");
+      return;
+    }
+    const snapshot = coordinator.snapshot();
+    ctx.ui.custom((tui, theme, keybindings, done) =>
+      new TodoDetailOverlay(snapshot, tui, theme, keybindings, done, settings.fallbackGlyphs), {
+      overlay: true,
+      overlayOptions: { width: "90%", maxHeight: "80%", margin: 1 },
+    });
+  };
+  pi.registerCommand("todo-details", { description: "Open Todo details", handler: async (_args, ctx) => openTodoDetails(ctx) });
+  pi.registerShortcut(Key.ctrlShift("t"), { description: "Open Todo details", handler: openTodoDetails });
+
   const markInteraction = (result: TodoResult): void => {
     if (result !== "view") interactedWithTodoThisTurn = true;
   };
-  registerHandler(pi, coordinator, "set", "Replace the complete Todo state.", TodoSetParamsSchema, (params, ctx) => coordinator.set(params, ctx, settings), markInteraction);
-  registerHandler(pi, coordinator, "add", "Append pending todos to an existing task.", TodoAddParamsSchema, (params, ctx) => coordinator.add(params, ctx, settings), markInteraction);
-  registerHandler(pi, coordinator, "transition", "Change Todo statuses by exact task and todo name.", TodoTransitionParamsSchema, (params, ctx) => coordinator.transition(params, ctx, settings), markInteraction);
-  registerHandler(pi, coordinator, "view", "Return the complete Todo snapshot without mutation.", TodoViewParamsSchema, (params) => coordinator.view(params), markInteraction);
+  const getSettings = (): Readonly<TodoSettings> => settings;
+  registerHandler(pi, coordinator, "set", "Replace the complete Todo state.", TodoSetParamsSchema, (params, ctx) => coordinator.set(params, ctx, settings), getSettings, markInteraction);
+  registerHandler(pi, coordinator, "add", "Append pending todos to an existing task.", TodoAddParamsSchema, (params, ctx) => coordinator.add(params, ctx, settings), getSettings, markInteraction);
+  registerHandler(pi, coordinator, "transition", "Change Todo statuses by exact task and todo name.", TodoTransitionParamsSchema, (params, ctx) => coordinator.transition(params, ctx, settings), getSettings, markInteraction);
+  registerHandler(pi, coordinator, "view", "Return the complete Todo snapshot without mutation.", TodoViewParamsSchema, (params) => coordinator.view(params), getSettings, markInteraction);
 }

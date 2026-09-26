@@ -2,6 +2,7 @@ import { truncateToWidth, visibleWidth } from "@earendil-works/pi-tui";
 import type { Theme } from "@earendil-works/pi-coding-agent";
 
 import { TODO_SEPARATOR_GLYPH, TODO_TRUNCATION_GLYPH, todoGlyph } from "./glyphs.js";
+import { countTodoStatuses, todoTasks } from "./format.js";
 import type { Todo, TodoState, TodoTask } from "./types.js";
 
 export type TodoWidgetLayoutOptions = {
@@ -10,7 +11,6 @@ export type TodoWidgetLayoutOptions = {
 };
 
 type ThemeLike = Partial<Pick<Theme, "bold" | "fg" | "strikethrough">>;
-type DisplayTodo = Todo & { todoIndex: number };
 
 /** Produces compact widget rows constrained to the supplied display width. */
 export function renderTodoWidgetLines(
@@ -21,37 +21,24 @@ export function renderTodoWidgetLines(
 ): string[] {
   const safeWidth = Math.max(1, Math.floor(width) || 1);
   const tasks = state?.tasks ?? [];
-  const activeGroups = tasks.map((task) => task.todos.some((todo) => todo.status === "in_progress"));
-  const hasActiveGroups = activeGroups.some(Boolean);
-  const maxVisible = boundedMaxVisible(options.maxVisible);
-  const lines: string[] = [fit(toolTitle("Todos", theme), safeWidth)];
+  const counts = countTodoStatuses(todoTasks(state));
+  const summary = `in_progress:${counts.in_progress} ${TODO_SEPARATOR_GLYPH} pending:${counts.pending} ${TODO_SEPARATOR_GLYPH} completed:${counts.completed} ${TODO_SEPARATOR_GLYPH} cancelled:${counts.cancelled}`;
+  const title = toolTitle("Todos", theme);
+  const lines = [fit(` ${title}  ${theme?.fg ? theme.fg("muted", summary) : summary}`, safeWidth)];
 
-  for (let taskIndex = 0; taskIndex < tasks.length; taskIndex += 1) {
-    const task = tasks[taskIndex];
-    const expanded = hasActiveGroups && activeGroups[taskIndex];
-    lines.push(fit(renderTodoTaskTitle(task, taskIndex, expanded, theme), safeWidth));
-
-    if (expanded) {
-      const selectedTodos = visibleTodos(task.todos, maxVisible);
-      for (const todo of selectedTodos) lines.push(fit(renderTodoLine(todo, theme, options.fallbackGlyphs), safeWidth));
-      const openTodos = task.todos.filter((todo) => !isTerminal(todo));
-      const hidden = openTodos.length - selectedTodos.length;
-      if (hidden > 0) lines.push(fit(`    +${hidden} more`, safeWidth));
-      const terminalSummary = terminalTodoSummary(task.todos);
-      if (terminalSummary) {
-        const line = `    + ${terminalSummary}`;
-        lines.push(fit(theme?.fg ? theme.fg("muted", line) : line, safeWidth));
-      }
-    }
+  const status = counts.in_progress ? "in_progress" : "pending";
+  if (counts[status]) {
+    const task = tasks.find((item) => item.todos.some((todo) => todo.status === status))!;
+    const todo = task.todos.find((item) => item.status === status)!;
+    const suffix = counts[status] > 1 ? ` +${counts[status] - 1}` : "";
+    const anchor = `   ${todoGlyph(status, options.fallbackGlyphs)} ${task.name} / ${todo.name}`;
+    const text = visibleWidth(suffix) >= safeWidth
+      ? fit(suffix, safeWidth)
+      : `${fit(anchor, safeWidth - visibleWidth(suffix))}${suffix}`;
+    lines.push(theme?.fg ? theme.fg(status === "in_progress" ? "text" : "muted", text) : text);
   }
 
-  return lines.map((line) => line ? fit(` ${line}`, safeWidth) : line);
-}
-
-
-function boundedMaxVisible(value: number | undefined): number {
-  if (value === undefined || !Number.isFinite(value)) return 5;
-  return Math.max(1, Math.floor(value));
+  return lines;
 }
 
 export function renderTodoTaskTitle(task: TodoTask, taskIndex: number, selected: boolean, theme: ThemeLike | undefined): string {
@@ -71,14 +58,6 @@ function toolTitle(text: string, theme: ThemeLike | undefined): string {
   return theme?.fg ? theme.fg("toolTitle", bold) : bold;
 }
 
-function visibleTodos(todos: readonly Todo[], maxVisible: number): DisplayTodo[] {
-  const ordered = todos.map((todo, todoIndex) => ({ ...todo, todoIndex }))
-    .filter((todo) => !isTerminal(todo))
-    .sort((left, right) => todoPriority(left) - todoPriority(right) || left.todoIndex - right.todoIndex);
-  const active = ordered.filter((todo) => todo.status === "in_progress");
-  return active.length > maxVisible ? active : ordered.slice(0, maxVisible);
-}
-
 export function renderTodoLine(todo: Todo, theme: ThemeLike | undefined, fallbackGlyphs = false): string {
   const marker = todoGlyph(todo.status, fallbackGlyphs);
   const color = todo.status === "in_progress" ? "text" : todo.status === "completed" ? "success" : "muted";
@@ -87,22 +66,8 @@ export function renderTodoLine(todo: Todo, theme: ThemeLike | undefined, fallbac
   return theme?.fg ? theme.fg(color, line) : line;
 }
 
-function terminalTodoSummary(todos: readonly Todo[]): string | undefined {
-  const completed = todos.filter((todo) => todo.status === "completed").length;
-  const cancelled = todos.filter((todo) => todo.status === "cancelled").length;
-  const parts = [
-    ...(completed ? [`${completed} complete ${completed === 1 ? "todo" : "todos"}`] : []),
-    ...(cancelled ? [`${cancelled} cancelled ${cancelled === 1 ? "todo" : "todos"}`] : []),
-  ];
-  return parts.length > 0 ? parts.join(` ${TODO_SEPARATOR_GLYPH} `) : undefined;
-}
-
 function isTerminal(todo: Todo): boolean {
   return todo.status === "completed" || todo.status === "cancelled";
-}
-
-function todoPriority(todo: Todo): number {
-  return todo.status === "in_progress" ? 0 : todo.status === "pending" ? 1 : 2;
 }
 
 function fit(line: string, width: number): string {
