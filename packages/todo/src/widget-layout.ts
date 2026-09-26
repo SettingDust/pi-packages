@@ -22,7 +22,9 @@ export function renderTodoWidgetLines(
   const safeWidth = Math.max(1, Math.floor(width) || 1);
   const tasks = state?.tasks ?? [];
   const counts = countTodoStatuses(todoTasks(state));
-  const summary = `in_progress:${counts.in_progress} ${TODO_SEPARATOR_GLYPH} pending:${counts.pending} ${TODO_SEPARATOR_GLYPH} completed:${counts.completed} ${TODO_SEPARATOR_GLYPH} cancelled:${counts.cancelled}`;
+  const summary = (["in_progress", "pending", "completed", "cancelled"] as const)
+    .map((status) => `${status === "in_progress" ? (options.fallbackGlyphs ? "◔" : "󰦖") : todoGlyph(status, options.fallbackGlyphs)} ${counts[status]}`)
+    .join(` ${TODO_SEPARATOR_GLYPH} `);
   const title = toolTitle("Todos", theme);
   const lines = [fit(` ${title}  ${theme?.fg ? theme.fg("muted", summary) : summary}`, safeWidth)];
 
