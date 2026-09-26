@@ -10,6 +10,7 @@ All notable changes to `@settingdust/pi-todo` will be documented in this file.
 - Remove the obsolete `workingOn` request, state, result, restore, formatter, reminder, renderer, and widget projections; multiple in-progress todos remain independently represented.
 - Reject request-level `workingOn` as unknown input, with no old-client compatibility parsing, dual-read, dual-write, or migration window.
 - Document the branch-local Host-recorded restore boundary and update public Todo terminology from phases/tasks to tasks/todos.
+- Show the complete task count and four status counts in the Todo widget, followed by one representative row per task without a task limit; keep the existing visibility lifecycle and detail overlay.
 
 ## [0.3.7] - 2026-08-03
 

@@ -9,7 +9,7 @@
 
 ## 1. Objective
 
-Deliver one bounded presentation change: keep the existing persistent Todo widget to at most two nonblank summary rows and provide complete, expandable detail in a focused Pi overlay opened by a command or shortcut. Preserve the canonical Todo model and every non-presentation contract.
+Deliver the persistent Todo widget and expandable detail overlay without changing the canonical Todo model or non-presentation contracts. The later user-authorized Section 8 all-task display supersedes the original fixed-height/global-anchor widget design below; its Gate C review and acceptance remain historical and do not certify the later change.
 
 The later user instruction to proceed authorized implementation. O0-O3 have since been delivered; the exact `0.85.1` graph and automated O4 checks passed. Required interactive O4 evidence is still unperformed; see [Context](context.md) and [Tasks](tasks.md) for current evidence and status. The following design and verification contract remains unchanged.
 
@@ -21,7 +21,7 @@ T1 synchronized this Plan, Work, and Context to the narrow presentation-anchor S
 
 | Path | Planned responsibility |
 | --- | --- |
-| `packages/todo/src/widget-layout.ts` | Replace task-by-task widget output with fixed-row status/active-or-next summary; retain existing width fitting and theme roles. |
+| `packages/todo/src/widget-layout.ts` | Emit a full task count and one representative row per task, retaining width fitting and theme roles. |
 | `packages/todo/src/detail-overlay.ts` (new) | Own the detail component, local cursor/expanded state, bounded rendering, overlay-owned bounded offset/slicing and public mouse composition, keyboard handling, and `done()` dismissal. |
 | `packages/todo/src/tool.ts` | After competing-owner release, register exact base command `todo-details` (public invocation resolved by Pi) and shortcut `Key.ctrlShift("t")` (`Ctrl+Shift+T`) at the existing coordinator boundary; pass a cloned `coordinator.snapshot()` into one shared overlay opener. Do not change tool handlers or renderers. |
 
@@ -29,7 +29,7 @@ T1 synchronized this Plan, Work, and Context to the narrow presentation-anchor S
 
 | Path | Planned responsibility |
 | --- | --- |
-| `packages/todo/test/widget.test.ts` | Prove one/two-row summary behavior, presentation-anchor derivation from canonical order, status counts, terminal state, width bounds, and unchanged lifecycle expectations. |
+| `packages/todo/test/widget.test.ts` | Prove full counts, independent per-task selection, empty/terminal-first fallback, unbounded row count, width bounds, and unchanged lifecycle expectations. |
 | `packages/todo/test/detail-overlay.test.ts` (new) | Prove initial state, full detail, keyboard transitions, public mouse toggling, scrolling, empty/narrow states, render invalidation, disposal, and no snapshot mutation. |
 | `packages/todo/test/index.test.ts` | Prove one command and one shortcut registration, common opener behavior, current snapshot handoff, TUI guard, and unchanged four-tool/event contracts. |
 
@@ -53,14 +53,9 @@ No other source, test, documentation, setting, package metadata, dependency, or 
 
 ### Persistent summary
 
-`renderTodoWidgetLines()` remains a pure width-aware projection and returns:
+`renderTodoWidgetLines()` remains a pure width-aware projection. Its first row is headed `Todos`, shows the complete task count (including empty groups), then shows all four fixed-order status glyph counts including zeros. It emits one row for every task in canonical order: first `in_progress` todo within that task, otherwise the first todo irrespective of status; an empty task shows only its name. Nonempty rows use the existing status glyph and `task / todo` format; no descriptions, other todos, global anchor, `+N`, or task cap appear. This does not mutate or select canonical state or change protocol or other consumers.
 
-1. A first nonblank row headed `Todos` followed by fixed-order counts for `in_progress`, `pending`, `completed`, and `cancelled`. Zero counts remain present so the row's semantic shape does not depend on status mix.
-2. A second nonblank row only when open work exists. It identifies `Task / Todo` using a deterministic read-only presentation anchor derived from existing canonical task and todo order: the first `in_progress` todo, otherwise the first pending todo. If neither exists, omit the row. This conditional projection introduces no fallback state. If more todos share that chosen status, append a bounded `+N` count rather than more rows.
-
-The anchor creates no canonical primary, selected, or unique active todo; does not mutate, serialize, persist, write back, or feed business logic; does not compress or replace active groups; and introduces no priority, timestamp, hidden selection, or fallback state. Every group containing `in_progress` todos remains independently represented, and the prohibition on a canonical or protocol single-active summary remains in force. The anchor changes no request, result, schema, canonical state, restore, queueing, persistence, tool behavior, complete-removal authority, implementation boundary, or other protocol contract. The overlay keyboard cursor and expansion/scroll indexes below are separate local interaction state and do not turn the anchor into a canonical selection.
-
-The function returns no task headers, descriptions, individual status rows, hidden-row summaries, or terminal summary rows. Existing width fitting applies to each line. The above-editor component may append its current blank spacer, keeping the entire widget at no more than three terminal rows. Existing empty/off/terminal visibility remains owned by `widget.ts` and is not changed.
+Every layout row is width-fitted. The result contains `1 + tasks.length` nonblank rows; the above-editor component may append its existing blank spacer. `maxVisibleTasks` does not cap these rows. Finite Host height can clip emitted rows, while the detail overlay remains available. Existing empty/off/terminal visibility remains owned by `widget.ts` and is not changed.
 
 ### Detail overlay
 
@@ -163,8 +158,8 @@ Run focused tests, package tests, compile/typecheck, static path checks, lock/pa
 
 | Behavior | Focused automated evidence | Interactive Host evidence |
 | --- | --- | --- |
-| Widget row stability | Snapshots with 0, 1, and many tasks/todos produce no more than two nonblank layout rows; component with spacer produces no more than three total rows. | Observe stable widget height before/after large `todo_set` and transitions at wide/narrow widths. |
-| Summary semantics | Assert fixed status-count order including zeros, deterministic read-only anchor from existing canonical task/todo order (`in_progress`, otherwise pending, otherwise no second row), bounded `+N`, description omission, and terminal-only row count. Verify every anchor exclusion in §3, including independent active-group representation and the canonical/protocol single-active-summary prohibition. | Compare visible counts/anchor with the complete `todo_view` snapshot; every active group remains independently represented. |
+| Widget rows | For zero, one, and many tasks, assert `1 + tasks.length` width-fitted layout rows and the optional component spacer; no task cap. | Observe widget content and Host clipping behavior at wide/narrow widths; inspect the full plan via detail overlay. |
+| Summary semantics | Assert full task count, four fixed status counts including zeros, first active per task else first todo even if terminal, and empty task names; no global anchor or `+N`. Assert projection does not mutate state. | Compare emitted rows and counts with complete `todo_view` snapshot. |
 | Width safety | For widths `1`, `4`, `20`, and `80`, every line satisfies `visibleWidth(line) <= width`; long Unicode names/descriptions do not throw. | Resize regular and fullscreen terminals; no overflow or unstable outer dimensions. |
 | Lifecycle preservation | Existing restore, off, refresh, five-second terminal clear, spacer, and warning tests remain passing without edits outside owned tests. | Transition final todo and observe unchanged final-summary timing/clear behavior. |
 | Registration and collision fallback | Assert command key `todo-details`, shortcut key `Key.ctrlShift("t")`, description `Open Todo details`, exactly four tools unchanged, existing events unchanged, and one common opener. Exercise shortcut collisions and deliberate duplicate-command qualification through the pinned public loading/session API; assert base-name absence, source-attributed discovery and actual invocation. Reverse load order; ambiguous attribution visibly fails the gate. | Native autocomplete exposes the base name only when unique. Deliberately duplicate the command and disable its shortcut through collision, select the attributed qualified Todo entry, and open its overlay. Record actual invocation/source and native shortcut diagnostics; ambiguous discovery fails admission. |

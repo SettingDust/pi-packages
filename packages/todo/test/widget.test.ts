@@ -22,18 +22,23 @@ const state: TodoState = {
   ],
 };
 
-test("todo widget keeps fixed-order counts and a canonical active anchor in two rows", () => {
+test("todo widget counts complete snapshot and shows one representative per task", () => {
   const before = structuredClone(state);
   const lines = renderTodoWidgetLines(state, undefined, 80, { maxVisible: 1, fallbackGlyphs: true });
-  assert.equal(lines.length, 2);
-  assert.equal(lines[0], " Todos  ◔ 1 · ○ 2 · ✓ 1 · × 1");
-  assert.equal(renderTodoWidgetLines(state, undefined, 80)[0], " Todos  󰦖 1 · 󰄰 2 · 󰄴 1 · 󰍷 1");
-  assert.match(lines[1]!, /○ Plan \/ Active todo$/);
-  assert.doesNotMatch(lines.join("\n"), /Detailed description|First pending todo|Second pending todo|Finished todo|Cancelled todo/);
+  assert.deepEqual(lines, [
+    " Todos  2 tasks · ◔ 1 · ○ 2 · ✓ 1 · × 1",
+    "   ○ Plan / Active todo",
+    "   ○ Build / Second pending todo",
+  ]);
+  assert.equal(renderTodoWidgetLines(state, undefined, 80)[0], " Todos  2 tasks · 󰦖 1 · 󰄰 2 · 󰄴 1 · 󰍷 1");
+  assert.deepEqual(renderTodoWidgetLines(state, undefined, 80).slice(1), [
+    "   󰄰 Plan / Active todo", "   󰄰 Build / Second pending todo",
+  ]);
+  assert.doesNotMatch(lines.join("\n"), /Detailed description|First pending todo|Finished todo|Cancelled todo/);
   assert.deepEqual(state, before);
 });
 
-test("todo widget uses semantic colors for title, counts and anchor", () => {
+test("todo widget uses semantic colors for title, counts and task rows", () => {
   const calls: { color: string; text: string }[] = [];
   renderTodoWidgetLines(state, {
     bold: (text: string) => text,
@@ -46,48 +51,52 @@ test("todo widget uses semantic colors for title, counts and anchor", () => {
   assert.equal(calls.find(({ text }) => text === "Todos")?.color, "toolTitle");
   assert.equal(calls.find(({ text }) => text.includes("◔ 1 · ○ 2"))?.color, "muted");
   assert.equal(calls.find(({ text }) => text.includes("Plan / Active todo"))?.color, "text");
+  assert.equal(calls.find(({ text }) => text.includes("Build / Second pending todo"))?.color, "muted");
   assert.ok(calls.every(({ color }) => color !== "dim"));
 });
 
-test("todo widget anchors the first active across groups and bounds remaining work to +N", () => {
+test("todo widget selects first active independently for each task", () => {
   const multiState: TodoState = {
     tasks: [
       { name: "Pending first", todos: [todo("first pending")] },
-      { name: "First", todos: [todo("first active", "in_progress"), todo("another active", "in_progress")] },
-      { name: "Second", todos: [todo("second active", "in_progress"), todo("last pending")] },
+      { name: "First", todos: [todo("earlier pending"), todo("first active", "in_progress"), todo("another active", "in_progress")] },
+      { name: "Second", todos: [todo("old", "completed"), todo("second active", "in_progress"), todo("last pending")] },
     ],
   };
   const lines = renderTodoWidgetLines(multiState, undefined, 80, { maxVisible: 1, fallbackGlyphs: true });
-  assert.equal(lines.length, 2);
-  assert.match(lines[0]!, /◔ 3 · ○ 2 · ✓ 0 · × 0/);
-  assert.match(lines[1]!, /First \/ first active \+2$/);
-  assert.doesNotMatch(lines[1]!, /Pending first|Second|another active|second active/);
-  assert.equal(multiState.tasks[2]?.todos[0]?.status, "in_progress");
+  assert.deepEqual(lines, [
+    " Todos  3 tasks · ◔ 3 · ○ 3 · ✓ 1 · × 0",
+    "   ○ Pending first / first pending",
+    "   ○ First / first active",
+    "   ○ Second / second active",
+  ]);
+  assert.doesNotMatch(lines.join("\n"), /earlier pending|another active|last pending|\+2/);
 });
 
-test("todo widget uses first pending only without active work and omits terminal anchor", () => {
-  const pendingState: TodoState = {
+test("todo widget falls back to the first todo, even terminal, and keeps empty tasks", () => {
+  const snapshot: TodoState = {
     tasks: [
-      { name: "Done", todos: [todo("old", "completed")] },
-      { name: "Next", todos: [todo("ready")] },
-      { name: "Later", todos: [todo("later")] },
+      { name: "Done", todos: [todo("old", "completed"), todo("ready")] },
+      { name: "Cancelled", todos: [todo("stopped", "cancelled"), todo("later")] },
+      { name: "Empty", todos: [] },
     ],
   };
-  const pendingLines = renderTodoWidgetLines(pendingState, undefined, 80, { fallbackGlyphs: true });
-  assert.match(pendingLines[0]!, /◔ 0 · ○ 2 · ✓ 1 · × 0/);
-  assert.match(pendingLines[1]!, /Next \/ ready \+1$/);
-
-  const terminalLines = renderTodoWidgetLines({
-    tasks: [{ name: "Done", todos: [todo("finished", "completed"), todo("cancelled", "cancelled")] }],
-  }, undefined, 80, { fallbackGlyphs: true });
-  assert.equal(terminalLines.length, 1);
-  assert.match(terminalLines[0]!, /◔ 0 · ○ 0 · ✓ 1 · × 1/);
-  assert.deepEqual(renderTodoWidgetLines({ tasks: [] }, undefined, 80), [
-    " Todos  󰦖 0 · 󰄰 0 · 󰄴 0 · 󰍷 0",
+  assert.deepEqual(renderTodoWidgetLines(snapshot, undefined, 80, { fallbackGlyphs: true }), [
+    " Todos  3 tasks · ◔ 0 · ○ 2 · ✓ 1 · × 1",
+    "   ✓ Done / old",
+    "   × Cancelled / stopped",
+    "   Empty",
+  ]);
+  assert.deepEqual(renderTodoWidgetLines({ tasks: [{ name: "Done", todos: [todo("finished", "completed")] }] }, undefined, 80, { fallbackGlyphs: true }), [
+    " Todos  1 task · ◔ 0 · ○ 0 · ✓ 1 · × 0",
+    "   ✓ Done / finished",
+  ]);
+  assert.deepEqual(renderTodoWidgetLines(undefined, undefined, 80), [
+    " Todos  0 tasks · 󰦖 0 · 󰄰 0 · 󰄴 0 · 󰍷 0",
   ]);
 });
 
-test("todo widget row count and width are stable for large and narrow snapshots", () => {
+test("todo widget emits every task and fits narrow widths", () => {
   const large: TodoState = { tasks: Array.from({ length: 100 }, (_, index) => ({
     name: `Task ${index} ${"Long".repeat(30)}`,
     todos: Array.from({ length: 10 }, (_, item) => todo(`Todo ${item} ${"界".repeat(30)}`, item ? "pending" : "in_progress")),
@@ -95,16 +104,17 @@ test("todo widget row count and width are stable for large and narrow snapshots"
   for (const snapshot of [undefined, { tasks: [] }, state, large]) {
     for (const width of [1, 4, 20, 80]) {
       for (const fallbackGlyphs of [false, true]) {
-        const lines = renderTodoWidgetLines(snapshot, undefined, width, { fallbackGlyphs });
-        assert.ok(lines.length >= 1 && lines.length <= 2);
+        const lines = renderTodoWidgetLines(snapshot, undefined, width, { maxVisible: 1, fallbackGlyphs });
+        assert.equal(lines.length, 1 + (snapshot?.tasks.length ?? 0));
         assert.ok(lines.every((line) => visibleWidth(line) <= width));
       }
     }
   }
-  assert.match(renderTodoWidgetLines(large, undefined, 80, { fallbackGlyphs: true })[1]!, /\+99$/);
+  assert.match(renderTodoWidgetLines(large, undefined, 80, { fallbackGlyphs: true })[0]!, /100 tasks · ◔ 100 · ○ 900 · ✓ 0 · × 0/);
+  assert.match(renderTodoWidgetLines(large, undefined, 80, { fallbackGlyphs: true }).at(-1)!, /Task 99/);
   const component = new TodoWidgetComponent(large, undefined, { blankLineBelow: true });
-  assert.equal(component.render(20).length, 3);
-  assert.equal(component.render(1).length, 3);
+  assert.equal(component.render(20).length, 102);
+  assert.equal(component.render(1).length, 102);
 });
 
 

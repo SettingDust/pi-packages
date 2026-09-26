@@ -26,18 +26,12 @@ export function renderTodoWidgetLines(
     .map((status) => `${status === "in_progress" ? (options.fallbackGlyphs ? "◔" : "󰦖") : todoGlyph(status, options.fallbackGlyphs)} ${counts[status]}`)
     .join(` ${TODO_SEPARATOR_GLYPH} `);
   const title = toolTitle("Todos", theme);
-  const lines = [fit(` ${title}  ${theme?.fg ? theme.fg("muted", summary) : summary}`, safeWidth)];
+  const lines = [fit(` ${title}  ${tasks.length} ${tasks.length === 1 ? "task" : "tasks"} ${TODO_SEPARATOR_GLYPH} ${theme?.fg ? theme.fg("muted", summary) : summary}`, safeWidth)];
 
-  const status = counts.in_progress ? "in_progress" : "pending";
-  if (counts[status]) {
-    const task = tasks.find((item) => item.todos.some((todo) => todo.status === status))!;
-    const todo = task.todos.find((item) => item.status === status)!;
-    const suffix = counts[status] > 1 ? ` +${counts[status] - 1}` : "";
-    const anchor = `   ${todoGlyph(status, options.fallbackGlyphs)} ${task.name} / ${todo.name}`;
-    const text = visibleWidth(suffix) >= safeWidth
-      ? fit(suffix, safeWidth)
-      : `${fit(anchor, safeWidth - visibleWidth(suffix))}${suffix}`;
-    lines.push(theme?.fg ? theme.fg(status === "in_progress" ? "text" : "muted", text) : text);
+  for (const task of tasks) {
+    const todo = task.todos.find((item) => item.status === "in_progress") ?? task.todos[0];
+    const text = fit(todo ? `   ${todoGlyph(todo.status, options.fallbackGlyphs)} ${task.name} / ${todo.name}` : `   ${task.name}`, safeWidth);
+    lines.push(theme?.fg ? theme.fg(todo?.status === "in_progress" ? "text" : "muted", text) : text);
   }
 
   return lines;

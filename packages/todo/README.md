@@ -23,9 +23,9 @@ Todo state restores only from a successful complete Todo tool result already rec
 
 - **Canonical task/todo state.** Four focused tools create, change, and view a single validated plan.
 - **Session-aware state.** Recorded Todo results restore the plan associated with the current Pi session branch.
-- **Persistent widget.** Keep active work visible above or below the editor, with configurable placement, task limits, and status glyphs.
+- **Persistent widget.** Show the complete task count, status counts, and one representative todo per task above or below the editor, with configurable placement and status glyphs. The detail overlay shows the full plan.
 - **Adaptive reminders.** System reminders refresh the model's awareness of stale plans during long runs and restore the full plan after context compaction.
-- **Native tool rendering.** Compact tool output summarizes task progress and expands into task rows while respecting configurable visibility settings.
+- **Native tool rendering.** Compact tool output summarizes task progress and expands into task rows.
 
 ## Local development
 
@@ -52,18 +52,12 @@ The settings loader reads global settings from `~/.pi/agent/todo/settings.json`.
 }
 ```
 
-`widgetPlacement` accepts `"aboveEditor"`, `"belowEditor"`, or `"off"`. `maxVisibleTasks` must be a positive integer, and `fallbackGlyphs` must be a boolean. Nerd Font status glyphs are the default; set `fallbackGlyphs` to `true` to use broadly supported Unicode symbols instead.
+`widgetPlacement` accepts `"aboveEditor"`, `"belowEditor"`, or `"off"`. `maxVisibleTasks` must be a positive integer but does not limit task rows in the persistent widget; it remains accepted for compatibility with existing settings. `fallbackGlyphs` must be a boolean. Nerd Font status glyphs are the default; set `fallbackGlyphs` to `true` to use broadly supported Unicode symbols instead.
 
-`toolVisibility` controls Todo tool output in the terminal UI only:
-
-- `"all"` shows every Todo action.
-- `"set-only"` shows only `set` operations.
-- `"none"` hides normal Todo activity.
-
-Errors are always shown, while hidden successful operations take up no terminal space. Expanded output stays synchronized with the latest plan on the active branch.
+`toolVisibility` accepts the legacy compatibility values `"all"`, `"set-only"`, and `"none"`. They do not hide or otherwise control native Todo tool calls or final results. Expanded output stays synchronized with the latest plan on the active branch.
 
 Dynamic reminders keep the model aware of the plan during longer runs without adding messages to session history. The turn, output-token, and per-run settings control their cadence; set `dynamicReminders` to `false` to disable them.
 
 After Pi compacts the context window, the extension supplies the full Todo plan once on the next turn so work can continue without losing task state. This does not alter Pi's compaction summary or session history.
 
-The widget refreshes after Todo changes and `/tree` navigation. Active todos keep their normal status glyph. After all todos become terminal, the widget shows the final task summary for five seconds before clearing. Set `widgetPlacement` to `"off"` to disable the widget.
+The widget refreshes after Todo changes and `/tree` navigation. Its summary counts all tasks (including empty groups) and all four todo statuses; each task row shows the first in-progress todo, otherwise its first todo, or only its name when empty. A finite terminal may clip rows; `/todo-details` shows the full plan. After all todos become terminal, the widget shows the final task summary for five seconds before clearing. Set `widgetPlacement` to `"off"` to disable the widget.
