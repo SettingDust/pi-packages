@@ -1,6 +1,6 @@
 # Tasks: Todo Inline Expand/Collapse
 
-- Status: initial T1 and authorized rendering correction implemented with passing headless checks; T2 live observation pending. This derived record is not an approval receipt.
+- Status: initial T1 and authorized rendering correction implemented with passing headless checks; T2 remains partial after the model-picker ownership defect was corrected and rechecked in disposable live Pi sessions. This derived record is not an approval receipt.
 - Work: [work.md](work.md); Context: [context.md](context.md); Plan: [plan.md](plan.md); authority: [Spec section 9](../todo-protocol-redesign/spec.md#9-accepted-above-editor-inline-interaction).
 
 ## T1: Implement Inline Entry And Bounded Interaction
@@ -20,12 +20,14 @@
 
 ## T2: Observe Actual Regular And Fullscreen Behavior
 
-**Status:** Pending. No interactive TUI observation surface was available in this execution.
+**Status:** Partial live regular/fullscreen ConPTY observation; the reproduced model-picker ownership failure is fixed and rechecked, but other T2 acceptance checks remain. See [live evidence](evidence.md).
 
 **Depends on:** T1 automated checks and a usable interactive Pi TUI observation surface on the same installed dependency graph.
 
 **Objective:** Determine whether the approved public-API implementation actually preserves editor/other-surface input and makes the final wrapped description visible in the dock.
 
 **Expected artifacts:** A concise verification record; no production code change unless a correction stays inside the confirmed T1 boundary and focused checks are rerun. Observe entry via command and shortcut (including a collision/qualified Todo command), keys, Escape then ordinary editor input, unrelated shortcut and bracketed paste passthrough, modal/other active-surface behavior, resize/narrow and short terminals, large expanded content to last line, refresh/replacement, hide/off, restore, and five-second terminal clear. Check both regular and fullscreen; do not infer keyboard or viewport behavior from API types alone.
+
+**Recorded live subset:** At commit `446409dc` the extension rendered regular/fullscreen summary, collapsed rows, selected background, expanded details, Escape retention and editor reentry. A ready regular session reached the final wrapped description with PageDown; fullscreen Down to the final task revealed the last description. Resize redraws were observed. The pre-correction Ctrl+L model-picker test exposed hidden Todo movement and a stolen first Escape. The Todo-local correction now releases on a non-Todo key before Host dispatch; deterministic tests and regular/fullscreen ConPTY reruns show picker navigation `(1/39)` to `(2/39)` without Todo movement and first Escape closing the picker. Scoped Todo suite 96 passed (12 files), installed TypeScript and diff checks passed. Shortcut/qualified entry, other foreground surfaces, fullscreen PageDown dock routing, rasterized font/viewport appearance and remaining lifecycle/passthrough paths are unverified. Do not mark T2 complete or claim full live acceptance.
 
 **Completion evidence:** Record environment, observed results and limitations. Failure of input isolation or dock visibility is a stop condition for this approved scope, not an implicit request for Host edits or overlay fallback. If interactive observation is unavailable, leave T2 pending and label overall live acceptance unverified. No separate Tasks approval gate is implied.

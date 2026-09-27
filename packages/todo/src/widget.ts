@@ -68,21 +68,21 @@ export function enterTodoWidget(ctx: TodoWidgetContext | undefined, settings: To
     ui.notify?.("Todo details need more terminal space.", "warning");
     return;
   }
-  let pasting = false;
   const listener: TerminalInputHandler = (data) => {
     if (lifecycle.component !== component || !lifecycle.unsubscribe) return;
-    if (data.includes("\x1b[200~")) pasting = true;
-    if (pasting) {
-      if (data.includes("\x1b[201~")) pasting = false;
-      return;
-    }
     if (isKeyRelease(data)) return;
     try {
+      if (data.includes("\x1b[200~")) {
+        exit(lifecycle);
+        return;
+      }
       if (matchesKey(data, Key.escape)) {
         exit(lifecycle);
         return { consume: true };
       }
       if (component.handleKey(data)) return { consume: true };
+      // A passthrough key may open another Host surface; release before it is dispatched.
+      exit(lifecycle);
     } catch (error) {
       exit(lifecycle);
       notifyWidgetError(ui, error);

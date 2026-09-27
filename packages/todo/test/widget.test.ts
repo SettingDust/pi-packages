@@ -276,6 +276,48 @@ test("collapsed separator keeps slashes in user text; expanded header and indent
   }
 });
 
+test("passthrough hands input ownership to a host selector before its navigation and Escape", () => {
+  for (const selectorKey of ["\x0c", "\x0b"]) {
+    const lifecycle = createTodoWidgetLifecycle();
+    let listener: ((data: string) => { consume?: boolean } | undefined) | undefined;
+    let widget: TodoWidgetComponent | undefined;
+    const tui = { terminal: { rows: 20 }, requestRender: vi.fn() };
+    const ui = {
+      onTerminalInput: (handler: typeof listener) => {
+        listener = handler;
+        return () => { listener = undefined; };
+      },
+      setWidget: (_id: string, factory: ((tui: never, theme: never) => TodoWidgetComponent) | undefined) => {
+        widget?.dispose();
+        widget = factory?.(tui as never, undefined as never);
+      },
+    };
+    const ctx = { mode: "tui", hasUI: true, ui } as never;
+    const snapshot: TodoState = { tasks: [...state.tasks, { name: "Verify", todos: [todo("Final")] }] };
+    let surface = "editor";
+    let selectorMoves = 0;
+    const dispatch = (data: string) => {
+      if (listener?.(data)?.consume) return;
+      if (surface === "editor" && data === selectorKey) surface = "selector";
+      else if (surface === "selector" && data === "\x1b[B") selectorMoves++;
+      else if (surface === "selector" && data === "\x1b") surface = "editor";
+    };
+    updateTodoWidget(ctx, snapshot, {}, lifecycle);
+    enterTodoWidget(ctx, {}, lifecycle);
+    dispatch("\x1b[B");
+    assert.match(widget!.render(80)[3]!, /selectedBg|󰅂/);
+    dispatch(selectorKey);
+    assert.equal(surface, "selector");
+    assert.equal(listener, undefined, "selector must not inherit Todo's upstream listener");
+    dispatch("\x1b[B");
+    assert.equal(selectorMoves, 1);
+    dispatch("\x1b");
+    assert.equal(surface, "editor", "first Escape closes foreground selector");
+    assert.doesNotMatch(widget!.render(80).join("\n"), /> 󰅂/);
+    resetTodoWidgetLifecycle(ctx, lifecycle);
+  }
+});
+
 test("inline listener consumes only exact keys, passes paste and retires on every replacement path", () => {
   const lifecycle = createTodoWidgetLifecycle();
   const listeners = new Set<(data: string) => unknown>();
@@ -320,12 +362,10 @@ test("inline listener consumes only exact keys, passes paste and retires on ever
   assert.deepEqual(input("\x1b[13;1:1u"), { consume: true });
   assert.equal(input("\x1b[13;1:3u"), undefined);
   assert.match(mounted!.render(80)[2]!, /^ 󰅀/);
-  for (const key of ["x", "\x1b[1;5C", "\x1b[200~ \x1b[201~", "\x1b[200~", " ", "\x1b[201~"]) assert.equal(input(key), undefined);
   assert.equal(input(" ")?.consume, true);
   assert.match(mounted!.render(80)[2]!, /^ 󰅂/);
   assert.equal(input(" ")?.consume, true);
   assert.match(mounted!.render(80)[2]!, /^ 󰅀/);
-  assert.equal(input("\x1b[84;6u"), undefined);
   assert.equal(input("\x1b[27;1:3u"), undefined);
   assert.equal(listeners.size, 1);
   assert.deepEqual(input("\x1b"), { consume: true });
@@ -360,6 +400,33 @@ test("inline listener consumes only exact keys, passes paste and retires on ever
   resetTodoWidgetLifecycle(ctx, lifecycle);
   assert.equal(listeners.size, 0);
   assert.equal(unsubscribe.mock.calls.length, 7);
+});
+
+test("passthrough and bracketed paste release Todo without consuming the forwarded input", () => {
+  for (const key of ["x", "\x1b[1;5C", "\x1b[84;6u", "\x1b[200~ \x1b[B \x1b[201~", "\x1b[200~"]) {
+    const lifecycle = createTodoWidgetLifecycle();
+    let listener: ((data: string) => { consume?: boolean } | undefined) | undefined;
+    let mounted: TodoWidgetComponent | undefined;
+    const ui = {
+      onTerminalInput: (handler: typeof listener) => {
+        listener = handler;
+        return () => { listener = undefined; };
+      },
+      setWidget: (_id: string, factory: ((tui: never, theme: never) => TodoWidgetComponent) | undefined) => {
+        mounted?.dispose();
+        mounted = factory?.({ terminal: { rows: 20 }, requestRender: vi.fn() } as never, undefined as never);
+      },
+    };
+    const ctx = { mode: "tui", hasUI: true, ui } as never;
+    updateTodoWidget(ctx, state, {}, lifecycle);
+    enterTodoWidget(ctx, {}, lifecycle);
+    assert.equal(listener?.("\x1b[1;1:3B"), undefined);
+    assert.ok(listener, "key release leaves Todo active");
+    assert.equal(listener?.(key), undefined);
+    assert.equal(listener, undefined, "passthrough yields input ownership");
+    assert.match(mounted!.render(80)[1]!, /^  󰦖/);
+    resetTodoWidgetLifecycle(ctx, lifecycle);
+  }
 });
 
 test("collapsed chevrons have exactly one space before status or task name at both glyph widths", () => {
