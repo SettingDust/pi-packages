@@ -4,7 +4,7 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, writeFil
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { createHerdrClient } from "@settingdust/pi-herdr";
-import activateSubagents, { AgentRegistry, SubagentRuntime, createHerdrTransport, createSubagentTools, paneChildExtensionPath, validateExplicitSpawnModel, type CompletionNotification, type HerdrTransport } from "../src/index.js";
+import activateSubagents, { AgentRegistry, SubagentRuntime, createHerdrTransport, createSubagentTools, paneChildExtensionPath, validateExplicitSpawnModel, type CompletionNotification, type HerdrTransport, type SubagentTask } from "../src/index.js";
 
 function fakeTransport(paneExists: boolean | (() => boolean) = true) {
   const calls: unknown[] = [];
@@ -144,7 +144,15 @@ describe("pi-herdr-subagents runtime", () => {
     expect(parameters.properties.agent?.enum).toEqual(["handler", "reviewer"]);
     expect(parameters.properties).toHaveProperty("taskSlug");
     expect(tools[0]!.description).toContain("taskSlug is required");
-    expect(tools[0]!.description).toContain("After spawning, end the Router turn");
+    expect(tools[0]!.description).toContain("another independent, authorized, nonconflicting ready branch in the same turn");
+    expect(tools[0]!.description).toContain("only when the effective registered tool contract and available resources permit it");
+    expect(tools[0]!.description).toContain("ordered resolve_delegation -> exact subagent_spawn pair");
+    expect(tools[0]!.description).toContain("spawn as the next environment action after resolution; do not batch resolutions");
+    expect(tools[0]!.description).toContain("End the Router turn after the eligible wave or at a contract/resource boundary");
+    expect(tools[0]!.description).toContain("overlap permission is unknown or stale, end the turn after that spawn");
+    expect(tools[0]!.description).toContain("instead of polling or routinely calling inspect or join");
+    expect(tools[0]!.description).toContain("Use subagent_join after a terminal notification for the full Result");
+    expect(tools[0]!.description).not.toContain("After spawning, end the Router turn");
     expect(tools.find(tool => tool.name === "subagent_inspect")!.description).toContain("do not poll this tool while waiting");
     expect(tools.find(tool => tool.name === "subagent_join")!.description).toContain("Caller cancellation, including ESC, stops only this wait");
 
@@ -162,6 +170,95 @@ describe("pi-herdr-subagents runtime", () => {
       sessionFile: join(parentDir, "parent", "tasks", "tool-spawn-g1.jsonl"),
       status: "running",
     });
+  });
+
+  test("successive ready-branch spawn calls return two active identities before either completion", async () => {
+    const root = mkdtempSync(join(tmpdir(), "subagents-ready-branches-"));
+    const branches = ["evidence-a", "evidence-c"].map(taskSlug => ({
+      taskSlug,
+      launchStarted: Promise.withResolvers<void>(),
+      launch: Promise.withResolvers<void>(),
+      completion: Promise.withResolvers<string>(),
+      notified: Promise.withResolvers<CompletionNotification>(),
+    }));
+    const notifications: CompletionNotification[] = [];
+    const closedTabs: string[] = [];
+    const transport: HerdrTransport = {
+      async createTab({ env }) {
+        const branch = branches.find(value => value.taskSlug === env?.PI_HERDR_SUBAGENT_ID)!;
+        expect(env?.PI_HERDR_SUBAGENT_GENERATION).toBe("1");
+        // Completion is independently held even after the transport accepts the launch.
+        void branch.completion.promise.then(result => {
+          writeFileSync(env!.PI_HERDR_SUBAGENT_RESULT_PATH!, JSON.stringify({
+            subagentId: branch.taskSlug, generation: 1, status: "completed", result,
+          }));
+        });
+        branch.launchStarted.resolve();
+        await branch.launch.promise;
+        return { tabId: `tab-${branch.taskSlug}`, paneId: `pane-${branch.taskSlug}` };
+      },
+      async run() {},
+      async sendText() {},
+      async closePane() {},
+      async closeTab(tabId) { closedTabs.push(tabId); return "closed"; },
+      async paneExists() { return true; },
+    };
+    const runtime = new SubagentRuntime(transport, handlerRegistry(), root, notification => {
+      notifications.push(notification);
+      branches.find(branch => branch.taskSlug === notification.subagentId)!.notified.resolve(notification);
+    });
+    const spawnTool = createSubagentTools(runtime, "/repo").find(tool => tool.name === "subagent_spawn")!;
+    const tasks: SubagentTask[] = [];
+    try {
+      for (const branch of branches) {
+        const spawning = (spawnTool.execute as any)(`spawn-${branch.taskSlug}`, {
+          agent: "handler", prompt: branch.taskSlug, label: branch.taskSlug, taskSlug: branch.taskSlug,
+        }, undefined, undefined, {});
+        await branch.launchStarted.promise;
+        expect(notifications).toEqual([]);
+        branch.launch.resolve();
+        const task = (await spawning).details as SubagentTask;
+        expect(task).toMatchObject({
+          subagentId: branch.taskSlug, generation: 1, label: branch.taskSlug, status: "running",
+          tabId: `tab-${branch.taskSlug}`, paneId: `pane-${branch.taskSlug}`,
+          sessionFile: join(root, "tasks", `${branch.taskSlug}-g1.jsonl`),
+          resultPath: join(root, "tasks", `${branch.taskSlug}-artifacts`, "result-1.json"),
+        });
+        tasks.push(task);
+        expect(runtime.listTasks().map(({ status }) => status)).toEqual(tasks.map(() => "running"));
+        expect(tasks.every(value => !existsSync(value.resultPath))).toBeTrue();
+        expect(notifications).toEqual([]);
+        expect(closedTabs).toEqual([]);
+      }
+      expect(new Set(tasks.map(task => task.subagentId)).size).toBe(2);
+
+      // Finish the second branch first; join only after its terminal notification.
+      for (const index of [1, 0]) {
+        const branch = branches[index]!;
+        const task = tasks[index]!;
+        const result = `status: completed\nsummary: ${branch.taskSlug}\nreport: ${branch.taskSlug} only`;
+        branch.completion.resolve(result);
+        await expect(branch.notified.promise).resolves.toEqual({
+          subagentId: branch.taskSlug, generation: 1, status: "completed", label: branch.taskSlug,
+        });
+        await expect(runtime.join(task.subagentId)).resolves.toMatchObject({
+          subagentId: branch.taskSlug, generation: 1, status: "completed", result,
+        });
+        if (index === 1) {
+          const pending = runtime.inspect(tasks[0]!.subagentId);
+          expect(pending.status).toBe("running");
+          expect(pending.result).toBeUndefined();
+          expect(existsSync(tasks[0]!.resultPath)).toBeFalse();
+          expect(notifications.map(value => value.subagentId)).toEqual(["evidence-c"]);
+          expect(closedTabs).toEqual(["tab-evidence-c"]);
+        }
+      }
+      expect(notifications.map(value => value.subagentId)).toEqual(["evidence-c", "evidence-a"]);
+      expect(notifications.every(value => !("result" in value))).toBeTrue();
+      expect(closedTabs).toEqual(["tab-evidence-c", "tab-evidence-a"]);
+    } finally {
+      runtime.stop();
+    }
   });
 
   test("resolves the requested Agent locally without exposing its body", async () => {

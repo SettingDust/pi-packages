@@ -3,6 +3,7 @@
 - Baseline status: accepted historical product authority
 - #41 coordination amendment: accepted final authority; implementation complete; fresh same-byte T5c GO with P0/P1/P2/P3 all zero; T5a generation-2 `t5a-g2-f1` explicitly disposed (no defect found; one-confirmation exact-Plan lifecycle preserved) and `t5a-g2-f2` explicitly disposed with the synthetic/live-runtime limitation retained. Canonical T5c evidence raw `5fb37d6ebf5da11470849d6a534adf951bd3a231156f89ab08de1cc36136f091`, output `f1a490e64101ae270d1a5bf8ef05542c2b25a364d53a0cf2e7645112d8a62bef`, record `cbf8d83f6a5739cf914dafb6c06c7a626010a0aa5c7c4ab1b7d819b418346ea3`. Synthetic prompt-contract and no-live-runtime limitations remain; commit, reload, activation, deployment, staging, and push remain pending and were not performed.
 - #42 capability-selection amendment: accepted current product authority; the canonical technical candidate is frozen and implementation, fresh T5 verification, and independent T6 review are complete. T5 and T6 each returned GO with P0-P3 zero. T5 command attribution is config-command `13/22`, config `21/22`, settings-store `19/37`, Extension `6/95`, affected `46/154`, distinct subset `53/81`, focused `94/250`, and full `136/538`; typecheck, import, activation, and execute passed. The 1085-byte LF path-sorted manifest aggregate is `a6c92e4fc2720f31ca9b34fb60561a7c8174dc8176cb1a9a62ceba7e51541850`; rejected 1095-byte literal-backslash-n aggregate is `3fd52e65a90f2d7eaee47b587e50d467abd2960fdb7ead118131bcfb0ce70525`. Exact selective-commit review is GO, while staging and commit remain pending. This makes no live backend, reload, settings/runtime, Herdr, Pi-core, push, or deployment claim; the unrelated Herdr failure remains outside #42.
+- Evidence-branch scheduling and on-demand coordination Skill: accepted documentation authority in [Router Spec](../spec/router-delegation.md#13-evidence-branch-scheduling-and-strategy-loading) and [Skill Library Spec](../spec/skill-library.md); implementation and live behavior remain unverified. Backend-specific dispatch interfaces are not selected by this amendment.
 
 ## router-level-guidance clarification
 
@@ -12,6 +13,12 @@
 - Clarification: independent axes, least-sufficient uncapped integers, ordinary/simple/complex reasoning distinctions and independent impact examples, without automatic planning/review uplift or label mapping, as required in Capability Request Semantics.
 - Implementation status: prompt/test implementation verified by T3 technical checks and T4 GO with P0-P3 zero for pre-T5 bytes; [evidence and limitations](../works/router-level-guidance/context.md#t3-t4-evidence). T5 documentary reconciliation requires final same-byte review before selective-commit eligibility. Historical #41/#42 completion is unchanged and is not clarification completion evidence.
 
+
+## Evidence-branch coordination outcome
+
+A user may ask for one deliverable that depends on separately useful, independently verifiable evidence. The Router must retain the branches' distinct outcomes and truthful completion states while assembling the one requested deliverable only from evidence whose dependencies are satisfied. Independent ready branches should be able to make progress without waiting on an unrelated branch when the available delegation environment permits background overlap; tool calls need not be simultaneous. When that capability is absent or unknown, the Router must obey the effective backend contract and serialize or stop, without representing unverified work as complete.
+
+Delegated units should have clear verification boundaries and the context needed to succeed with the least sufficient reasoning and impact requested separately. Splitting to lower a capability score, hiding consequential impact, or manufacturing valueless fragments is not an outcome. An implementation must preserve Router-owned coordination, exact per-Handler delegation, user authorization, and backend selection freedom; this documentation change does not claim that any installed tool now permits multiple same-turn launches.
 
 ## Problem
 
@@ -26,7 +33,7 @@ A Pi main session needs to handle arbitrary user input without treating every re
 - Main-session responses can remain direct for clarification, summaries, completion, blocking conditions, and other work that does not need delegation.
 - Delegations carry validated Skills, references, constraints, deliverables, semantic capability requirements, and a stable YAML handoff prompt; the Resolver selects the exact available provider/model/thinking candidate.
 - Invalid Skill names, inaccessible referenced files, legacy or malformed candidate configuration, unavailable candidates, and insufficient capability prevent a Handler from starting.
-- Handlers return a normalized YAML Result; the Router alone selects subsequent work.
+- Handlers return a normalized YAML Result; the Router alone selects subsequent work. A single requested deliverable can depend on distinct evidence-branch Results without conflating branch failure, completion, or final delivery.
 - Candidate capability investment is configurable per user without committing provider or account details to a project.
 
 ## Scope
@@ -49,7 +56,7 @@ The package does not depend on `pi-dust`, `pi-dust-harness`, or other reference 
 
 ## Success Criteria
 
-A configured user can install the package, start Pi, and have the Router reliably produce either a direct response or a resolver-validated delegation request. The Router can select package, user, and project Skills as per-Handoff primary and companion methods. A compatible backend can run the bundled Handler Agent with the returned Handoff and feed its Result back to the Router without requiring a project-specific wrapper protocol.
+A configured user can install the package, start Pi, and have the Router reliably produce either a direct response or a resolver-validated delegation request. The Router can select package, user, and project Skills as per-Handoff primary and companion methods. A compatible backend can run the bundled Handler Agent with the returned Handoff and feed its Result back to the Router without requiring a project-specific wrapper protocol. For a shared deliverable with independent evidence branches, success also requires separately observable branch states, dispatch of ready nonconflicting branches when the effective backend permits overlap, and a final writer that consumes only satisfied dependencies. Lack of overlap support must not become a false completion or authorization claim.
 
 ## Capability Request Semantics
 

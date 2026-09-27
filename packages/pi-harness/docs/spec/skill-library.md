@@ -8,6 +8,12 @@ The Router selects exactly one primary Skill and zero or more unique companion S
 
 The Router may read Skill names, descriptions, and full Skill instructions when necessary to make a routing decision. It must not treat that access as permission to execute the Skill's project-domain method itself.
 
+### Coordination-only strategy
+
+`delegation-strategy` is the designated package Skill name for Router coordination, not a Handler domain method. When preparing new delegation the Router must discover it in the model-visible Pi Skill catalog and load its complete body with Pi's normal Skill mechanism before decomposition, domain Skill selection, Handoff creation, or capability requests. Within the same context a complete identifiable body can be reused; a new session, missing body after resume/compaction, changed catalog identity, or uncertainty requires reload. Unavailable or unreadable strategy blocks new delegation while already available Results may still be projected. Merely seeing the Skill name or a remembered summary is insufficient.
+
+The strategy is instruction-only: it has no private orchestration tool, persistent state, or project-domain authority. Its method must preserve independent evidence Results for a shared deliverable, dependency/conflict and cost-aware dispatch, conditional background overlap, separate reasoning/impact selection, and truthful full-Result projection under [Router delegation](router-delegation.md#13-evidence-branch-scheduling-and-strategy-loading). Its presence in the unfiltered structural Handoff enum does not authorize a Handler to coordinate; a Handler accidentally handed this coordination task must refuse it. No second coordinator is implied. The Skill content and Router prompt trigger are implementation work still pending; this specification does not claim they are installed.
+
 ## 2. Initial Package Skills
 
 ### Clarification

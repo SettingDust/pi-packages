@@ -1,6 +1,6 @@
 # Backend Adaptation Specification
 
-- Status: accepted base contract with draft host-compatibility amendment; amendment unaccepted and unimplemented
+- Status: accepted base contract with selected §3 Herdr dispatch-pacing clarification (not implemented); draft host-compatibility amendment in §§2, 6–8 remains unaccepted and unimplemented
 - Host authority candidate: [ADR-0008](../adr/0008-host-owned-effective-tool-inventory.md), [Effective Tool Inventory Specification](effective-tool-inventory.md)
 
 ## 1. Inputs
@@ -62,7 +62,9 @@ subagent_spawn:
 
 After `resolved`, this call must be the Router's next environment action in the same Router pass. It must not emit prose, call another tool, batch another resolution, or retain the invocation for later. The host dispatches the exact snapshot-pinned winning registration rather than performing a fresh name-only lookup.
 
-A successful launch returns a non-empty stable `subagentId` and active status, then ends the Router turn. A later terminal notification begins another pass. Routine immediate polling/join is forbidden.
+A successful launch returns a non-empty stable `subagentId` and active status. For the selected Herdr ready-branch dispatch behavior, the Router may prepare and launch another independent, authorized, nonconflicting branch in the same turn only when the **effective registered** `subagent_spawn` contract and available resources permit a subsequent call. Each branch still uses its own ordered exact `resolve_delegation` -> `subagent_spawn` pair; no batch resolution or simultaneous tool calls are required. If the effective contract still requires ending the turn after the first spawn, the Router ends the turn and waits for notification; unknown or stale overlap permission is not permission to continue. Routine immediate polling/join remains forbidden. The tool description and its focused regression test and README must reflect this conditional rule before it can be used; changing this Specification alone does not change the effective registration or prove live overlap. This amendment changes only Herdr dispatch pacing, not the invocation fields, notification/join lifecycle, resource limits, or another backend's contract.
+
+The accepted [Router evidence-branch scheduling requirements](router-delegation.md#13-evidence-branch-scheduling-and-strategy-loading) remain backend-neutral. A different backend still needs its own compatibility profile and full Result retrieval mapping before use. The draft host-compatibility requirements in sections 2, 6-8 remain unaccepted and unimplemented; this dispatch-pacing decision does not accept them. Deterministic two-active runtime tests and an authorized live Router trace are separate evidence requirements, not claims established by this text.
 
 ## 4. Source-Mapping Evidence
 
