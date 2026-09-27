@@ -782,7 +782,7 @@ export class SubagentRuntime {
       await this.persist(task);
       this.notifyTaskUpdate();
       const args = ["--session", sessionFile, "-e", paneChildExtensionPath, "--system-prompt", agent.body, "--exclude-tools", "subagent_spawn,subagent_resume,subagent_inspect,subagent_join,subagent_steer,subagent_cancel,subagent_remove", ...input.launchArgs];
-      args.push(`${input.prompt}\n\nReturn the Handler Result as YAML, then call subagent_done with that exact YAML string.`);
+      args.push(`${input.prompt}\n\nWhen subagent_done is available, submit the full YAML Handler Result once as its result argument. Do not output the full Result separately before or after successful submission. If unavailable, return the YAML as your final assistant response. If submission fails, correct and retry or report the failure.`);
       const launchScript = join(artifactDir, `launch-${input.generation}.ps1`);
       const bootstrapScript = join(artifactDir, `launch-${input.generation}.cjs`);
       try {

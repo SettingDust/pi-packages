@@ -90,7 +90,7 @@ describe("pi-herdr-subagents runtime", () => {
     expect(spec.args.slice(1)).toEqual([
       "--session", task.sessionFile, "-e", paneChildExtensionPath, "--system-prompt", "Execute the Handoff.",
       "--exclude-tools", childToolExclusions, "--model", "test/model", "--thinking", "high",
-      "Do\nthe work\n\nReturn the Handler Result as YAML, then call subagent_done with that exact YAML string.",
+      "Do\nthe work\n\nWhen subagent_done is available, submit the full YAML Handler Result once as its result argument. Do not output the full Result separately before or after successful submission. If unavailable, return the YAML as your final assistant response. If submission fails, correct and retry or report the failure.",
     ]);
     expect(spec.args).not.toContain("--tools");
     expect(spec.args).toContain("Execute the Handoff.");
@@ -2757,7 +2757,7 @@ test("resume preserves the persisted generation-2 combined argv", async () => {
   expect(spec.args.slice(1)).toEqual([
     "--session", first.sessionFile, "-e", paneChildExtensionPath, "--system-prompt", "Handler",
     "--exclude-tools", childToolExclusions, "--model", "test/family/model:high",
-    "two\n\nReturn the Handler Result as YAML, then call subagent_done with that exact YAML string.",
+    "two\n\nWhen subagent_done is available, submit the full YAML Handler Result once as its result argument. Do not output the full Result separately before or after successful submission. If unavailable, return the YAML as your final assistant response. If submission fails, correct and retry or report the failure.",
   ]);
   expect(spec.args).not.toContain("--tools");
   expect(spec.args.slice(modelIndex, modelIndex + 2)).toEqual(["--model", "test/family/model:high"]);

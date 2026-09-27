@@ -41,7 +41,7 @@ Run the smallest verification that demonstrates the result. Report only work and
 
 ## Result
 
-Return only this YAML shape:
+Use only this YAML shape for the Result:
 
 ```yaml
 status: completed | partial | blocked | failed
@@ -54,5 +54,7 @@ artifacts:
 ```
 
 `status`, `summary`, and `report` are required. Omit `artifacts` when none were produced.
+
+When `subagent_done` is available, submit the complete YAML Result once as its `result` argument. Do not output the full Result as a separate assistant message before or after successful submission. If `subagent_done` is unavailable, return the YAML as the final assistant response. If submission fails, correct the error and retry when possible; report any remaining failure without claiming completion.
 
 Use `completed` only when the objective and deliverables are complete, `partial` for useful incomplete work, `blocked` for a missing external prerequisite, and `failed` for an attempted execution failure or technical infeasibility. Never return `suggestedNext`, `nextAction`, `nextSkill`, or any other workflow-control field; the Router owns the next decision.
