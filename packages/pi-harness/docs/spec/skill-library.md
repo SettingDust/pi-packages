@@ -50,7 +50,7 @@ Research modes apply `research-source-grounded` whenever material claims depend 
 ### Documentation
 
 - `documentation`: classify document ownership and coordinate multi-artifact documentation work.
-- `documentation-structure`: determine repository locations, naming, authority relationships, and bounded Work structure.
+- `documentation-structure`: determine repository locations, naming, authority relationships, and bounded Work structure; own the concrete default folder layout for ADR, PRD, Spec, Proposal, DDD, and Work artifacts.
 - `documentation-work`: create or update a bounded Work entry and processed Context from current authority.
 - `documentation-prd-writing`: create or update product intent, scope, requirements, outcomes, and success criteria.
 - `documentation-adr-writing`: create or update accepted architectural decisions, rationale, consequences, and revisit criteria.
@@ -60,7 +60,7 @@ Research modes apply `research-source-grounded` whenever material claims depend 
 - `documentation-proposal-writing`: manage non-authoritative proposal creation and lifecycle transitions.
 - `documentation-domain-driven-design`: document domain language, invariants, bounded contexts, and context relationships.
 
-`documentation` routes each artifact to its owning Skill. Writers must update existing authority when ownership is unchanged instead of creating competing documents.
+`documentation` routes each artifact to its owning Skill. Writers must update existing authority when ownership is unchanged instead of creating competing documents. When an owning repo or package has no explicit documentation convention, writers must use the default placement in [documentation-structure](../../skills/documentation-structure/SKILL.md#default-layout). DDD defaults to an owner-root `CONTEXT.md` for a single context, or an owner-root `CONTEXT-MAP.md` linking per-context `CONTEXT.md` files for multiple contexts; it does not default to `docs/ddd/`. Explicit existing conventions take precedence; this default does not require a repository-level `docs/` directory or any unused artifact.
 
 ### Review
 
