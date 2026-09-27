@@ -1,12 +1,12 @@
 # Tasks: Todo Compact Authority Reconciliation
 
-- Status: **administrative gates complete; I0-I3 delivered; I4 automated checks and independent review done; live interactive acceptance blocked, delivery incomplete**
+- Status: **Live TUI acceptance cancelled by explicit user decision; I0-I3 and automated I4 evidence remain historical, and unperformed interactive checks are not passes.**
 - Owner: `packages/todo`
 - Governing Spec: [Todo Multi-Tool Protocol](../todo-protocol-redesign/spec.md)
 - Governing Work: [work.md](work.md)
 - Governing Context: [context.md](context.md)
 - Governing Plan: [plan.md](plan.md)
-- Implementation progression: **the later user authorization led to I0-I3 delivery; I4 waits on interactive observation, not renewed approval**
+- Implementation progression: **the later user authorization led to I0-I3 delivery; the remaining I4 live acceptance is cancelled by explicit user decision**
 
 ## 1. Purpose And Correction Basis
 

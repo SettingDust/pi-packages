@@ -1,6 +1,6 @@
 # Live Pi TUI Evidence: Todo Inline Expand/Collapse
 
-**Verdict:** Partial live acceptance. The original observation at `446409dc2efcc98fcf897663262a0ab3f655e7b1` exposed model-picker input isolation failure; the subsequent Todo-local correction passed isolated regular and fullscreen ConPTY checks for that defect (see below). Remaining T2 criteria are not fully verified. No commit was made.
+**Verdict:** Partial live acceptance. The model-picker ownership correction remains supported in both modes. The follow-up below adds ordinary/fullscreen keyboard, paste, command completion/qualification and lifecycle evidence, but reproduces a fullscreen detail-page routing failure. Physical Ctrl+Shift+T and rasterized dock/font appearance remain unobserved. No production code, index, HEAD, or global configuration change was made during this acceptance run.
 
 ## Reproduction Boundary
 
@@ -8,7 +8,7 @@
 - Arguments: `node node_modules/@earendil-works/pi-coding-agent/dist/cli.js --session <fixture> --no-extensions --no-skills --no-prompt-templates --no-context-files -e packages/todo/src/index.ts --tui-mode regular` (repeat with `fullscreen`). `PI_OFFLINE=1`, `PI_SKIP_VERSION_CHECK=1`, `PI_TELEMETRY=0`. PTY initially 100 columns x 35 rows, then resized to 48 x 12 and 25 x 8 and restored; each process was terminated after the observation. Wait for the widget and startup warning before issuing commands: one early regular trial sent `/todo-details` before readiness and is excluded from positive entry evidence.
 - Observations below are captured VT output and key-response traces from those real processes, not screenshots of a terminal emulator or font rasterization. `pywinpty`/ConPTY produced Unicode Nerd Font codepoints and SGR true-color sequences. Font appearance, pixel clipping and mouse/physical-key mapping were not verified. Headless component tests are separate historical T1 evidence.
 
-## Direct Observations
+## Historical Direct Observations At Pre-Correction Source
 
 | Claim | Evidence and classification |
 | --- | --- |
@@ -35,8 +35,77 @@ The original failed implementation registered `onTerminalInput` before focused H
 - **Regular and fullscreen:** `/todo-details` entered Todo (`selectedBg` SGR `48;2;58;58;74`); Ctrl+L opened the Host picker at `(1/39)`; Down changed the picker to `(2/39)` with no Todo selected-background redraw. The first Escape dismissed the picker and restored the foreground editor surface. Regular mode's widget rows were outside the captured viewport after the picker closed; fullscreen output showed the Todo summary/rows still present without selection. This demonstrates the reported ownership defect is corrected in both tested modes; it does not establish other T2 criteria.
 - Deterministic regression tests model upstream listener then Host dispatch for two passthrough chords, asserting selector navigation and first-Escape ownership; additional cases check editor/paste handoff and retained key-release behavior. Package-scoped `vitest run`: 96 tests passed (12 files). Installed `tsc --noEmit -p packages/todo/tsconfig.json` and `git diff --check -- packages/todo` passed. A root-wide Vitest invocation also encountered an unrelated sibling worktree's unresolved `../src/index.js`; only the package-scoped suite is claimed here.
 
-The original picker failure below is historical evidence for the pre-correction commit; it is not a current failure claim. T2 remains partial: the other surface/viewport/lifecycle checks listed above have not been replayed to completion. Pixel/font claims still need an actual terminal emulator framebuffer capture.
+The original picker failure above is historical evidence for the pre-correction commit; it is not a current failure claim. The following follow-up supersedes the earlier remaining-acceptance inventory without promoting VT output to pixel/font evidence.
+
+## Follow-Up Boundary And Provenance
+
+Observed on 2026-09-27 (local Windows clock), from `E:/Projects/pi-packages`, using Node `v24.15.0`, installed Pi coding-agent/TUI `0.85.1` and `pywinpty 2.0.15`. No dependency installation or global settings change occurred. Repository instruction searches found no applicable `AGENTS.md`/`CLAUDE.md`; the owning Spec section 9, Work/Context/Plan/Tasks, existing evidence and prior acceptance scripts were read before execution.
+
+HEAD remained `446409dc2efcc98fcf897663262a0ab3f655e7b1`, but this is **not** a claim to have tested only HEAD bytes: the staged Todo focus correction was present. Processes loaded the current source, not a packaged Todo build. Source SHA-256 values remained unchanged during this run:
+
+| Source | SHA-256 |
+| --- | --- |
+| `src/index.ts` | `4014F43F2FD59734981AFAA0D4643DE197A7B423552DA95DFD095BC535A0E326` |
+| `src/tool.ts` | `0A156E3C47A3E7E94181740A677EBCFCEB2291297853E15B3076819455FC1A57` |
+| `src/widget.ts` | `6A68A4A1A4377A4FB8B573C89DD55F559255A0BC7E31C3EE5E1B2B422563D0BC` |
+| `src/widget-component.ts` | `C7D55F6C7CE9DC09CD67A58F12BB6053B5959266D7E77194B4FD3227DDF8459C` |
+| `src/widget-layout.ts` | `7A0E1A5F1DE7B1DC1260C167F8224147743E84A110D65DB12ED5F4BE739780EC` |
+
+The canonical fixture `%TEMP%/todo-inline-accept-446409dc/fixture.jsonl` had SHA-256 `25602591D75A9F0528A36026D9A27F4A1CA9E19A5FE341995230BFCC72EFD650`. All processes used isolated agent directories, `PI_OFFLINE=1`, `PI_SKIP_VERSION_CHECK=1`, `PI_TELEMETRY=0`, the existing no-auto-extension/skill/prompt/context flags, and initial 100x35 geometry. Follow-up/short sessions used the same child-only dummy OpenAI key as the earlier picker check; no provider request was submitted. Other runs intentionally used no dummy key and displayed the startup no-model warning. Every acceptance-owned process was terminated in its script's `finally` block; production sessions were not used.
+
+### Commands And Captures
+
+All scripts below are under `C:/Users/WINDOWS/AppData/Local/Temp/`. Each was run with `$env:PYTHONIOENCODING='utf-8'; python <script>` and launches both `--tui-mode regular` and `fullscreen`. Reuse the launch command in Reproduction Boundary; lifecycle/async substitute `-e %TEMP%/todo-live-controls.ts`, and collision adds `-e %TEMP%/todo-live-collision.ts` after the real Todo extension. Temporary scripts/settings are fixture controls, not shipped extension changes.
+
+| ID | Script | Actual capture directory under `%TEMP%` |
+| --- | --- | --- |
+| A | `todo-live-followup.py` | `todo-live-followup-bnxy2_te` |
+| B | `todo-live-short.py` | `todo-live-short-vsr7sexr` |
+| C | `todo-live-tree.py` | `todo-live-tree-trcgh2si` |
+| D | `todo-live-lifecycle.py` | `todo-live-lifecycle-qy9z29i4` |
+| E | `todo-live-collision.py` | `todo-live-collision-ae1btzjp` |
+| F | `todo-live-async.py` | `todo-live-async-i1jfxtuh` |
+
+Each directory contains `regular.vt`, `fullscreen.vt` and per-mode JSON step summaries; D/E/F also retain per-step VT deltas. The durable [acceptance archive](live-acceptance-captures.zip) contains these captures, fixture, scripts, source hashes and index fingerprint, **not** isolated agent/auth/model directories. `todo-live-controls-lifecycle.ts` preserves the exact D controller (SHA-256 `CBA75980A3DB5126B4A07E155EBA35C11E3378EB408D52619A1A6EC761CFBF89`); the subsequently extended F controller is `todo-live-controls.ts` (SHA-256 `C239CF01911624401CD96820B8ED9D603E03DEDB4445334AA1E13C85EA4488CB`). For D reproduction, use the lifecycle controller at the launch script's expected controller path; F uses the extended one. Scripts require the already installed Windows ConPTY/pywinpty setup and the fixture/agent seed paths recorded above.
+
+D/F import and register the exact current Todo source through an isolated controller, forwarding normal registration and retaining its real tool `execute` callbacks. Commands call those callbacks against actual live Host UI; F schedules mutations 2.5 seconds later while Todo interaction is active. This establishes real publication/render/listener behavior, **not** provider dispatch or Host persistence acknowledgement. D uses actual `ctx.switchSession` to copied canonical fixtures and changes placement only in its disposable `PI_CODING_AGENT_DIR/todo/settings.json` before switching. A/B/C/E load the original Todo extension directly.
+
+Excluded trials: `todo-live-followup-biceuynl` stopped after startup and is not positive interaction evidence. The first lifecycle trial, `todo-live-lifecycle-0u_b8_dq`, accessed the old command context after `ctx.switchSession` and emitted a Host stale-context warning. That fixture-controller mistake was removed; clean D is the claimed lifecycle run, not the warning trial. JSON `selected`/`selectedBg` flags indicate an SGR sequence anywhere in an output delta, not final framebuffer focus; transcript redraws can contain old selection formatting.
+
+### Remaining Criterion Matrix
+
+Here **pass (VT)** means an observed transition in a real Pi process, bounded to terminal output and accepted editor input. It does not mean font/pixel or physical-key acceptance. **Not observed** is neither a pass nor a demonstrated code failure.
+
+| Contract criterion | Regular | Fullscreen | Evidence and exact limit |
+| --- | --- | --- | --- |
+| Ordinary rendering; command entry; independent task expansion | Pass (VT) | Pass (VT) | A/F: collapsed canonical task order/counts, selected header, Plan and Build independently expanded, completed Finish and descriptions emitted. Empty remains selectable in B. Existing historical color/glyph traces are retained; appearance is not rasterized. |
+| Up/Down, Left/Right, Enter/Space; repeated command entry | Pass (VT) | Pass (VT) | F: Right expands, Left collapses, Enter/Space toggle, Up/Down change selected task. Repeated `/todo-details` returns selection to Plan. This is a repeated-entry observation, not an independent listener-count measurement. PageUp in F was at the top; it does not prove reverse detail scrolling. |
+| Full descriptions with PageDown at 100x35 | Pass (VT) | **Fail: detail PageDown preempted** | A: regular fourth separated `ESC[6~` reaches Step 16 and complete final sentinel. Fullscreen 14 separated PageDown keys produce only 16-byte synchronization frames and no changed Todo detail row. B repeats the failure at short size. Down to Empty plus restoring geometry emits the final description, but this is not a PageDown pass. |
+| Resize to 48x12 and 25x8; short/narrow final-line reachability | Partial (VT traversal) | Fail for PageDown; pixel visibility not observed | A/B: live resize and restoration redraw. At 25 columns the regular raw capture contains wrapped `FINAL_DESCRIPTION_S`, `ENTINEL live last`, and `line verification` across successive detail slices; B's contiguous-string `final:false` is therefore not proof of missing text. Fullscreen PageDown does not traverse detail; Down/restore emits the sentinel at 100x35. No final screen-cell/framebuffer reconstruction or pixel-clipping pass is claimed for either mode. |
+| Escape keeps expansion; ordinary editor input; reentry | Pass (VT) | Pass (VT) | A/B: `EDITOR_SENTINEL` reaches editor after Escape; explicit reentry retains Plan/Build expansion. B restores geometry before this check. No editor submission/provider request occurred. |
+| Bracketed paste and unrelated shortcut handoff | Pass (VT) | Pass (VT) | A: `ESC[200~PASTE_SENTINEL ESC[201~` yields editor `PASTE_SENTINEL`; subsequent command reentry retains expansion. Ctrl+L reaches the native picker, Down navigates it, first Escape dismisses it. This complements the earlier `(1/39)` to `(2/39)` regression. Arbitrary unbracketed key-equivalent paste remains indistinguishable. |
+| Other foreground surface and focus restoration | Partial (VT) | Partial (VT) | C: `/tree` opens native Session Tree from active Todo; first Escape closes it, explicit Todo reentry retains Plan expansion, and `EDITOR_TREE` then reaches editor. This single-node fixture gives no meaningful alternate tree node for Down; no claim of branch navigation or all-Host-surface isolation. B opens/cancels `/resume` after `/new`, but the isolated list is empty and does not prove resume selection. |
+| Command completion and duplicate-command qualified fallback | Pass (VT) | Pass (VT) | E: native discovery attributes real Todo to `todo-details:1` and fixture collision to `todo-details:2`; `/todo-d` lists both and Tab completes the former. The actually discovered qualified Todo command enters/expands the widget; the other command prints `COLLISION_OWNER_SENTINEL`. Suffixes were observed, not assumed as a contract. |
+| Shortcut collision winner and actual Ctrl+Shift+T entry | Winner diagnostic observed; physical entry not observed | Same | E: startup emits native duplicate `ctrl+shift+t` winner diagnostic. Synthetic `ESC[116;6u` and `ESC[84;6u` produce no entry/collision-handler transition in A/B/E; neither is proof of a physical chord failure or of actual winning-handler dispatch. The qualified command works despite this boundary. |
+| Same-session refresh/replacement while active | Pass (live controller) | Pass (live controller) | F: scheduled real `todo_add` fires after entry, preserves Plan/Build expansion by existing names, renders `ASYNC_REFRESH_SENTINEL`, and retires interaction: `ASYNC_EDITOR_SENTINEL` reaches editor without Escape; reentry succeeds. No task reorder/rename case or provider-level dispatch was driven. |
+| Complete set resets expansion; removal clears active listener | Pass (live controller) | Pass (live controller) | F: scheduled real `todo_set` replaces state while active; Plan is collapsed on reentry despite retaining its name. Scheduled `{tasks:[]}` clears the widget; `REMOVAL_EDITOR_SENTINEL` reaches editor and details entry reports unavailable. |
+| Terminal status and five-second clear while active | Pass (live controller) | Pass (live controller) | D: real tools set one pending replacement then transition it completed; terminal summary/child render, details reentry activates, and after 5.7 seconds widget is cleared. Down yields no Todo transition, `TIMER_EDITOR_SENTINEL` reaches editor, and `/todo-details` reports unavailable. This brackets the implemented five-second timer, not a millisecond timing assertion. |
+| New session; canonical restore/switch; off/below-editor notices | Pass (live/controller subset) | Pass (live/controller subset) | A/B: native `/new` starts a session with no Todo widget and details becomes unavailable. D: actual `ctx.switchSession` restores canonical Plan/Build rows with collapsed expansion; off removes the widget and permits `OFF_EDITOR_SENTINEL`; belowEditor retains ordinary rows and rejects details; restoring aboveEditor allows entry. Off/below changes are child settings plus session replacement, not an in-session settings-UI event. |
+| Failure cleanup, graceful session shutdown, non-TUI notice, runtime refresh rename/reorder | Not observed live | Not observed live | Existing deterministic coverage is reused but not relabeled live acceptance. Fixture processes are deliberately terminated; that is not graceful `session_shutdown` evidence. F's 25x7 attempt occurred after removal and therefore proves no separate insufficient-space guard. |
+| Actual dock/font appearance and rasterized final-line visibility | Not observed | Not observed | ConPTY captures codepoints/SGR and redraw deltas, not a terminal emulator with a known Nerd Font. No font, pixel spacing, physical chord, or all-geometry visibility pass is claimed. |
+
+### Concrete Blocker And Smallest Proposed Correction
+
+Fullscreen detail paging is contradicted by the real input traces and installed source. `node_modules/@earendil-works/pi-tui/dist/tui-alt-screen.js:103` registers the Host viewport listener during construction, before Todo adds its public listener. Its PageUp/PageDown branches at lines 538/544 return `{consume:true}`. `dist/tui.js:662` iterates input listeners in insertion order and returns immediately on consumption, so those keys never reach Todo's listener. This is a routing failure, not a Todo offset calculation demonstrated to fail; the Down-to-Empty workaround does not satisfy Spec section 9's page-key requirement.
+
+The smallest **candidate**, not an implemented or verified fix, is a Host input-priority/defer change allowing a consuming extension foreground listener to run before transcript-page handling. That is outside this Work's no-Host-change boundary. No compliant Todo-only correction is established with the current public API; private listener reordering, keybinding changes, new shortcuts and overlay fallback were not attempted. Fullscreen PageDown remains a stop condition for full acceptance. Physical shortcut input and known-font framebuffer evidence are separate unavailable observation boundaries, not inferred failures.
+
+### Verification And Index Preservation
+
+The prior package-scoped **96 passing tests (12 files)** and installed TypeScript pass remain reused evidence. They were **not rerun**: only acceptance artifacts and Work/Tasks prose changed, not Todo source/test bytes or the installed dependency graph. This run's executable verification was the six ConPTY scripts, captured step responses, source/input-order inspection, and the final scoped `git diff --check`/index comparisons.
+
+Before and after, raw `.git/index` SHA-256 was `5DC4BD4546103B9037F57A0D3AEDC6C2913E5B37CE302C137EB90BA955DCDD19`; `git ls-files -s | git hash-object --stdin` remained `d6840b0984d84f6be08f575666391770177edb57`. The same five Todo files stayed staged: `src/widget.ts`, `test/widget.test.ts`, and this Work's `evidence.md`, `tasks.md`, `work.md`. No staging, reset, commit or push occurred. The three documentation updates remain **unstaged on top of their prior staged versions**; the acceptance archive is untracked. Harness edits, unrelated/untracked files, and existing code were preserved.
 
 ## Remaining Acceptance
 
-T2 remains **partial**. Isolation across other Host modals/overlays and restoration after their close, physical shortcut and collision/qualified command, unrelated shortcuts and confirmed bracketed paste passthrough, fullscreen PageDown dock scrolling, narrow/short final-line access and rasterized viewport/font appearance, and refresh/hide/restore/terminal-clear lifecycle are not established here. The model-picker ownership failure has been corrected and live-rechecked in both modes; those other criteria have not been promoted to live acceptance. Pixel/font claims require terminal emulator framebuffer capture with a known Nerd Font.
+T2 remains **partial**, with a reproduced fullscreen detail-page routing blocker. Physical Ctrl+Shift+T, actual shortcut winning-handler dispatch, known-font/rasterized dock visibility, graceful shutdown/failure cleanup, non-TUI live notice, and complete coverage of other Host surfaces/refresh identity edge cases remain unobserved. Supported lifecycle and command/paste criteria above are no longer listed as entirely unverified, but their stated fixture/VT boundaries remain. This record is not an approval receipt or a claim of full acceptance.

@@ -1,6 +1,6 @@
 # Work: Todo Multi-Expand
 
-- Status: **Implementation accepted by the user (Handoff-reported fact); T0 technical baseline passed; T1-T4 pending; unimplemented.**
+- Status: **Administrative closure recorded as completed by explicit user direction; implementation and focused verification remain unperformed/unimplemented.** Historical T0 baseline and pending T1-T4 evidence are preserved below.
 - Scope: Define the status-derived persistent Todo widget behavior that displays every task group containing at least one `in_progress` todo at the same time.
 - Related Context: [context.md](context.md)
 - Existing Authority: [Todo Protocol Redesign Work](../todo-protocol-redesign/work.md), [Context](../todo-protocol-redesign/context.md), [Spec](../todo-protocol-redesign/spec.md), [Plan](../todo-protocol-redesign/plan.md), and [Tasks](../todo-protocol-redesign/tasks.md)
@@ -26,6 +26,6 @@ The following remain unchanged:
 
 The implementation boundary is exactly `packages/todo/src/widget-layout.ts` and `packages/todo/test/widget.test.ts`, as specified by [Plan](plan.md) and [Tasks](tasks.md). The earlier conditional `widget.ts` candidate is superseded; it is excluded from implementation.
 
-## Delivery State
+## Administrative closure
 
-The current Handoff reports that the user has accepted implementation of the Work/Context/Plan/Tasks tuple. This is a factual lifecycle synchronization, not an acceptance receipt or a new grant of authority by this document. T0's technical baseline passed; see [Tasks evidence](tasks.md#6-pre-t1-lifecycle-evidence) for the source and acceptance-time identities. T1-T4 remain pending; no implementation or verification completion is claimed. The accepted Plan defines the two-path rendering contract, dependency order, and verification. Completion still requires implementation and focused evidence that zero, one, and multiple active groups render according to the fixed boundary without changing excluded behavior.
+The user directed this Work to be treated as completed for status bookkeeping. This closes the coordination item only; it does not convert the preserved pending T1-T4 or missing implementation/test evidence into demonstrated completion. This is a factual lifecycle synchronization, not an acceptance receipt or a new grant of authority by this document. T0's technical baseline passed; see [Tasks evidence](tasks.md#6-pre-t1-lifecycle-evidence) for the source and acceptance-time identities. T1-T4 remain pending; no implementation or verification completion is claimed. The accepted Plan defines the two-path rendering contract, dependency order, and verification. Completion still requires implementation and focused evidence that zero, one, and multiple active groups render according to the fixed boundary without changing excluded behavior.

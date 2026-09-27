@@ -1,0 +1,260 @@
+{
+  "status": "passed",
+  "checks": {
+    "effectiveTools": true,
+    "conditionalContract": true,
+    "strategyBeforeResolve": true,
+    "branchesAC": true,
+    "exactAdjacent": true,
+    "overlappingRuntime": true,
+    "fullResultsBeforeWriter": true,
+    "singleFinalWriter": true
+  },
+  "timedOut": false,
+  "exitCode": 143,
+  "errors": [],
+  "cleanupFailed": false,
+  "durationMs": 177304,
+  "tools": [
+    {
+      "at": "2026-09-27T06:14:42.070Z",
+      "kind": "registered",
+      "name": "resolve_delegation",
+      "active": true,
+      "description": "Validate a Handler Handoff and resolve its invocation metadata using semantic reasoning and impact requirements."
+    },
+    {
+      "at": "2026-09-27T06:14:42.071Z",
+      "kind": "registered",
+      "name": "subagent_spawn",
+      "active": true,
+      "description": "Start one background subagent. taskSlug is required and must be a caller-provided canonical task identity; the parent receives a terminal completion notification without the full Result. After an active spawn, you may prepare and launch another independent, authorized, nonconflicting ready branch in the same turn only when the effective registered tool contract and available resources permit it. Each branch requires its own ordered resolve_delegation -> exact subagent_spawn pair, with spawn as the next environment action after resolution; do not batch resolutions. End the Router turn after the eligible wave or at a contract/resource boundary, then wait for terminal completion notifications instead of polling or routinely calling inspect or join. If the effective contract still requires ending the turn after the first spawn, or overlap permission is unknown or stale, end the turn after that spawn. Use subagent_join after a terminal notification for the full Result."
+    },
+    {
+      "at": "2026-09-27T06:14:42.071Z",
+      "kind": "registered",
+      "name": "subagent_join",
+      "active": true,
+      "description": "Wait for a subagent and read its full Result. Use after a terminal completion notification, or when an explicit immediate Result wait is necessary; do not use it for routine polling. Caller cancellation, including ESC, stops only this wait and does not cancel the subagent; use subagent_cancel to cancel it."
+    }
+  ],
+  "timeline": [
+    {
+      "at": "2026-09-27T06:14:47.676Z",
+      "kind": "call",
+      "name": "read",
+      "id": "call_kAXbJ4NEvQMSWQgoFX71lN1Y|fc_050040cb24522694016ab8b460fda887d1887f92120cbadeb7",
+      "strategy": true
+    },
+    {
+      "at": "2026-09-27T06:14:47.680Z",
+      "kind": "result",
+      "name": "read",
+      "id": "call_kAXbJ4NEvQMSWQgoFX71lN1Y|fc_050040cb24522694016ab8b460fda887d1887f92120cbadeb7",
+      "isError": false,
+      "strategyBody": true
+    },
+    {
+      "at": "2026-09-27T06:15:01.622Z",
+      "kind": "call",
+      "name": "resolve_delegation",
+      "id": "call_nSlP30Td87x8QDWWw0gWewIj|fc_050040cb24522694016ab8b469625087d195a4ec4946f4ca1b",
+      "branch": "branch A"
+    },
+    {
+      "at": "2026-09-27T06:15:01.630Z",
+      "kind": "result",
+      "name": "resolve_delegation",
+      "id": "call_nSlP30Td87x8QDWWw0gWewIj|fc_050040cb24522694016ab8b469625087d195a4ec4946f4ca1b",
+      "isError": false,
+      "status": "resolved",
+      "branch": "branch A"
+    },
+    {
+      "at": "2026-09-27T06:15:09.569Z",
+      "kind": "call",
+      "name": "subagent_spawn",
+      "id": "call_gGBvMrg9TYuA6C99TfWsRjjy|fc_050040cb24522694016ab8b47252e887d1abb9546b23adef2d",
+      "label": "branch A",
+      "exact": true
+    },
+    {
+      "at": "2026-09-27T06:15:09.691Z",
+      "kind": "result",
+      "name": "subagent_spawn",
+      "id": "call_gGBvMrg9TYuA6C99TfWsRjjy|fc_050040cb24522694016ab8b47252e887d1abb9546b23adef2d",
+      "isError": false,
+      "status": "running",
+      "subagentId": "fixture-branch-a",
+      "generation": 1,
+      "tabId": "wJ:t2",
+      "startedAt": "2026-09-27T06:15:09.643Z",
+      "branch": "branch A"
+    },
+    {
+      "at": "2026-09-27T06:15:19.721Z",
+      "kind": "call",
+      "name": "resolve_delegation",
+      "id": "call_BcnVqlWEEduQIdRcN1SbthBK|fc_050040cb24522694016ab8b47b904087d1a1b7832258063d9c",
+      "branch": "branch C"
+    },
+    {
+      "at": "2026-09-27T06:15:19.731Z",
+      "kind": "result",
+      "name": "resolve_delegation",
+      "id": "call_BcnVqlWEEduQIdRcN1SbthBK|fc_050040cb24522694016ab8b47b904087d1a1b7832258063d9c",
+      "isError": false,
+      "status": "resolved",
+      "branch": "branch C"
+    },
+    {
+      "at": "2026-09-27T06:15:30.125Z",
+      "kind": "call",
+      "name": "subagent_spawn",
+      "id": "call_3cdWcXslAZlCbLfExTuuOHTf|fc_050040cb24522694016ab8b485449087d1bdd5cbe3540344b8",
+      "label": "branch C",
+      "exact": true
+    },
+    {
+      "at": "2026-09-27T06:15:30.365Z",
+      "kind": "result",
+      "name": "subagent_spawn",
+      "id": "call_3cdWcXslAZlCbLfExTuuOHTf|fc_050040cb24522694016ab8b485449087d1bdd5cbe3540344b8",
+      "isError": false,
+      "status": "running",
+      "subagentId": "fixture-branch-c",
+      "generation": 1,
+      "tabId": "wJ:t3",
+      "startedAt": "2026-09-27T06:15:30.236Z",
+      "branch": "branch C"
+    },
+    {
+      "at": "2026-09-27T06:15:45.520Z",
+      "kind": "notification",
+      "subagentId": "fixture-branch-a",
+      "status": "completed"
+    },
+    {
+      "at": "2026-09-27T06:15:50.658Z",
+      "kind": "call",
+      "name": "subagent_join",
+      "id": "call_lT9QxXI085UcByDAEjfX7qpU|fc_050040cb24522694016ab8b4a062e087d1bfe94509406bfc94",
+      "subagentId": "fixture-branch-a"
+    },
+    {
+      "at": "2026-09-27T06:15:50.661Z",
+      "kind": "result",
+      "name": "subagent_join",
+      "id": "call_lT9QxXI085UcByDAEjfX7qpU|fc_050040cb24522694016ab8b4a062e087d1bfe94509406bfc94",
+      "isError": false,
+      "status": "completed",
+      "subagentId": "fixture-branch-a",
+      "generation": 1,
+      "updatedAt": "2026-09-27T06:15:45.302Z",
+      "resultSha256": "bb33a45fc3c37956a43f0f0daf5b02cef4443ce76b242cd53c810f46d121bfce",
+      "fullResult": true,
+      "resultStatus": "completed",
+      "fixtureFact": "amber",
+      "artifactCount": 0
+    },
+    {
+      "at": "2026-09-27T06:16:01.241Z",
+      "kind": "notification",
+      "subagentId": "fixture-branch-c",
+      "status": "completed"
+    },
+    {
+      "at": "2026-09-27T06:16:04.757Z",
+      "kind": "call",
+      "name": "subagent_join",
+      "id": "call_nzfawVB49tdRCh8EHzae55GM|fc_050040cb24522694016ab8b4ae9dc087d1b9ef6c6531c45425",
+      "subagentId": "fixture-branch-c"
+    },
+    {
+      "at": "2026-09-27T06:16:04.760Z",
+      "kind": "result",
+      "name": "subagent_join",
+      "id": "call_nzfawVB49tdRCh8EHzae55GM|fc_050040cb24522694016ab8b4ae9dc087d1b9ef6c6531c45425",
+      "isError": false,
+      "status": "completed",
+      "subagentId": "fixture-branch-c",
+      "generation": 1,
+      "updatedAt": "2026-09-27T06:16:01.106Z",
+      "resultSha256": "7275b2996a60f802c5c64ca1c74524f607786a3479c70afd559aed4860d03c8e",
+      "fullResult": true,
+      "resultStatus": "completed",
+      "fixtureFact": "cedar",
+      "artifactCount": 0
+    },
+    {
+      "at": "2026-09-27T06:16:28.155Z",
+      "kind": "call",
+      "name": "resolve_delegation",
+      "id": "call_eN7zbZHF6B4SwPu2XgSPRbWj|fc_050040cb24522694016ab8b4b50d4487d1929f98a5d47e05eb",
+      "branch": "final writer"
+    },
+    {
+      "at": "2026-09-27T06:16:28.166Z",
+      "kind": "result",
+      "name": "resolve_delegation",
+      "id": "call_eN7zbZHF6B4SwPu2XgSPRbWj|fc_050040cb24522694016ab8b4b50d4487d1929f98a5d47e05eb",
+      "isError": false,
+      "status": "resolved",
+      "branch": "final writer"
+    },
+    {
+      "at": "2026-09-27T06:16:48.335Z",
+      "kind": "call",
+      "name": "subagent_spawn",
+      "id": "call_zIzWkNAeWPmwSsWNQc4N43ot|fc_050040cb24522694016ab8b4c9a9f887d18d5cfe19b3250ac9",
+      "label": "final writer",
+      "exact": true
+    },
+    {
+      "at": "2026-09-27T06:16:48.465Z",
+      "kind": "result",
+      "name": "subagent_spawn",
+      "id": "call_zIzWkNAeWPmwSsWNQc4N43ot|fc_050040cb24522694016ab8b4c9a9f887d18d5cfe19b3250ac9",
+      "isError": false,
+      "status": "running",
+      "subagentId": "fixture-final-writer",
+      "generation": 1,
+      "tabId": "wJ:t4",
+      "startedAt": "2026-09-27T06:16:48.407Z",
+      "branch": "final writer"
+    },
+    {
+      "at": "2026-09-27T06:17:33.821Z",
+      "kind": "notification",
+      "subagentId": "fixture-final-writer",
+      "status": "completed"
+    },
+    {
+      "at": "2026-09-27T06:17:38.428Z",
+      "kind": "call",
+      "name": "subagent_join",
+      "id": "call_aSjGx6Gj0AuFu0dJ4LjhMxZZ|fc_050040cb24522694016ab8b50c4ab087d184c8ca1305a6d617",
+      "subagentId": "fixture-final-writer"
+    },
+    {
+      "at": "2026-09-27T06:17:38.429Z",
+      "kind": "result",
+      "name": "subagent_join",
+      "id": "call_aSjGx6Gj0AuFu0dJ4LjhMxZZ|fc_050040cb24522694016ab8b50c4ab087d184c8ca1305a6d617",
+      "isError": false,
+      "status": "completed",
+      "subagentId": "fixture-final-writer",
+      "generation": 1,
+      "updatedAt": "2026-09-27T06:17:33.661Z",
+      "resultSha256": "4238372c87b53c25344517e717427735b16ee66f9c5bb2520d9df915ec7d3ace",
+      "fullResult": true,
+      "resultStatus": "completed",
+      "fixtureFact": "amber",
+      "artifactCount": 1
+    }
+  ],
+  "notices": 3,
+  "fixtureReportPresent": true,
+  "fixtureSessionWasIsolated": true,
+  "workspaceVerified": true
+}

@@ -1,6 +1,6 @@
 # Work: Todo Protocol Redesign
 
-- Status: **T0 through T8 complete. T10 complete; fresh correctness review and evidence/selective-boundary review GO (P0-P3=0); commit candidate reviewed and pending explicit user submission authorization.**
+- Status: **Completed by explicit user direction; recorded T0-T8/T10 technical evidence and review results remain historical evidence, with commit still unperformed.**
 - Scope: Preserve the completed four-tool protocol and frozen 41-entry inventory while defining the narrow T10 authority needed for two final correctness repairs.
 - Related Context: [context.md](context.md)
 - Related Spec: [spec.md](spec.md)

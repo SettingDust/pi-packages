@@ -1,13 +1,15 @@
 # Work: Todo `workingOn` clean-break authority reconciliation
 
-- **状态**：accepted amendment / A0 ownership reconciled / bounded implementation authorized / implementation verification incomplete
+- **状态**：administratively completed by explicit user direction; source implementation verification remains incomplete and no typecheck/commit/release completion is claimed
 - **Owner**：`packages/todo`
 - **本次范围**：只同步本 Work、Context、Plan、Tasks 与 governing Spec 的 authority/lifecycle 记录。本次不完成 source implementation，不提交或修改 Git。
 - **Work 目录**：`packages/todo/docs/works/todo-workingon-contract/`
 - **Governing Spec**：[`../todo-protocol-redesign/spec.md`](../todo-protocol-redesign/spec.md)
 - **Tuple**：[`work.md`](./work.md)、[`context.md`](./context.md)、[`plan.md`](./plan.md)、[`tasks.md`](./tasks.md)
 
-## Decision and lifecycle
+## Administrative closure
+
+用户已明确将本 Work 按完成处理，作为状态簿记关闭。该行政关闭不把现有 source/test 修改、11 个测试文件结果或缺失的 typecheck 证据提升为实现完成；原有 implementation verification incomplete 和回滚边界继续有效。
 
 当前 session 用户已接受 `workingOn` complete-removal amendment，并明确选择扩大 source boundary，将 `schema.ts` 与 `tool.ts` 纳入本次 clean break。该决定形成可审查的 21-path implementation boundary；acceptance receipt 和 digest 仍由运行时持有，不写入 Markdown。
 

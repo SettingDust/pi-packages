@@ -1,13 +1,15 @@
 # Tasks: Todo Status-Derived Multi-Expand
 
-- Status: **Implementation accepted by the user (Handoff-reported fact); T0 technical baseline passed; T1-T4 pending; unimplemented.**
+- Status: **Administrative closure recorded as completed by explicit user direction; T0 baseline evidence is historical and T1-T4 implementation/verification remain unperformed.**
 - Owner: `packages/todo`
 - Governing Work: [work.md](work.md)
 - Governing Context: [context.md](context.md)
 - Governing Plan: [plan.md](plan.md)
 - Implementation authorization: **The current Handoff reports explicit user acceptance of the bounded implementation. This document records that fact, not a new grant or receipt. T0 technical baseline passed; T1-T4 remain pending.** See [lifecycle evidence](#6-pre-t1-lifecycle-evidence).
 
-## 1. Boundary
+## Administrative closure
+
+The user directed this Work to be treated as completed for status bookkeeping. Preserve the existing T0 baseline, pending T1-T4 decomposition, and explicit absence of implementation/test evidence; this is not a pass for any failed or unrun check.
 
 These Tasks derive exactly the accepted Plan's T0-T4 sequence for the persistent Todo widget. The implementation owner boundary is exactly:
 

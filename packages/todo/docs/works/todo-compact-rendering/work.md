@@ -1,13 +1,15 @@
 # Work: Todo Compact Summary and Detail Overlay
 
-- Status: **design accepted at Gate C; I0-I3 delivered; automated I4 verification and independent review complete; live TUI acceptance unperformed, I4/overall delivery incomplete**
+- Status: **Live TUI acceptance cancelled by explicit user decision; I0-I3 and automated I4 evidence remain historical, and unperformed interactive checks are not passes.**
 - Owner: `packages/todo`
 - Related Context: [context.md](context.md)
 - Related Plan: [plan.md](plan.md)
 - Governing protocol authority: [Todo Multi-Tool Protocol](../todo-protocol-redesign/spec.md)
 - Implementation progression: **user-authorized implementation delivered through I3; I4 awaits live interactive observation on the verified graph**
 
-## User Outcome
+## Administrative cancellation
+
+The remaining live TUI acceptance is cancelled by explicit user decision. Preserve the recorded automated evidence and all interactive limitations; this cancellation does not establish the unperformed live criteria.
 
 Keep the persistent Todo widget useful by showing the full task count and one representative row for every task while it is visible under the existing lifecycle. The existing below-widget spacer may remain. A Todo-owned detail overlay exposes the complete snapshot when requested and supports keyboard navigation plus mouse expansion/collapse in fullscreen Pi. This later user-authorized all-task display supersedes the fixed-height/global-anchor acceptance criteria below only for the persistent widget; the original Gate C record remains historical evidence, not acceptance of the new display.
 

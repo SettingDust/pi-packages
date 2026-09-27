@@ -1,6 +1,6 @@
 # Tasks: Todo Four-Tool Protocol
 
-- Status: **T0 through T8 complete. T10 complete with technical validation and both fresh final reviews GO (P0-P3=0); 34-path commit candidate reviewed and pending explicit user submission authorization.**
+- Status: **Completed by explicit user direction; recorded T0-T8/T10 validation evidence and review results remain historical evidence, with no commit made.**
 - Owner: `packages/todo`
 - Governing Work: [work.md](work.md)
 - Governing Context: [context.md](context.md)

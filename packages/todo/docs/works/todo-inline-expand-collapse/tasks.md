@@ -1,11 +1,13 @@
 # Tasks: Todo Inline Expand/Collapse
 
-- Status: initial T1 and authorized rendering correction implemented with passing headless checks; T2 remains partial after the model-picker ownership defect was corrected and rechecked in disposable live Pi sessions. This derived record is not an approval receipt.
+- Status: **Live TUI acceptance cancelled by explicit user decision.** T1 remains implemented with recorded checks; T2 evidence remains partial and unobserved/blocked criteria are preserved.
 - Work: [work.md](work.md); Context: [context.md](context.md); Plan: [plan.md](plan.md); authority: [Spec section 9](../todo-protocol-redesign/spec.md#9-accepted-above-editor-inline-interaction).
 
-## T1: Implement Inline Entry And Bounded Interaction
+## Administrative cancellation
 
-**Status:** Implemented; focused and full Todo tests and direct TypeScript typecheck passed. The live behavior in T2 is not verified.
+The remaining live TUI acceptance is cancelled by explicit user decision. Do not reinterpret the cancelled T2 criteria, including fullscreen PageDown and physical visibility, as passed.
+
+**Status:** Implemented; focused and full Todo tests and direct TypeScript typecheck passed. T2 records observed live subsets and remaining failures/limits; this automated completion is not full live acceptance.
 
 **Depends on:** Explicit disclosure/confirmation of the [Plan's exact implementation scope](plan.md#exact-implementation-scope-for-disclosure). First inspect installed public listener/widget contracts and current dispatch; if public APIs demonstrably cannot support the scope, stop without inventing a Host or overlay alternative.
 
@@ -20,7 +22,7 @@
 
 ## T2: Observe Actual Regular And Fullscreen Behavior
 
-**Status:** Partial live regular/fullscreen ConPTY observation; the reproduced model-picker ownership failure is fixed and rechecked, but other T2 acceptance checks remain. See [live evidence](evidence.md).
+**Status:** Partial live regular/fullscreen ConPTY acceptance after the model-picker correction and remaining executable follow-up. Fullscreen detail PageDown is contradicted by live routing traces; physical shortcut and framebuffer/font appearance remain unobserved. See the [criterion matrix and captures](evidence.md#remaining-criterion-matrix).
 
 **Depends on:** T1 automated checks and a usable interactive Pi TUI observation surface on the same installed dependency graph.
 
@@ -28,6 +30,8 @@
 
 **Expected artifacts:** A concise verification record; no production code change unless a correction stays inside the confirmed T1 boundary and focused checks are rerun. Observe entry via command and shortcut (including a collision/qualified Todo command), keys, Escape then ordinary editor input, unrelated shortcut and bracketed paste passthrough, modal/other active-surface behavior, resize/narrow and short terminals, large expanded content to last line, refresh/replacement, hide/off, restore, and five-second terminal clear. Check both regular and fullscreen; do not infer keyboard or viewport behavior from API types alone.
 
-**Recorded live subset:** At commit `446409dc` the extension rendered regular/fullscreen summary, collapsed rows, selected background, expanded details, Escape retention and editor reentry. A ready regular session reached the final wrapped description with PageDown; fullscreen Down to the final task revealed the last description. Resize redraws were observed. The pre-correction Ctrl+L model-picker test exposed hidden Todo movement and a stolen first Escape. The Todo-local correction now releases on a non-Todo key before Host dispatch; deterministic tests and regular/fullscreen ConPTY reruns show picker navigation `(1/39)` to `(2/39)` without Todo movement and first Escape closing the picker. Scoped Todo suite 96 passed (12 files), installed TypeScript and diff checks passed. Shortcut/qualified entry, other foreground surfaces, fullscreen PageDown dock routing, rasterized font/viewport appearance and remaining lifecycle/passthrough paths are unverified. Do not mark T2 complete or claim full live acceptance.
+**Recorded live subset:** At commit `446409dc` the extension rendered regular/fullscreen summary, collapsed rows, selected background, expanded details, Escape retention and editor reentry. A ready regular session reached the final wrapped description with PageDown; fullscreen Down to the final task revealed the last description. Resize redraws were observed. The pre-correction Ctrl+L model-picker test exposed hidden Todo movement and a stolen first Escape. The Todo-local correction now releases on a non-Todo key before Host dispatch; deterministic tests and regular/fullscreen ConPTY reruns show picker navigation `(1/39)` to `(2/39)` without Todo movement and first Escape closing the picker. Scoped Todo suite 96 passed (12 files), installed TypeScript and diff checks passed. Those test/typecheck results are reused, not rerun for this evidence-only follow-up. Subsequent live regular/fullscreen checks observe Left/Right/Enter/Space and Up/Down, Escape/editor input and retained expansion, bracketed paste editor handoff, native command completion and discovered qualified commands under collision, Session Tree cancellation/editor return, asynchronous same-session refresh and complete-set/removal while active, terminal completion plus five-second clear while active, native `/new`, controlled actual session switch/restore and off/below-editor notices. The detailed matrix distinguishes native entry from fixture-controlled real tool callbacks and records all observation limits. No code, dependency, global settings or index change was made; Work/Tasks/evidence edits are unstaged over the existing staged documents, and the capture archive is untracked.
+
+**Blocked/not observed:** Fullscreen PageDown is consumed by the earlier Host viewport listener before Todo's public listener; repeated keys do not traverse Todo detail. Regular VT output reaches the final description, including split fragments at 25x8, but no terminal framebuffer proves actual glyph/dock appearance. Physical Ctrl+Shift+T and actual shortcut collision-handler dispatch remain unobserved; startup winner diagnostics are not chord evidence. Graceful shutdown, runtime failure cleanup, non-TUI live notices, refresh rename/reorder and all-Host-surface coverage are not promoted from component tests. No out-of-scope Host or private-listener correction was attempted. Do not mark T2 complete or claim full live acceptance.
 
 **Completion evidence:** Record environment, observed results and limitations. Failure of input isolation or dock visibility is a stop condition for this approved scope, not an implicit request for Host edits or overlay fallback. If interactive observation is unavailable, leave T2 pending and label overall live acceptance unverified. No separate Tasks approval gate is implied.

@@ -1,13 +1,15 @@
 # Tasks: Todo `workingOn` clean-break authority reconciliation
 
-- **状态**：A0 reconciled and accepted / T1-T5 implementation status unverified / T6 and review gates open
+- **状态**：administratively completed by explicit user direction; T1-T5 implementation evidence remains present but unverified, and T6/review gates remain open
 - **Owner**：`packages/todo`
 - **Governing Spec**：[`../todo-protocol-redesign/spec.md`](../todo-protocol-redesign/spec.md)
 - **Governing Work**：[`work.md`](./work.md)
 - **Governing Context**：[`context.md`](./context.md)
 - **Governing Plan**：[`plan.md`](./plan.md)
 
-## 1. Boundary
+## Administrative closure
+
+用户已明确将本 Work 按完成处理，作为状态簿记关闭。T1-T5 的 `implementation present` 仍是 worktree 状态而非验证通过；T6、review、typecheck、commit 和发布证据不被此关闭补足。
 
 The clean break removes request-level and canonical `workingOn` plus every dedicated serialization, restore, error, setter, compatibility, and consumer projection path. It keeps four tools, multi-active-group status behavior, non-target request fields, queue order, failed-mutation atomicity, persistence/recovery, renderer rows, tool/result rendering, and widget behavior outside the removed field.
 
