@@ -1,10 +1,12 @@
 # Plan: Atomic Router Delegation
 
-- Status: draft; unaccepted; unimplemented; not authorized for execution
-- Updated: 2026-08-22
+- Status: draft independent #3 plan; Host-dependent phases abandoned; unaccepted; unimplemented; not authorized for execution
+- Updated: 2026-09-28
 - Work: [work.md](work.md)
 - Host Plan: [Host Effective Tool Inventory Plan](../host-effective-tool-inventory/plan.md)
 - Tasks: [tasks.md](tasks.md)
+
+The Host plan linked above is abandoned under the no-Pi-core-change decision. Sections below preserve the earlier combined plan but are not executable as written. Independent Handoff decomposition/Model Role scope remains a draft candidate; Host outcome consumption, C3 rows, and integrated Host/#36/#3 verification are abandoned, not queued. Herdr child `--exclude-tools` addresses the selected isolation need only.
 
 ## Objective
 
@@ -48,4 +50,4 @@ Planned checks cover one-outcome boundaries, multi-outcome blocking, dependency 
 
 ## Final Gate
 
-All planned #3 rows and applicable consumer rows pass on one revision; native Harness gates pass; no Resolver/admission/Handler Result shape changes; and independent review has no actionable finding. Status reconciliation and commit remain separate governance decisions.
+The former combined Host/#36/#3 final gate was not run and is no longer scheduled. Independent #3 decomposition scope needs its own authority and authorization before implementation; this historical plan does not supply them.

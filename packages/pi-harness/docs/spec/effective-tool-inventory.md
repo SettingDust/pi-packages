@@ -1,10 +1,15 @@
 # Effective Tool Inventory Specification
 
-- Status: draft candidate specification; unaccepted; unimplemented
+- Status: withdrawn draft candidate specification; unaccepted; unimplemented
 - Date: 2026-08-22
+- Withdrawn: 2026-09-28 (no Pi core modifications)
 - Decision: [ADR-0008](../adr/0008-host-owned-effective-tool-inventory.md)
 - Work: [Host Effective Tool Inventory](../works/host-effective-tool-inventory/work.md)
 - Compatibility profile contract: [Host Compatibility Profile v1](../works/host-effective-tool-inventory/compatibility-profile.md)
+
+## Withdrawal
+
+Withdrawn with ADR-0008. Existing Herdr child `--exclude-tools` meets the selected child-isolation need; the broader Host inventory program will not proceed because Pi core will not be modified. Sections 1-15 preserve the unimplemented candidate contract, not current requirements. Child filtering does not provide every proposed Host guarantee; no acceptance conditions were executed.
 
 ## 1. Scope
 

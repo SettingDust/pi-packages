@@ -1,10 +1,12 @@
 # Plan: Host Effective Tool Inventory
 
-- Status: draft; unaccepted; unimplemented; not authorized for execution
-- Updated: 2026-08-22
+- Status: abandoned historical plan; unaccepted; unimplemented; not authorized for execution
+- Updated: 2026-09-28
 - Work: [work.md](work.md)
 - Context: [context.md](context.md)
 - Tasks: [tasks.md](tasks.md)
+
+Withdrawn with ADR-0008 and the Host Spec under the no-Pi-core-change decision. The phases and gates below preserve the candidate strategy only; none is queued or authorized. Herdr child `--exclude-tools` covers the selected child-isolation need, not the proposed Host guarantees.
 
 ## Objective
 
@@ -12,7 +14,7 @@ Implement the smallest host-owned seam that authorizes and binds each provider t
 
 ## Preconditions
 
-The repaired authority set must receive fresh independent review and one later consolidated user confirmation. Concrete implementation still requires separate authorization. Stop if source inspection contradicts the object-snapshot, lifecycle, or execution-guard contract.
+The former preconditions were fresh independent review, later consolidated confirmation, and separate implementation authorization. None was completed; these are not pending gates. The source-seam stop condition below is retained only as historical design context.
 
 ## Scope and Non-Goals
 
@@ -82,4 +84,4 @@ Revert host/profile, #36, and #3 changes as one compatibility unit unless a comp
 
 ## Final Gate
 
-All matrices pass on one revision; provider and executor object identity is directly observed; no unsupported attestation claim remains; Host -> #36 -> #3 order is preserved; and independent review has no actionable finding. Status reconciliation and commit remain separate work.
+This final gate was not reached and is cancelled: matrices were never run, provider/executor identity was not dynamically observed, and no independent implementation review was performed. Host -> #36 -> #3 is no longer an execution order.

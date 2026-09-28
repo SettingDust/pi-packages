@@ -1,8 +1,12 @@
 # Atomic Router Delegation Work
 
-- Status: draft; unaccepted; unimplemented
-- Updated: 2026-08-22
+- Status: draft independent #3 decomposition scope; Host-dependent consumer abandoned; unaccepted; unimplemented
+- Updated: 2026-09-28
 - Nature: #3 consumer coordination material; not authority or acceptance evidence
+
+## Host Dependency Closure
+
+The Host effective-tool-inventory ADR/Spec/Work are withdrawn under the no-Pi-core-change decision, and #36 adapters were already withdrawn. Host outcome consumption, nested Host-code integration, and the Host -> #36 -> #3 delivery chain below are historical, not executable follow-up. Existing Herdr child `--exclude-tools` meets the selected child-isolation need but does not implement the proposed Host compatibility contract. Independent neutral decomposition/Model Role scope and accepted Router/delegation base remain distinct; this Work does not claim their acceptance or implementation.
 
 ## Goal
 
@@ -41,11 +45,11 @@ Define the smallest #3 consumer change that gives each Handoff one clear observa
 
 ## Dependency and Parallel-Safety Contract
 
-#3 consumes a compatible, implemented Host object-snapshot seam and #36 adapters before any delegation that needs them. Independent Handoffs may be scheduled concurrently when their declared inputs, outputs, ownership, and side effects do not conflict. Handoffs with data, authority, ownership, or behavioral dependencies must be serialized by the Router. The Router may schedule more than one independent Handoff in a scheduling interval; no one-pass or adjacency rule follows from decomposition.
+The Host-dependent part of #3 would have consumed a compatible, implemented Host object-snapshot seam and #36 adapters; that path is abandoned. The independent Handoff dependency/parallel-safety criteria below remain candidate scope, not an authorized task. Independent Handoffs may be scheduled concurrently when their declared inputs, outputs, ownership, and side effects do not conflict. Handoffs with data, authority, ownership, or behavioral dependencies must be serialized by the Router. The Router may schedule more than one independent Handoff in a scheduling interval; no one-pass or adjacency rule follows from decomposition.
 
 ## Current State
 
-Amendment Extension B and Backend Adaptation define Host compatibility consumption. T1 remains semantic backend evidence only and cannot prove a current effective object. All #3 amendment material remains draft, unaccepted, unimplemented, unauthorized, and unexecuted.
+Amendment Extension B's independent decomposition scope remains draft. The Host-dependent compatibility-consumer work is abandoned; T1 remains historical semantic backend evidence, not proof of a current effective object. No #3 candidate work in this package is authorized or executed.
 
 ## Host-Bound Lifecycle Contract
 
@@ -53,8 +57,8 @@ The Host outcome binds the exact provider-turn `context.tools` object used for p
 
 ## Completion Signal
 
-Completion requires the planned decomposition, dependency, parallel-safety, Model Role, Host-outcome, nested-code, and C3 consumer checks to pass on one integrated revision, followed by independent review. Runtime checks remain unexecuted in this documentation revision.
+The independent decomposition and Model Role checks below are candidate checks; Host-outcome, nested-code, and C3 consumer checks are abandoned with the Host program, not pending gates. No runtime checks were executed.
 
 ## Acceptance Boundary
 
-The complete repaired Host/#36/#3 set requires fresh independent review and one later consolidated user confirmation before acceptance. This file prescribes no mechanism and creates no review, confirmation, implementation authority, staging, or commit.
+The earlier combined Host/#36/#3 acceptance boundary was not completed and is abandoned. Independent #3 scope remains unaccepted and requires separate authority and authorization before implementation; this Work creates none.

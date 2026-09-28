@@ -1,8 +1,10 @@
 # Atomic Router Delegation Context
 
-- Status: draft processed consumer context; not authority; unaccepted; unimplemented
-- Updated: 2026-08-22
+- Status: draft independent #3 context; Host-consumer context historical; unaccepted; unimplemented
+- Updated: 2026-09-28
 - T1 evidence: [research.md](research.md)
+
+The Host effective-tool-inventory program and its dependent #3 consumer were abandoned under the no-Pi-core-change decision; #36 adapters were already withdrawn. Host lifecycle, compatibility, failure mapping, and Host-dependent rows below describe the former candidate only and are not executable gates. Existing Herdr child `--exclude-tools` meets the selected isolation need but not the proposed Host inventory guarantees. The independent Handoff decomposition/Model Role candidate and accepted Router/delegation base are not withdrawn by this closure.
 
 ## Objective Boundary
 
@@ -48,7 +50,7 @@ Host first-turn preparation occurs on common `_runAgentPrompt` before `Agent.pro
 | D3-04 | Model Role choice | Selected model/thinking is explainably matched to ambiguity, risk, and verification burden; unavailable choices do not silently fall back. |
 | D3-05 | Forged Host projection | Model-supplied compatibility fields cannot replace the private current-turn outcome or trigger resolution/launch. |
 
-All rows are planned and unexecuted.
+D3-01 through D3-04 remain independent candidate rows; D3-05 depends on the withdrawn Host outcome and is abandoned. All rows are unexecuted.
 
 ## Failure Matrix
 
@@ -63,4 +65,4 @@ All rows are planned and unexecuted.
 
 ## Status and Risks
 
-All runtime claims and matrix rows are planned/unexecuted; all Host-consumer materials remain draft, unaccepted, unimplemented, and unauthorized. Host output must remain non-model-forgeable and provider-turn scoped. T1 may drift and must be rechecked before profile admission.
+The Host-consumer runtime claims and matrix rows below were never executed and are abandoned, not pending. T1 remains historical backend semantic evidence; independent decomposition scope remains draft and unimplemented.

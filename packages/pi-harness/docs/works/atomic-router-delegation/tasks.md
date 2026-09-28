@@ -1,8 +1,10 @@
 # Tasks: Atomic Router Delegation
 
-- Status: draft candidate task set; unaccepted; unimplemented
-- Updated: 2026-08-22
+- Status: draft independent #3 tasks; Host-dependent tasks abandoned; unaccepted; unimplemented; unexecuted
+- Updated: 2026-09-28
 - Plan: [plan.md](plan.md)
+
+The Host -> #36 -> #3 chain below is abandoned under the no-Pi-core-change decision; #36 adapters were already withdrawn. T3 Host-consumer work and its C3/D3-05 checks are cancelled; T4's combined verification is cancelled. T1/T2 describe independent draft decomposition/Model Role scope, not authorized or queued tasks. The original "not started" labels are historical; no checks ran.
 
 ## Dependency Graph
 
@@ -29,20 +31,20 @@ T1 and T2 may be prepared independently once their shared authority input is ava
 - Planned verification: D3-03 and D3-04.
 - Status: not started.
 
-## T3. Consume Host Outcome
+## T3. Consume Host Outcome (Abandoned)
 
 - Outcome: read the current provider-turn Host outcome through the authorized path, preserve nested `host.code`, and apply the owning Backend Adaptation mapping without model-supplied provenance or name-only fallback.
 - Depends on: implemented/admitted Host profile, #36 adapters, T1, and T2.
 - Planned verification: D3-05 and C3-01 through C3-08.
-- Status: not started.
+- Status: abandoned; never started.
 
-## T4. Run Planned Integrated Verification
+## T4. Run Planned Integrated Verification (Abandoned)
 
 - Outcome: produce reproducible evidence for the planned decomposition, Model Role, Host-outcome, nested-code, and consumer rows on one revision.
 - Evidence: revision, interface/profile version, action/dependency ordering, parallel-safety decision, selected Role, Host/Router codes, exact object-reference observation where applicable, and side-effect inventory.
-- Constraint: matrix rows are planned and unexecuted in this documentation revision.
-- Status: not started.
+- Constraint: matrix rows were never executed; the Host-dependent portion is abandoned.
+- Status: abandoned; never started.
 
 ## Acceptance Gate and Exclusions
 
-The complete repaired Host/#36/#3 set requires fresh independent review and one later consolidated user confirmation before acceptance. No mechanism is prescribed. Host and #36 implementation remain outside these #3 tasks; other package ownership boundaries remain unchanged. Runtime checks, staging, and commits are not performed by this documentation revision.
+The combined Host/#36/#3 review and confirmation gate below is historical and no longer queued. Independent #3 scope retains its own unaccepted status; no implementation or runtime check is authorized by these tasks.

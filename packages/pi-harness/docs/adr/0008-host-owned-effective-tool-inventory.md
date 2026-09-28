@@ -1,10 +1,15 @@
 # ADR-0008: Host-Owned Effective Tool Inventory
 
-- Status: draft; unaccepted; unimplemented
+- Status: withdrawn draft; unaccepted; unimplemented
 - Date: 2026-08-22
+- Withdrawn: 2026-09-28 (no Pi core modifications)
 - Owners: Pi host `AgentSession`/Agent tool-context lifecycle
 - Specification: [Effective Tool Inventory Specification](../spec/effective-tool-inventory.md)
 - Work: [Host Effective Tool Inventory](../works/host-effective-tool-inventory/work.md)
+
+## Withdrawal
+
+This unaccepted decision is abandoned. No Pi core modification will be pursued. Existing Herdr child `--exclude-tools` meets the selected child-isolation need, so the broader Host effective-tool-inventory program and its Host -> #36 -> #3 implementation chain will not proceed. The decision and alternatives below are historical candidate design, not current authority or an executable plan. Child filtering does not establish the other inventory, lifecycle, compatibility, or dispatch guarantees proposed here; no acceptance matrix was run.
 
 ## Context
 

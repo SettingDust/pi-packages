@@ -1,8 +1,12 @@
 # Work: Host Effective Tool Inventory
 
-- Status: draft; unaccepted; unimplemented
-- Updated: 2026-08-22
+- Status: abandoned historical Work; unaccepted; unimplemented; unexecuted
+- Updated: 2026-09-28
 - Nature: derived coordination material; not authority or acceptance evidence
+
+## Closure
+
+Abandoned with the withdrawn ADR-0008 and effective-tool-inventory Spec under the no-Pi-core-change decision. Herdr child `--exclude-tools` meets the selected child-isolation need but does not deliver the proposed Host inventory guarantees. The linked Context, Plan, Tasks, matrix, profile, manifest, and report are retained as historical records, not executable follow-up; #36 adapters were already withdrawn. No Host/#36/#3 implementation or verification ran under this package. Independent accepted Router/delegation scope is not withdrawn by this closure.
 
 ## Objective
 
@@ -47,18 +51,18 @@ Excluded:
 
 ## Current State
 
-The Pi 0.84.2 source map establishes usable host lifecycle seams and the limits above. No runtime behavior is implemented or verified. All matrices remain unexecuted, and the complete repaired set still requires fresh independent review.
+The Pi 0.84.2 source map recorded possible host lifecycle seams and limits. No runtime behavior was implemented or verified. All matrices remain unexecuted; the former fresh-review gate is closed with this Work.
 
 ## Dependency and Stop Rule
 
-Implementation order is strictly Host -> #36 -> #3 -> integrated verification -> independent final review. Stop for authority reconciliation if implementation cannot bind compatibility/provider/executor to the same `context.tools` objects, cannot run preparation before both first-turn paths, or cannot enforce generation/revocation before execution.
+The historical implementation order was Host -> #36 -> #3 -> integrated verification -> independent final review. It is cancelled, not an instruction to proceed. The proposed stop condition was to reconcile authority if host seams could not meet the contract.
 
 ## Completion Signal
 
-Future delivery completes only when every required matrix row passes on one revision, the profile fixture is generated and independently reviewed, no host seam contradicts authority, and statuses are reconciled truthfully under separately authorized work.
+This completion signal was never reached and is no longer an active gate: every required matrix row would have needed to pass on one revision, with a reviewed profile and independent review. No such delivery was performed.
 
 ## Acceptance Boundary
 
-This complete repaired Host/#36/#3 set remains draft, unaccepted, unimplemented, and unexecuted. After fresh independent review, one later consolidated user confirmation of that reviewed set is required. No mechanism is prescribed; this Work creates no review, confirmation, implementation authority, staging, or commit.
+The earlier combined Host/#36/#3 review and confirmation boundary was not completed and is abandoned. This Work creates no review, confirmation, implementation authority, staging, or commit.
 
 - [Consistency report](consistency-report.md)

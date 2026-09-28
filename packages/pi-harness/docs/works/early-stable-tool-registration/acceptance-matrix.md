@@ -1,8 +1,10 @@
 # Acceptance Matrix: Early Stable Harness and Herdr Tool Registration
 
-- Status: draft; unaccepted; unimplemented; unexecuted
+- Status: withdrawn historical draft; unaccepted; unimplemented; unexecuted
 - Updated: 2026-08-22
 - Host matrix: [Host Effective Tool Inventory](../host-effective-tool-inventory/acceptance-matrix.md)
+
+Withdrawn with the [#36 adapter Proposal](../../proposals/early-stable-tool-registration.md) on 2026-09-28. Rows below preserve unexecuted candidate checks, not active gates or evidence of host delivery.
 
 ## Required Adapter Observations
 

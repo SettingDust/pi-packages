@@ -1,11 +1,12 @@
 # Acceptance Matrix: Host Effective Tool Inventory
 
-- Status: draft; unaccepted; unimplemented; unexecuted
-- Updated: 2026-08-22
+- Status: abandoned historical matrix; unaccepted; unimplemented; unexecuted
+- Updated: 2026-09-28
 - Authority: [Effective Tool Inventory Specification](../../spec/effective-tool-inventory.md)
 - Profile: [Host Compatibility Profile v1](compatibility-profile.md)
 
-All rows are planned and unexecuted. No row is runtime completion evidence.
+All rows are abandoned, planned-only historical checks. No row was executed or is a current acceptance gate. Herdr child `--exclude-tools` meets the selected isolation need, not the broader Host contract.
+
 
 ## Observation Layers
 
@@ -66,4 +67,4 @@ For each failed row record exact revision, profile/interface versions, Pi/core/p
 
 ## Completion Rule
 
-Every `P` row must pass on one integrated revision after authority review/confirmation and authorized implementation. Names, schema, package/version, a current filesystem hash, historical T1, model self-report, or an ordinary prompt inserted into triggerTurn-first cannot substitute. Completion also requires native gates and independent final review.
+The former completion rule called for every `P` row on one integrated revision after authority review/confirmation and implementation, native gates, and final independent review. None was run; this rule is abandoned. Names, schema, package/version, hashes, historical T1, and model self-report never constituted completion evidence.

@@ -1,6 +1,6 @@
 # Proposal: Harness and Herdr Effective-Inventory Adapters
 
-- Status: draft; unaccepted; unimplemented
+- Status: withdrawn (closed by user decision 2026-09-28); unaccepted; unimplemented
 - Date: 2026-08-22
 - Owners: `@settingdust/pi-harness` and `@settingdust/pi-herdr-subagents` as package adapters
 - Host authority: [ADR-0008](../adr/0008-host-owned-effective-tool-inventory.md), [Effective Tool Inventory Specification](../spec/effective-tool-inventory.md)
@@ -53,6 +53,12 @@ Negative:
 
 No Pi host implementation is authorized by this Proposal; that work belongs to the Host Effective Tool Inventory Work. No Toolbelt policy change, backend compatibility consumer, #18, #29, #39, unrelated Herdr lifecycle change, settings change, source/test edit during this documentation Handoff, staging, or commit is included.
 
-## Acceptance Boundary
+## Closure
+
+Withdrawn by user decision after the blacklist/inventory comparison (`C:/Users/WINDOWS/.pi/agent/sessions/--E--Projects-pi-packages--/2026-08-16T11-58-37-784Z_01a00a70-28d7-789b-8c64-0d784f30d9b4/tasks/compare-tool-blacklist-inventory-artifacts/result-1.json`). Existing Herdr child `--exclude-tools` filtering meets the selected child-isolation need; broader host effective-inventory and package-adapter work is not being pursued. This is a scope decision, not technical replacement or delivery: the blacklist does not establish ordinary-first/trigger-first equivalence, host inventory snapshots or dispatch guards. The incident evidence above remains historical. The candidate adapter Spec and #36 Work tuple are withdrawn with this Proposal; independent host draft authority is not accepted, withdrawn, or implemented by this decision.
+
+## Historical Acceptance Boundary
+
+The following was the pre-withdrawal candidate boundary, not an active review or implementation gate:
 
 This Proposal, candidate adapter Spec, and existing #36 Work tuple remain draft, unaccepted, and unimplemented. They require independent review as part of the complete host authority set and one later user confirmation of that reviewed set. No interaction mechanism is prescribed, and this authoring creates no acceptance or implementation authorization.

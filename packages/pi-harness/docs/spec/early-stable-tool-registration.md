@@ -1,6 +1,6 @@
 # Early Stable Tool Registration Specification
 
-- Status: draft candidate adapter specification; unaccepted; unimplemented
+- Status: withdrawn candidate adapter specification (proposal closed by user decision 2026-09-28); unaccepted; unimplemented
 - Date: 2026-08-22
 - Host authority: [ADR-0008](../adr/0008-host-owned-effective-tool-inventory.md), [Effective Tool Inventory Specification](effective-tool-inventory.md)
 - Proposal: [Harness and Herdr Effective-Inventory Adapters](../proposals/early-stable-tool-registration.md)
@@ -110,6 +110,8 @@ Acceptance is governed by A36-01 through A36-08 in the [Host acceptance matrix](
 
 No host provenance or dispatch implementation, package-owned effective registry, Toolbelt policy change, backend mapping, new tool name, persistent registration state, #18, #29, #39, unrelated lifecycle repair, staging, or commit is part of this adapter contract.
 
-## 10. Acceptance Boundary
+## 10. Disposition
 
-This candidate Specification remains draft, unaccepted, and unimplemented. It becomes eligible for acceptance only with the complete reviewed host authority set and one later user confirmation of that set. It prescribes no confirmation mechanism.
+Withdrawn with the linked Proposal. Sections 1-9 preserve the unimplemented candidate contract and historical ordinary-first/trigger-first, eligibility, and host-guard limits; they are not current implementation requirements or evidence that child `--exclude-tools` filtering supplies host effective-inventory behavior. The independent draft host ADR/Specification are not withdrawn here.
+
+The former acceptance boundary required review and later confirmation of the host/#36 set. That path is no longer active for this adapter candidate.

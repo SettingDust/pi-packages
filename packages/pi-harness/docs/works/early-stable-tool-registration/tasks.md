@@ -1,8 +1,10 @@
 # Tasks: Early Stable Harness and Herdr Tool Registration
 
-- Status: draft candidate decomposition; unaccepted; unimplemented
+- Status: withdrawn historical candidate decomposition; unaccepted; unimplemented
 - Updated: 2026-08-22
 - Plan: [plan.md](plan.md)
+
+Withdrawn with the [#36 adapter Proposal](../../proposals/early-stable-tool-registration.md) on 2026-09-28. T1-T3 and their "not started" statuses are historical, not queued tasks.
 
 ## Dependencies
 

@@ -1,10 +1,12 @@
 # Host Compatibility Profile: `@settingdust/pi-herdr-subagents/subagent_spawn` v1
 
-- Status: draft fixture contract; unaccepted; unimplemented; unexecuted
-- Updated: 2026-08-22
+- Status: abandoned historical fixture contract; unaccepted; unimplemented; unexecuted
+- Updated: 2026-09-28
 - Interface: `effective-tool-compatibility/v1`
 - Authority: [Effective Tool Inventory Specification](../../spec/effective-tool-inventory.md)
 - Semantic source baseline: [Atomic Router Delegation T1 research](../atomic-router-delegation/research.md)
+
+Withdrawn with the Host Work under the no-Pi-core-change decision. The shape and cases below are historical candidate material, not an active profile or fixture to generate or admit. No fixture case was executed.
 
 ## Purpose
 
@@ -127,4 +129,4 @@ All are planned and unexecuted:
 
 ## Admission Boundary
 
-No concrete generated expected path/digest/runtime values are approved by this draft. Fixture generation, review, confirmation, implementation, execution, staging, and commit remain outstanding.
+No concrete expected path/digest/runtime values were approved, and no fixture case was executed. The former generation, review, confirmation, implementation, staging, and commit gates are abandoned, not outstanding work.

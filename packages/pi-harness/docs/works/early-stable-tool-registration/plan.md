@@ -1,10 +1,12 @@
 # Plan: Early Stable Harness and Herdr Tool Registration
 
-- Status: draft; unaccepted; unimplemented; not authorized for execution
+- Status: withdrawn historical draft; unaccepted; unimplemented; not authorized for execution
 - Updated: 2026-08-22
 - Work: [work.md](work.md)
 - Host Plan: [Host Effective Tool Inventory Plan](../host-effective-tool-inventory/plan.md)
 - Tasks: [tasks.md](tasks.md)
+
+Withdrawn with the [#36 adapter Proposal](../../proposals/early-stable-tool-registration.md) on 2026-09-28. The phases and gates below are historical, not an active implementation plan.
 
 ## Objective
 

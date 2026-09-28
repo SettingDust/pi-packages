@@ -1,9 +1,11 @@
 # Consistency Report: Host Effective Tool Inventory Repair
 
-- Status: read-only documentation reconciliation; draft; unaccepted; unimplemented; unexecuted
-- Updated: 2026-08-22
+- Status: historical reconciliation report; Host/#36/#3 program abandoned; unaccepted; unimplemented; unexecuted
+- Updated: 2026-09-28
 - Scope: Host effective-tool-inventory authority, #36 adapter authority, and narrowed #3 decomposition/Model Role authority
 - Evidence basis: fresh review Result, user-directed scope correction, Pi 0.84.2 source-map Result, and the existing Host/#36/#3 authority set
+
+This report describes the earlier draft repair, not current delivery readiness. The Host draft ADR/Spec/Work and dependent execution records were withdrawn under the no-Pi-core-change decision; #36 adapters were already withdrawn. Its remaining gates below are historical, not queued. No matrix was executed. Independent accepted Router/delegation scope remains separate.
 
 ## Decision-relevant outcome
 
@@ -32,7 +34,7 @@ Removed from #3 decomposition authority:
 - forced `resolve_delegation`-to-backend adjacency as a decomposition rule;
 - unrelated Host snapshot, compatibility, lifecycle, object-identity, and backend runtime contracts from the #3 decomposition materials.
 
-Host compatibility and backend launch behavior remain in their owning Host and Backend Adaptation authority, including the repaired M2/M3 integration gates. The narrowed #3 material does not redefine those contracts.
+The earlier draft assigned Host compatibility and backend launch behavior to their owning Host and Backend Adaptation candidates, including M2/M3 integration gates. Those Host gates are now abandoned; the narrowed independent #3 decomposition material does not redefine the accepted base contracts.
 
 ## Changed artifacts
 
@@ -58,7 +60,7 @@ Host compatibility and backend launch behavior remain in their owning Host and B
 
 No source, tests, settings, runtime, Herdr state, Git index, or commits were modified. No dynamic matrix execution, provider call, child launch, or independent review was performed.
 
-## Remaining unexecuted gates
+## Former Unexecuted Gates (Not Queued)
 
 1. Fresh independent review of the repaired Host/#36/#3 artifact set.
 2. One later consolidated user confirmation after a clean review; no acceptance or implementation authorization exists yet.
@@ -70,4 +72,4 @@ No source, tests, settings, runtime, Herdr state, Git index, or commits were mod
 
 ## Readiness
 
-**Not ready for acceptance or implementation.** This revision repairs the requested documentation findings and scope boundary only; it does not claim dynamic execution or authorize the next workflow action.
+**Historical finding only; not ready and no longer pursued.** The remaining gates above are not active follow-up for the abandoned Host program. This report does not claim runtime execution or authorize work.

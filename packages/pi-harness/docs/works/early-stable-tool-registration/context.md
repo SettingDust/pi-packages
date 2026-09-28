@@ -1,7 +1,9 @@
 # Context: Early Stable Harness and Herdr Tool Registration
 
-- Status: draft adapter context; not authority; unaccepted; unimplemented
+- Status: withdrawn historical adapter context; not authority; unaccepted; unimplemented
 - Updated: 2026-08-22
+
+Withdrawn with the [#36 adapter Proposal](../../proposals/early-stable-tool-registration.md) on 2026-09-28. Incident evidence below remains historical; planned adapter and host behavior is not delivered by child `--exclude-tools` filtering.
 
 ## Boundary
 
@@ -66,7 +68,7 @@ This Work cannot implement safely before the host seam exists. If host positive 
 
 ## Status
 
-All #36 materials remain draft, unaccepted, and unimplemented. The earlier O1-O5 package-local design choices are superseded by the host ownership split: eligibility defaults fail closed, host snapshots own visibility, Herdr contributes atomically, and collision handling is host-owned.
+All #36 materials were draft, unaccepted, and unimplemented before withdrawal. The earlier O1-O5 package-local design choices were superseded by the host ownership split: eligibility defaults fail closed, host snapshots own visibility, Herdr contributes atomically, and collision handling is host-owned.
 
 ## Pi 0.84.2 Lifecycle Reconciliation
 

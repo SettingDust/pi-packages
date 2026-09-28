@@ -1,7 +1,9 @@
 # Context: Host Effective Tool Inventory
 
-- Status: draft processed context; not authority; unaccepted; unimplemented
-- Updated: 2026-08-22
+- Status: abandoned historical context; not authority; unaccepted; unimplemented
+- Updated: 2026-09-28
+
+Withdrawn with ADR-0008 and the Host Spec under the no-Pi-core-change decision. Existing Herdr child `--exclude-tools` meets the selected child-isolation need only; the Host -> #36 -> #3 program will not proceed. The source observations below are historical evidence, not an active implementation direction or proof of executed checks.
 
 ## Settled Candidate Direction
 
@@ -77,4 +79,4 @@ The exact session prefix for abbreviated task locators is the prefix shown in th
 | `review-manifest.md` | exact package inventory/status/dependency gate |
 ## Status and Remaining Evidence
 
-All runtime claims are planned. All matrices are unexecuted. Concrete profile expected path/digest/runtime values, implementation tests, integrated evidence, independent review, user confirmation, implementation authorization, staging, and commit remain outstanding. Implementation must proceed Host -> #36 -> #3 and stop if actual seams contradict the contract.
+All runtime claims below were planned and all matrices remain unexecuted. The previously listed evidence gates and Host -> #36 -> #3 sequence are abandoned, not outstanding work. Independent accepted Router/delegation scope is unaffected.

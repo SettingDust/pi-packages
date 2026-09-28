@@ -1,8 +1,10 @@
 # Tasks: Host Effective Tool Inventory
 
-- Status: draft candidate task set; unaccepted; unimplemented
-- Updated: 2026-08-22
+- Status: abandoned historical candidate task set; unaccepted; unimplemented; unexecuted
+- Updated: 2026-09-28
 - Plan: [plan.md](plan.md)
+
+Abandoned with the Host Work under the no-Pi-core-change decision. T0-T6 and their "not started" labels below are historical, not queued tasks; #36 adapters were already withdrawn and dependent #3 Host-consumer work will not proceed. No matrix ran.
 
 ## Dependency Graph
 
