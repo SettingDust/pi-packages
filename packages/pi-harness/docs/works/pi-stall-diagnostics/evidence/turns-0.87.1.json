@@ -1,0 +1,73 @@
+{
+  "status": "passed",
+  "activationAllowed": false,
+  "t1Complete": false,
+  "revision": "offline-5",
+  "command": [
+    "node",
+    "packages/pi-harness/tools/pi-stall-diagnostics/check-turns.mjs",
+    "D:/Applications/Scoop/apps/pi-coding-agent-bun/current/node_modules/@earendil-works/pi-coding-agent",
+    "packages/pi-harness/docs/works/pi-stall-diagnostics/evidence/turns-0.87.1.json"
+  ],
+  "environment": {
+    "node": "v24.15.0",
+    "platform": "win32",
+    "arch": "x64",
+    "os": "10.0.19045",
+    "cpu": "13th Gen Intel(R) Core(TM) i5-13490F",
+    "cpus": 16
+  },
+  "originalHash": "81c81a21ec81e84200205f561687408ff5e3738fbbbb3c2a6c186b348d376020",
+  "patchedHash": "7db71a2ea905b0fdc495348d0c6cfc3c52e2acfd6d1a7caea78c890bbe65ddfd",
+  "sourceHashes": {
+    "stage.mjs": "2a96a0a3fae049b619792e5b0dbb9985ec9a1e93c38647bf3dc828b050d35876",
+    "logger.mjs": "a07bd0235e0f4daa2e35aabbd31896873556390d9b050d2ad3bdd0fed0f99f21",
+    "check-turns.mjs": "74d9561471d0ff7c5a69f117067c9700b474ab38d0fb7004eb32a46a95869168"
+  },
+  "workload": {
+    "samplesPerMode": 200,
+    "warmupPerMode": 20,
+    "streamsPerTurn": 1,
+    "deltasPerStream": 32,
+    "messageDispatches": 2,
+    "handlersPerDispatch": 2,
+    "appends": 2,
+    "tools": 2,
+    "hooksPerTool": 1,
+    "order": "interleaved rotating"
+  },
+  "timing": {
+    "baseline": {
+      "medianMs": 0.07420000000001892,
+      "p95Ms": 0.13189999999997326,
+      "events": 0,
+      "bytes": 0
+    },
+    "patchedDisabled": {
+      "medianMs": 0.1226000000001477,
+      "p95Ms": 0.24149999999985994,
+      "events": 0,
+      "bytes": 0
+    },
+    "patchedEnabled": {
+      "medianMs": 7.351699999999937,
+      "p95Ms": 9.801699999999983,
+      "events": 6600,
+      "bytes": 1396092
+    }
+  },
+  "totalEnabledIncludingWarmup": {
+    "events": 7260,
+    "bytes": 1532410
+  },
+  "overhead": {
+    "medianAddedMs": 7.277499999999918,
+    "p95AddedMs": 9.66980000000001,
+    "medianRatio": 99.07951482477173
+  },
+  "limitations": [
+    "Synthetic extracted full loop with fake dependencies, not real provider latency or complete CLI throughput.",
+    "Synchronous metadata writes are included; no artificial provider/network wait.",
+    "No activation approval or performance budget acceptance is implied."
+  ]
+}

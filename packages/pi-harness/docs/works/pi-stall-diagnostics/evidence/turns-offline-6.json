@@ -1,0 +1,386 @@
+{
+  "status": "passed",
+  "googleMeasurements": [
+    {
+      "scenario": "success",
+      "samplesPerMode": 200,
+      "warmupPerMode": 20,
+      "eventsPerEnabledSample": 33,
+      "timing": {
+        "baseline": {
+          "samples": 200,
+          "medianMs": 0.6460999999999331,
+          "p95Ms": 1.0271999999995387,
+          "events": 0,
+          "bytes": 0,
+          "synchronousSink": {
+            "samples": 200,
+            "medianMs": 0,
+            "p95Ms": 0
+          },
+          "rotationLatency": null
+        },
+        "patchedDisabled": {
+          "samples": 200,
+          "medianMs": 0.6703999999999724,
+          "p95Ms": 0.9745000000002619,
+          "events": 0,
+          "bytes": 0,
+          "synchronousSink": {
+            "samples": 200,
+            "medianMs": 0,
+            "p95Ms": 0
+          },
+          "rotationLatency": null
+        },
+        "patchedEnabled": {
+          "samples": 200,
+          "medianMs": 9.666600000000017,
+          "p95Ms": 13.14850000000024,
+          "events": 6600,
+          "bytes": 1398551,
+          "synchronousSink": {
+            "samples": 200,
+            "medianMs": 8.215799999999945,
+            "p95Ms": 11.280200000002878
+          },
+          "rotationLatency": null
+        }
+      },
+      "overhead": {
+        "enabledMedianMs": 9.020500000000084,
+        "enabledP95Ms": 12.121300000000701,
+        "disabledMedianMs": 0.02430000000003929,
+        "disabledP95Ms": -0.05269999999927677
+      }
+    },
+    {
+      "scenario": "retry",
+      "samplesPerMode": 200,
+      "warmupPerMode": 20,
+      "eventsPerEnabledSample": 34,
+      "timing": {
+        "baseline": {
+          "samples": 200,
+          "medianMs": 0.6098999999994703,
+          "p95Ms": 0.9542999999994208,
+          "events": 0,
+          "bytes": 0,
+          "synchronousSink": {
+            "samples": 200,
+            "medianMs": 0,
+            "p95Ms": 0
+          },
+          "rotationLatency": null
+        },
+        "patchedDisabled": {
+          "samples": 200,
+          "medianMs": 0.6039000000000669,
+          "p95Ms": 0.993399999999383,
+          "events": 0,
+          "bytes": 0,
+          "synchronousSink": {
+            "samples": 200,
+            "medianMs": 0,
+            "p95Ms": 0
+          },
+          "rotationLatency": null
+        },
+        "patchedEnabled": {
+          "samples": 200,
+          "medianMs": 8.678499999999985,
+          "p95Ms": 10.770000000000437,
+          "events": 6800,
+          "bytes": 1442343,
+          "synchronousSink": {
+            "samples": 200,
+            "medianMs": 7.3499000000037995,
+            "p95Ms": 9.2274000000034
+          },
+          "rotationLatency": null
+        }
+      },
+      "overhead": {
+        "enabledMedianMs": 8.068600000000515,
+        "enabledP95Ms": 9.815700000001016,
+        "disabledMedianMs": -0.0059999999994033715,
+        "disabledP95Ms": 0.039099999999962165
+      }
+    },
+    {
+      "scenario": "concurrent",
+      "samplesPerMode": 200,
+      "warmupPerMode": 20,
+      "eventsPerEnabledSample": 67,
+      "timing": {
+        "baseline": {
+          "samples": 200,
+          "medianMs": 1.0357999999996537,
+          "p95Ms": 1.6812000000008993,
+          "events": 0,
+          "bytes": 0,
+          "synchronousSink": {
+            "samples": 200,
+            "medianMs": 0,
+            "p95Ms": 0
+          },
+          "rotationLatency": null
+        },
+        "patchedDisabled": {
+          "samples": 200,
+          "medianMs": 1.0805999999993219,
+          "p95Ms": 1.5725000000002183,
+          "events": 0,
+          "bytes": 0,
+          "synchronousSink": {
+            "samples": 200,
+            "medianMs": 0,
+            "p95Ms": 0
+          },
+          "rotationLatency": null
+        },
+        "patchedEnabled": {
+          "samples": 200,
+          "medianMs": 16.51260000000002,
+          "p95Ms": 22.59389999999985,
+          "events": 13400,
+          "bytes": 2861350,
+          "synchronousSink": {
+            "samples": 200,
+            "medianMs": 13.996800000002622,
+            "p95Ms": 19.48549999998977
+          },
+          "rotationLatency": null
+        }
+      },
+      "overhead": {
+        "enabledMedianMs": 15.476800000000367,
+        "enabledP95Ms": 20.91269999999895,
+        "disabledMedianMs": 0.044799999999668216,
+        "disabledP95Ms": -0.10870000000068103
+      }
+    },
+    {
+      "scenario": "rotation",
+      "samplesPerMode": 50,
+      "warmupPerMode": 20,
+      "eventsPerEnabledSample": 33,
+      "timing": {
+        "baseline": {
+          "samples": 50,
+          "medianMs": 0.5753999999997177,
+          "p95Ms": 0.872799999999188,
+          "events": 0,
+          "bytes": 0,
+          "synchronousSink": {
+            "samples": 50,
+            "medianMs": 0,
+            "p95Ms": 0
+          },
+          "rotationLatency": null
+        },
+        "patchedDisabled": {
+          "samples": 50,
+          "medianMs": 0.5340000000014697,
+          "p95Ms": 0.7493000000013126,
+          "events": 0,
+          "bytes": 0,
+          "synchronousSink": {
+            "samples": 50,
+            "medianMs": 0,
+            "p95Ms": 0
+          },
+          "rotationLatency": null
+        },
+        "patchedEnabled": {
+          "samples": 50,
+          "medianMs": 12.55119999999988,
+          "p95Ms": 17.606299999999464,
+          "events": 1650,
+          "bytes": 346094,
+          "synchronousSink": {
+            "samples": 50,
+            "medianMs": 10.902999999989333,
+            "p95Ms": 15.520599999998012
+          },
+          "rotationLatency": {
+            "samples": 50,
+            "medianMs": 12.55119999999988,
+            "p95Ms": 17.606299999999464
+          }
+        }
+      },
+      "overhead": {
+        "enabledMedianMs": 11.975800000000163,
+        "enabledP95Ms": 16.733500000000276,
+        "disabledMedianMs": -0.04139999999824795,
+        "disabledP95Ms": -0.12349999999787542
+      }
+    }
+  ],
+  "targets": [
+    {
+      "target": "D:\\Applications\\Scoop\\apps\\pi-coding-agent-bun\\0.87.1\\node_modules\\@earendil-works\\pi-coding-agent\\dist\\bundle\\chunks\\chunk-OJP47DM6.js",
+      "originalHash": "81c81a21ec81e84200205f561687408ff5e3738fbbbb3c2a6c186b348d376020",
+      "patchedHash": "b1c6995246bb393df5fda23dc3a286f7d8f26814a09fc2aa140760ba78207d3c",
+      "backup": "C:\\Users\\WINDOWS\\AppData\\Local\\Temp\\pi-turns-XGb4T2\\original.js",
+      "staged": "C:\\Users\\WINDOWS\\AppData\\Local\\Temp\\pi-turns-XGb4T2\\patched.mjs",
+      "boundaries": [
+        {
+          "start": "async function runAgentLoop(",
+          "end": "async function runAgentLoopContinue(",
+          "sha256": "cb29a892dc35a50cc9ffd3023f9fa07b3a000f14ede23f18b04a9ba12543b5e1"
+        },
+        {
+          "start": "async function runAgentLoopContinue(",
+          "end": "function createAgentStream(",
+          "sha256": "8f52f97e91bae494cae3080497e650abcb1da91026ccf0cfe633a47c5ce07e74"
+        },
+        {
+          "start": "async function runLoop(initialContext,",
+          "end": "function declareToolChanges(",
+          "sha256": "6c5c345f969b2c4f6d540045b3f14cfeaa110322ba126936cb1c1288b6107dff"
+        },
+        {
+          "start": "async function streamAssistantResponse(",
+          "end": "async function failToolCallsFromTruncatedMessage(",
+          "sha256": "eca7a776e638712886a77cae8e72bc4c8cd3f68e77ba1b18a608a3232a31d2f2"
+        },
+        {
+          "start": "async emitMessageEnd(event){",
+          "end": "async emitToolResult(",
+          "sha256": "ac8d63b8d510b2f91e0628aaa2891ece1da8811c0d346e4698565ea9e3cbaa78"
+        },
+        {
+          "start": "appendMessage(message){",
+          "end": "appendThinkingLevelChange(thinkingLevel){",
+          "sha256": "3ff98ffa61a4036769028c4e0c0dd3bbe81a8da47d7a02128e7293a437814551"
+        },
+        {
+          "start": "async emitToolCall(event){",
+          "end": "async emitUserBash(event){",
+          "sha256": "2de35120f22a21a256f351bbf706afd2fe9df8feccd0079a05cadb535bfdc47c"
+        },
+        {
+          "start": "async function executePreparedToolCall(",
+          "end": "async function finalizeExecutedToolCall(",
+          "sha256": "d0d7117b03a98e66213b4ab74726ec8ea55a407fe0ddcc6943ab4a87c4177835"
+        },
+        {
+          "start": "async abort(){this._isAgentRunActive",
+          "end": "async waitForIdle(){this.isIdle",
+          "sha256": "1ed1e083602bda0076301dba5e6b115ba240d8f9fc15197b435df18851c70e7b"
+        }
+      ]
+    },
+    {
+      "target": "D:\\Applications\\Scoop\\apps\\pi-coding-agent-bun\\0.87.1\\node_modules\\@earendil-works\\pi-coding-agent\\dist\\bundle\\chunks\\chunk-FUXEF6JQ.js",
+      "originalHash": "b7d0697d0f4c7d3b54c6aee545d3b27c5981c27d0470e1c79876898f28f2c472",
+      "patchedHash": "32b6ff866b6a64fc2613fa12474f7ada5ca1483a362d0be7680735bdaedc1200",
+      "backup": "C:\\Users\\WINDOWS\\AppData\\Local\\Temp\\pi-turns-XGb4T2\\google-original.js",
+      "staged": "C:\\Users\\WINDOWS\\AppData\\Local\\Temp\\pi-turns-XGb4T2\\google-patched.mjs",
+      "boundaries": [
+        {
+          "selector": "response=this.apiClient.requestStream({path:path2,queryParams,body:JSON.stringify(body),httpMethod:\"POST\",httpOptions:(_a2=params.config)===null||_a2===void 0?void 0:_a2.httpOptions,abortSignal:(_b=params.config)===null||_b===void 0?void 0:_b.abortSignal})",
+          "sha256": "31eb29154c66d14d0d01c774ee25b31697c5f153b0d814b8a15939212ac791f7"
+        },
+        {
+          "selector": "response=this.apiClient.requestStream({path:path2,queryParams,body:JSON.stringify(body),httpMethod:\"POST\",httpOptions:(_c=params.config)===null||_c===void 0?void 0:_c.httpOptions,abortSignal:(_d=params.config)===null||_d===void 0?void 0:_d.abortSignal})",
+          "sha256": "e152a7e887d336ed56864aa719e2ba239306f1c2539631379250c46736fc4579"
+        },
+        {
+          "selector": "async requestStream(request){",
+          "sha256": "1ed62caf62ae737b63e5cf055e2fd4ba9975f707fad2f913309d35a8f12fd8d8"
+        },
+        {
+          "selector": "this.streamApiCall(url,requestInit,request.httpMethod,patchedHttpOptions.retryOptions,patchedHttpOptions.timeout,request.abortSignal)",
+          "sha256": "138ce916be3d9ae9c4722728ad7ff664f3c79e3483cd82c635e0a6b57a96cef8"
+        },
+        {
+          "selector": "async streamApiCall(url,requestInit,httpMethod,retryOptions,timeout,abortSignal){return this.apiCall(url.toString(),Object.assign(Object.assign({},requestInit),{method:httpMethod}),retryOptions,timeout,abortSignal).then(async response=>(await throwErrorIfNotOK(response),this.processStreamResponse(response))).catch(e=>{throw e instanceof Error?e:new Error(`exception ${e} sending request`,{cause:e})})}",
+          "sha256": "11a6a8c19007831fb54c91ec089642dd64815acf03d4df04c20c47067a722e56"
+        },
+        {
+          "selector": "async apiCall(url,requestInit,retryOptions,timeout,abortSignal){",
+          "sha256": "e92994cb5312874d391ac42e78f4c67f3513d4cc676cf12465f8891fc1495fe6"
+        },
+        {
+          "selector": "runFetch=async()=>{let attempt=createAttemptSignal(timeout,abortSignal),response;try{response=await fetch(url,Object.assign(Object.assign({},requestInit),{signal:attempt.signal}))}catch(e){throw attempt.dispose(),e}",
+          "sha256": "422d27b8fa79bfa947a7b0eb601558008498af468b7a172f9b8b99cf9ffe81fa"
+        }
+      ]
+    }
+  ],
+  "activationAllowed": false,
+  "t1Complete": false,
+  "revision": "offline-6-google",
+  "command": [
+    "node",
+    "packages/pi-harness/tools/pi-stall-diagnostics/check-turns.mjs",
+    "D:/Applications/Scoop/apps/pi-coding-agent-bun/current/node_modules/@earendil-works/pi-coding-agent",
+    "packages/pi-harness/docs/works/pi-stall-diagnostics/evidence/turns-offline-6.json"
+  ],
+  "environment": {
+    "node": "v24.15.0",
+    "platform": "win32",
+    "arch": "x64",
+    "os": "10.0.19045",
+    "cpu": "13th Gen Intel(R) Core(TM) i5-13490F",
+    "cpus": 16
+  },
+  "originalHash": "81c81a21ec81e84200205f561687408ff5e3738fbbbb3c2a6c186b348d376020",
+  "patchedHash": "b1c6995246bb393df5fda23dc3a286f7d8f26814a09fc2aa140760ba78207d3c",
+  "sourceHashes": {
+    "stage.mjs": "37aa6a72cea8726c66f5ae37bcb45eab5b84e1e683356ac8a6c9922528d3726f",
+    "logger.mjs": "bb82a426532a67f3cc6744c2d621984036ce1ef35622f30325f21e04f8de92dd",
+    "check-turns.mjs": "19da01dcf1a5358e71fe93d46cce97c1fd93cf7866af3e5ad7634e9153395f01",
+    "check-google.mjs": "b49fb6ae067c7243ca9240b4bf9b28599a53052e063e24c37994be11d16dc783"
+  },
+  "workload": {
+    "samplesPerMode": 200,
+    "warmupPerMode": 20,
+    "streamsPerTurn": 1,
+    "deltasPerStream": 32,
+    "messageDispatches": 2,
+    "handlersPerDispatch": 2,
+    "appends": 2,
+    "tools": 2,
+    "hooksPerTool": 1,
+    "order": "interleaved rotating"
+  },
+  "timing": {
+    "baseline": {
+      "medianMs": 0.08589999999998099,
+      "p95Ms": 0.1505000000001928,
+      "events": 0,
+      "bytes": 0
+    },
+    "patchedDisabled": {
+      "medianMs": 0.13989999999989777,
+      "p95Ms": 0.26769999999987704,
+      "events": 0,
+      "bytes": 0
+    },
+    "patchedEnabled": {
+      "medianMs": 8.017800000000022,
+      "p95Ms": 14.193899999999985,
+      "events": 6600,
+      "bytes": 1389528
+    }
+  },
+  "totalEnabledIncludingWarmup": {
+    "events": 7260,
+    "bytes": 1525227
+  },
+  "overhead": {
+    "medianAddedMs": 7.9319000000000415,
+    "p95AddedMs": 14.043399999999792,
+    "medianRatio": 93.33876600700579
+  },
+  "limitations": [
+    "Synthetic extracted full loop with fake dependencies, not real provider latency or complete CLI throughput.",
+    "Synchronous metadata writes are included; no artificial provider/network wait.",
+    "Google scenarios include constant test-only sink observers to count rotated events/bytes and time append/mkdir/rm/rename calls; reduced 4 KiB retention cap forces rotation.",
+    "No activation approval or real-provider latency claim is implied."
+  ]
+}

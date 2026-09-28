@@ -1,0 +1,170 @@
+{
+  "status": "source-determination-complete",
+  "determination": "No exposed provider-scoped raw HTTP response hook on the inspected adapter/SDK path; proposed additional shared SDK file described in google-http-0.87.1.md. No probe implemented.",
+  "version": "0.87.1",
+  "revision": "offline-5",
+  "activationAllowed": false,
+  "t1Complete": false,
+  "targetRoot": "D:\\Applications\\Scoop\\apps\\pi-coding-agent-bun\\0.87.1\\node_modules\\@earendil-works\\pi-coding-agent",
+  "originalHash": "81c81a21ec81e84200205f561687408ff5e3738fbbbb3c2a6c186b348d376020",
+  "files": [
+    {
+      "file": "dist/bundle/chunks/chunk-OJP47DM6.js",
+      "sha256": "81c81a21ec81e84200205f561687408ff5e3738fbbbb3c2a6c186b348d376020"
+    },
+    {
+      "file": "dist/bundle/chunks/google-generative-ai-IMS5EK2Y.js",
+      "sha256": "075e745faaeed61ea2ef0350b0227cc1983232a3289ad8be830350ad85c38cb6"
+    },
+    {
+      "file": "dist/bundle/chunks/google-vertex-O4YJEQUW.js",
+      "sha256": "10c917f7884cb7d97b1e0945f646480bfdc461ca465e6761458cbecead1ffd2e"
+    },
+    {
+      "file": "dist/bundle/chunks/chunk-FUXEF6JQ.js",
+      "sha256": "b7d0697d0f4c7d3b54c6aee545d3b27c5981c27d0470e1c79876898f28f2c472"
+    }
+  ],
+  "citations": [
+    {
+      "file": "chunk-OJP47DM6.js",
+      "symbol": "Google lazy import",
+      "offsetUtf16": 2686555,
+      "line": 604,
+      "columnUtf16": 802854,
+      "excerpt": "var googleGenerativeAIApi=()=>lazyApi(()=>import(\"./google-generative-ai-IMS5EK2Y.js\"))"
+    },
+    {
+      "file": "chunk-OJP47DM6.js",
+      "symbol": "Vertex lazy import",
+      "offsetUtf16": 2686908,
+      "line": 604,
+      "columnUtf16": 803207,
+      "excerpt": "var googleVertexApi=()=>lazyApi(()=>import(\"./google-vertex-O4YJEQUW.js\"))"
+    },
+    {
+      "file": "google-generative-ai-IMS5EK2Y.js",
+      "symbol": "fetch rejection",
+      "offsetUtf16": 1416,
+      "line": 2,
+      "columnUtf16": 1299,
+      "excerpt": "if(options?.fetch&&options.fetch!==globalThis.fetch)throw new Error(\"Custom fetch is not supported by the Google Generative AI adapter\")"
+    },
+    {
+      "file": "google-generative-ai-IMS5EK2Y.js",
+      "symbol": "SDK import",
+      "offsetUtf16": 433,
+      "line": 2,
+      "columnUtf16": 316,
+      "excerpt": "from\"./chunk-FUXEF6JQ.js\""
+    },
+    {
+      "file": "google-generative-ai-IMS5EK2Y.js",
+      "symbol": "Payload callback and SDK call",
+      "offsetUtf16": 1760,
+      "line": 2,
+      "columnUtf16": 1643,
+      "excerpt": "nextParams=await options?.onPayload?.(params,model);nextParams!==void 0&&(params=nextParams);let googleStream=await retryGoogleRequest(()=>client.models.generateContentStream(params),options)"
+    },
+    {
+      "file": "google-vertex-O4YJEQUW.js",
+      "symbol": "fetch rejection",
+      "offsetUtf16": 1548,
+      "line": 2,
+      "columnUtf16": 1431,
+      "excerpt": "if(options?.fetch&&options.fetch!==globalThis.fetch)throw new Error(\"Custom fetch is not supported by the Google Vertex adapter\")"
+    },
+    {
+      "file": "google-vertex-O4YJEQUW.js",
+      "symbol": "SDK import",
+      "offsetUtf16": 447,
+      "line": 2,
+      "columnUtf16": 330,
+      "excerpt": "from\"./chunk-FUXEF6JQ.js\""
+    },
+    {
+      "file": "google-vertex-O4YJEQUW.js",
+      "symbol": "Payload callback and SDK call",
+      "offsetUtf16": 1931,
+      "line": 2,
+      "columnUtf16": 1814,
+      "excerpt": "nextParams=await options?.onPayload?.(params,model);nextParams!==void 0&&(params=nextParams);let googleStream=await retryGoogleRequest(()=>client.models.generateContentStream(params),options)"
+    },
+    {
+      "file": "chunk-FUXEF6JQ.js",
+      "symbol": "SDK client ownership",
+      "offsetUtf16": 940091,
+      "line": 43,
+      "columnUtf16": 159329,
+      "excerpt": "this.apiClient=new ApiClient({auth,project:this.project,location:this.location,apiVersion:this.apiVersion,apiKey:this.apiKey,vertexai:this.vertexai,httpOptions:this.httpOptions,userAgentExtra:LANGUAGE_LABEL_PREFIX+process.version,uploader:new NodeUploader,downloader:new NodeDownloader}),this.models=new Models(this.apiClient)"
+    },
+    {
+      "file": "chunk-FUXEF6JQ.js",
+      "symbol": "Models streaming entry",
+      "offsetUtf16": 689345,
+      "line": 41,
+      "columnUtf16": 37263,
+      "excerpt": "async generateContentStreamInternal(params){"
+    },
+    {
+      "file": "chunk-FUXEF6JQ.js",
+      "symbol": "Vertex requestStream",
+      "offsetUtf16": 689675,
+      "line": 41,
+      "columnUtf16": 37593,
+      "excerpt": "response=this.apiClient.requestStream({path:path2,queryParams,body:JSON.stringify(body),httpMethod:\"POST\",httpOptions:(_a2=params.config)===null||_a2===void 0?void 0:_a2.httpOptions,abortSignal:(_b=params.config)===null||_b===void 0?void 0:_b.abortSignal})"
+    },
+    {
+      "file": "chunk-FUXEF6JQ.js",
+      "symbol": "Gemini requestStream",
+      "offsetUtf16": 690841,
+      "line": 41,
+      "columnUtf16": 38759,
+      "excerpt": "response=this.apiClient.requestStream({path:path2,queryParams,body:JSON.stringify(body),httpMethod:\"POST\",httpOptions:(_c=params.config)===null||_c===void 0?void 0:_c.httpOptions,abortSignal:(_d=params.config)===null||_d===void 0?void 0:_d.abortSignal})"
+    },
+    {
+      "file": "chunk-FUXEF6JQ.js",
+      "symbol": "requestStream consumed options",
+      "offsetUtf16": 650481,
+      "line": 37,
+      "columnUtf16": 345708,
+      "excerpt": "this.streamApiCall(url,requestInit,request.httpMethod,patchedHttpOptions.retryOptions,patchedHttpOptions.timeout,request.abortSignal)"
+    },
+    {
+      "file": "chunk-FUXEF6JQ.js",
+      "symbol": "streamApiCall consumes Response",
+      "offsetUtf16": 651359,
+      "line": 37,
+      "columnUtf16": 346586,
+      "excerpt": "async streamApiCall(url,requestInit,httpMethod,retryOptions,timeout,abortSignal){return this.apiCall(url.toString(),Object.assign(Object.assign({},requestInit),{method:httpMethod}),retryOptions,timeout,abortSignal).then(async response=>(await throwErrorIfNotOK(response),this.processStreamResponse(response)))"
+    },
+    {
+      "file": "chunk-FUXEF6JQ.js",
+      "symbol": "actual fetch settlement",
+      "offsetUtf16": 653738,
+      "line": 41,
+      "columnUtf16": 1656,
+      "excerpt": "runFetch=async()=>{let attempt=createAttemptSignal(timeout,abortSignal),response;try{response=await fetch(url,Object.assign(Object.assign({},requestInit),{signal:attempt.signal}))}catch(e){throw attempt.dispose(),e}"
+    },
+    {
+      "file": "chunk-FUXEF6JQ.js",
+      "symbol": "SDK exports",
+      "offsetUtf16": 949510,
+      "line": 44,
+      "columnUtf16": 3682,
+      "excerpt": "export{ResourceScope,GoogleGenAI2 as GoogleGenAI,resolveGoogleThinkingLevel,usesGoogleThinkingLevel,toGoogleThinkingLevel,toGoogleSdkThinkingLevel,getDisabledGoogleThinkingConfig,isThinkingPart,retainThoughtSignature,convertMessages,convertTools,supportsGoogleStrictToolSampling,resolveGoogleFunctionCallingMode,mapStopReason,retryGoogleRequest};"
+    }
+  ],
+  "preservedCorrelationEvidenceHash": "ca26ca64522dcf6491fed56663213bde142f3729c13a7e992b24a3de9a2bc06a",
+  "verification": [
+    "Exact installed version/hash/entry guard passed",
+    "All 16 source excerpts matched uniquely",
+    "Both full adapters have zero onResponse references",
+    "stage.mjs and logger.mjs hashes still match correlation evidence",
+    "Installed main bundle hash unchanged"
+  ],
+  "notRun": [
+    "Transport probe tests: no probe implemented",
+    "Provider requests, CLI smoke, benchmarks, full suite, installation, rollback"
+  ]
+}

@@ -1,0 +1,2355 @@
+{
+  "status": "passed",
+  "t4Complete": true,
+  "activationAllowed": false,
+  "command": [
+    "bun",
+    "E:\\Projects\\pi-packages\\packages\\pi-harness\\tools\\pi-stall-diagnostics\\check-await-install.mjs",
+    "D:/Applications/Scoop/apps/pi-coding-agent-bun/0.87.1/node_modules/@earendil-works/pi-coding-agent",
+    "E:\\Projects\\pi-packages\\packages\\pi-harness\\docs\\works\\pi-stall-diagnostics\\evidence\\await-install-offline.json"
+  ],
+  "runtime": {
+    "bun": "1.4.0"
+  },
+  "checks": [
+    {
+      "name": "Unchanged T3 diagnostic kit evidence reused by hash"
+    },
+    {
+      "name": "Exact original-to-offline-6 main reproduction; five verified pristine/baseline/new materials"
+    },
+    {
+      "name": "Five import/export contracts unchanged"
+    },
+    {
+      "name": "Install/baseline rollback/pristine restoration and repeat no-rewrite; unchanged Google skipped"
+    },
+    {
+      "name": "Pair-only admission still refuses expanded revision"
+    },
+    {
+      "name": "Thrown boundary fault restores baseline",
+      "action": "install",
+      "point": "before",
+      "index": 0
+    },
+    {
+      "name": "Thrown boundary fault restores baseline",
+      "action": "install",
+      "point": "before",
+      "index": 1
+    },
+    {
+      "name": "Thrown boundary fault restores baseline",
+      "action": "install",
+      "point": "before",
+      "index": 2
+    },
+    {
+      "name": "Thrown boundary fault restores baseline",
+      "action": "install",
+      "point": "before",
+      "index": 3
+    },
+    {
+      "name": "Thrown boundary fault restores baseline",
+      "action": "install",
+      "point": "after",
+      "index": 0
+    },
+    {
+      "name": "Thrown boundary fault restores baseline",
+      "action": "install",
+      "point": "after",
+      "index": 1
+    },
+    {
+      "name": "Thrown boundary fault restores baseline",
+      "action": "install",
+      "point": "after",
+      "index": 2
+    },
+    {
+      "name": "Thrown boundary fault restores baseline",
+      "action": "install",
+      "point": "after",
+      "index": 3
+    },
+    {
+      "name": "Thrown boundary fault restores baseline",
+      "action": "rollback",
+      "point": "before",
+      "index": 0
+    },
+    {
+      "name": "Thrown boundary fault restores baseline",
+      "action": "rollback",
+      "point": "before",
+      "index": 1
+    },
+    {
+      "name": "Thrown boundary fault restores baseline",
+      "action": "rollback",
+      "point": "before",
+      "index": 2
+    },
+    {
+      "name": "Thrown boundary fault restores baseline",
+      "action": "rollback",
+      "point": "before",
+      "index": 3
+    },
+    {
+      "name": "Thrown boundary fault restores baseline",
+      "action": "rollback",
+      "point": "after",
+      "index": 0
+    },
+    {
+      "name": "Thrown boundary fault restores baseline",
+      "action": "rollback",
+      "point": "after",
+      "index": 1
+    },
+    {
+      "name": "Thrown boundary fault restores baseline",
+      "action": "rollback",
+      "point": "after",
+      "index": 2
+    },
+    {
+      "name": "Thrown boundary fault restores baseline",
+      "action": "rollback",
+      "point": "after",
+      "index": 3
+    },
+    {
+      "name": "Voluntary worker exit and truncated journal restart restores baseline",
+      "action": "install",
+      "point": "before",
+      "index": 0
+    },
+    {
+      "name": "Voluntary worker exit and truncated journal restart restores baseline",
+      "action": "install",
+      "point": "before",
+      "index": 1
+    },
+    {
+      "name": "Voluntary worker exit and truncated journal restart restores baseline",
+      "action": "install",
+      "point": "before",
+      "index": 2
+    },
+    {
+      "name": "Voluntary worker exit and truncated journal restart restores baseline",
+      "action": "install",
+      "point": "before",
+      "index": 3
+    },
+    {
+      "name": "Voluntary worker exit and truncated journal restart restores baseline",
+      "action": "install",
+      "point": "after",
+      "index": 0
+    },
+    {
+      "name": "Voluntary worker exit and truncated journal restart restores baseline",
+      "action": "install",
+      "point": "after",
+      "index": 1
+    },
+    {
+      "name": "Voluntary worker exit and truncated journal restart restores baseline",
+      "action": "install",
+      "point": "after",
+      "index": 2
+    },
+    {
+      "name": "Voluntary worker exit and truncated journal restart restores baseline",
+      "action": "install",
+      "point": "after",
+      "index": 3
+    },
+    {
+      "name": "Voluntary worker exit and truncated journal restart restores baseline",
+      "action": "rollback",
+      "point": "before",
+      "index": 0
+    },
+    {
+      "name": "Voluntary worker exit and truncated journal restart restores baseline",
+      "action": "rollback",
+      "point": "before",
+      "index": 1
+    },
+    {
+      "name": "Voluntary worker exit and truncated journal restart restores baseline",
+      "action": "rollback",
+      "point": "before",
+      "index": 2
+    },
+    {
+      "name": "Voluntary worker exit and truncated journal restart restores baseline",
+      "action": "rollback",
+      "point": "before",
+      "index": 3
+    },
+    {
+      "name": "Voluntary worker exit and truncated journal restart restores baseline",
+      "action": "rollback",
+      "point": "after",
+      "index": 0
+    },
+    {
+      "name": "Voluntary worker exit and truncated journal restart restores baseline",
+      "action": "rollback",
+      "point": "after",
+      "index": 1
+    },
+    {
+      "name": "Voluntary worker exit and truncated journal restart restores baseline",
+      "action": "rollback",
+      "point": "after",
+      "index": 2
+    },
+    {
+      "name": "Voluntary worker exit and truncated journal restart restores baseline",
+      "action": "rollback",
+      "point": "after",
+      "index": 3
+    },
+    {
+      "name": "Interrupted mixed restoration repeatable",
+      "point": "recovery-before",
+      "index": 0
+    },
+    {
+      "name": "Interrupted mixed restoration repeatable",
+      "point": "recovery-before",
+      "index": 1
+    },
+    {
+      "name": "Interrupted mixed restoration repeatable",
+      "point": "recovery-before",
+      "index": 2
+    },
+    {
+      "name": "Interrupted mixed restoration repeatable",
+      "point": "recovery-before",
+      "index": 3
+    },
+    {
+      "name": "Interrupted mixed restoration repeatable",
+      "point": "recovery-after",
+      "index": 0
+    },
+    {
+      "name": "Interrupted mixed restoration repeatable",
+      "point": "recovery-after",
+      "index": 1
+    },
+    {
+      "name": "Interrupted mixed restoration repeatable",
+      "point": "recovery-after",
+      "index": 2
+    },
+    {
+      "name": "Interrupted mixed restoration repeatable",
+      "point": "recovery-after",
+      "index": 3
+    },
+    {
+      "name": "Smoke failure restores baseline"
+    },
+    {
+      "name": "Unknown target preserved: 0"
+    },
+    {
+      "name": "backup missing refuses writes: 0"
+    },
+    {
+      "name": "backup corrupt refuses writes: 0"
+    },
+    {
+      "name": "baseline missing refuses writes: 0"
+    },
+    {
+      "name": "baseline corrupt refuses writes: 0"
+    },
+    {
+      "name": "staged missing refuses writes: 0"
+    },
+    {
+      "name": "staged corrupt refuses writes: 0"
+    },
+    {
+      "name": "Unknown target preserved: 1"
+    },
+    {
+      "name": "backup missing refuses writes: 1"
+    },
+    {
+      "name": "backup corrupt refuses writes: 1"
+    },
+    {
+      "name": "baseline missing refuses writes: 1"
+    },
+    {
+      "name": "baseline corrupt refuses writes: 1"
+    },
+    {
+      "name": "staged missing refuses writes: 1"
+    },
+    {
+      "name": "staged corrupt refuses writes: 1"
+    },
+    {
+      "name": "Unknown target preserved: 2"
+    },
+    {
+      "name": "backup missing refuses writes: 2"
+    },
+    {
+      "name": "backup corrupt refuses writes: 2"
+    },
+    {
+      "name": "baseline missing refuses writes: 2"
+    },
+    {
+      "name": "baseline corrupt refuses writes: 2"
+    },
+    {
+      "name": "staged missing refuses writes: 2"
+    },
+    {
+      "name": "staged corrupt refuses writes: 2"
+    },
+    {
+      "name": "Unknown target preserved: 3"
+    },
+    {
+      "name": "backup missing refuses writes: 3"
+    },
+    {
+      "name": "backup corrupt refuses writes: 3"
+    },
+    {
+      "name": "baseline missing refuses writes: 3"
+    },
+    {
+      "name": "baseline corrupt refuses writes: 3"
+    },
+    {
+      "name": "staged missing refuses writes: 3"
+    },
+    {
+      "name": "staged corrupt refuses writes: 3"
+    },
+    {
+      "name": "Unknown target preserved: 4"
+    },
+    {
+      "name": "backup missing refuses writes: 4"
+    },
+    {
+      "name": "backup corrupt refuses writes: 4"
+    },
+    {
+      "name": "baseline missing refuses writes: 4"
+    },
+    {
+      "name": "baseline corrupt refuses writes: 4"
+    },
+    {
+      "name": "staged missing refuses writes: 4"
+    },
+    {
+      "name": "staged corrupt refuses writes: 4"
+    },
+    {
+      "name": "Malformed/path/selector manifest refused"
+    },
+    {
+      "name": "Malformed/path/selector manifest refused"
+    },
+    {
+      "name": "Malformed/path/selector manifest refused"
+    },
+    {
+      "name": "Malformed/path/selector manifest refused"
+    },
+    {
+      "name": "Malformed/path/selector manifest refused"
+    },
+    {
+      "name": "Malformed/path/selector manifest refused"
+    },
+    {
+      "name": "Mapping/read-only drift refused: cli-runtime.js"
+    },
+    {
+      "name": "Mapping/read-only drift refused: chunk-A3JYRWB6.js"
+    },
+    {
+      "name": "Mapping/read-only drift refused: google-vertex-O4YJEQUW.js"
+    },
+    {
+      "name": "Linked target refused"
+    },
+    {
+      "name": "Linked backup refused"
+    },
+    {
+      "name": "Linked baseline refused"
+    },
+    {
+      "name": "Linked staged refused"
+    },
+    {
+      "name": "Between-write target drift stops recovery and reports all five residuals"
+    },
+    {
+      "name": "Between-write backup drift stops recovery and reports all five residuals"
+    },
+    {
+      "name": "Between-write baseline drift stops recovery and reports all five residuals"
+    },
+    {
+      "name": "Between-write staged drift stops recovery and reports all five residuals"
+    },
+    {
+      "name": "Windows open-reader refusal preserves bytes"
+    },
+    {
+      "name": "Concurrent ownership refused"
+    },
+    {
+      "name": "Windows serialized ownership"
+    },
+    {
+      "name": "Consistent base isolated CLI/Google smoke",
+      "version": "0.87.1",
+      "runtime": {
+        "executable": "D:\\Applications\\Scoop\\apps\\bun\\1.4.0\\bun.exe",
+        "node": "v26.3.0",
+        "bun": "1.4.0"
+      },
+      "isolatedHomeEmpty": true,
+      "networkAndProcessesBlocked": true,
+      "probe": {
+        "mainAndBothLazyAdaptersImported": true,
+        "appendIdentityPreserved": true,
+        "loggingRecords": 2,
+        "sessionCreated": false
+      },
+      "work": "C:\\Users\\WINDOWS\\AppData\\Local\\Temp\\pi-stall-smoke-MO4M1d"
+    },
+    {
+      "name": "Consistent patched isolated CLI/Google smoke",
+      "version": "0.87.1",
+      "runtime": {
+        "executable": "D:\\Applications\\Scoop\\apps\\bun\\1.4.0\\bun.exe",
+        "node": "v26.3.0",
+        "bun": "1.4.0"
+      },
+      "isolatedHomeEmpty": true,
+      "networkAndProcessesBlocked": true,
+      "probe": {
+        "mainAndBothLazyAdaptersImported": true,
+        "appendIdentityPreserved": true,
+        "loggingRecords": 2,
+        "sessionCreated": false
+      },
+      "work": "C:\\Users\\WINDOWS\\AppData\\Local\\Temp\\pi-stall-smoke-AYT41r"
+    },
+    {
+      "name": "Consistent original isolated CLI/Google smoke",
+      "version": "0.87.1",
+      "runtime": {
+        "executable": "D:\\Applications\\Scoop\\apps\\bun\\1.4.0\\bun.exe",
+        "node": "v26.3.0",
+        "bun": "1.4.0"
+      },
+      "isolatedHomeEmpty": true,
+      "networkAndProcessesBlocked": true,
+      "probe": {
+        "mainAndBothLazyAdaptersImported": true,
+        "appendIdentityPreserved": true,
+        "loggingRecords": 0,
+        "sessionCreated": false
+      },
+      "work": "C:\\Users\\WINDOWS\\AppData\\Local\\Temp\\pi-stall-smoke-TMiELs"
+    },
+    {
+      "name": "Bun cached-main/lazy-import fake OpenAI/forwarding combination",
+      "mask": 0,
+      "sets": [
+        "base",
+        "base",
+        "base",
+        "base",
+        "base"
+      ],
+      "mode": "disabled",
+      "result": {
+        "status": "passed",
+        "mode": "disabled",
+        "mainSet": "base",
+        "consistent": false,
+        "cachedMainUnchanged": true,
+        "networkAndProcessesBlocked": true,
+        "outcomes": [
+          {
+            "abort": false,
+            "events": [
+              "start",
+              "done"
+            ],
+            "stopReason": "stop",
+            "resultIdentity": true,
+            "callbackIdentity": true
+          },
+          {
+            "abort": true,
+            "events": [
+              "start",
+              "error"
+            ],
+            "stopReason": "aborted",
+            "resultIdentity": true,
+            "callbackIdentity": true
+          }
+        ]
+      }
+    },
+    {
+      "name": "Bun cached-main/lazy-import fake OpenAI/forwarding combination",
+      "mask": 0,
+      "sets": [
+        "base",
+        "base",
+        "base",
+        "base",
+        "base"
+      ],
+      "mode": "enabled",
+      "result": {
+        "status": "passed",
+        "mode": "enabled",
+        "mainSet": "base",
+        "consistent": false,
+        "cachedMainUnchanged": true,
+        "networkAndProcessesBlocked": true,
+        "outcomes": [
+          {
+            "abort": false,
+            "events": [
+              "start",
+              "done"
+            ],
+            "stopReason": "stop",
+            "resultIdentity": true,
+            "callbackIdentity": true
+          },
+          {
+            "abort": true,
+            "events": [
+              "start",
+              "error"
+            ],
+            "stopReason": "aborted",
+            "resultIdentity": true,
+            "callbackIdentity": true
+          }
+        ]
+      }
+    },
+    {
+      "name": "Bun cached-main/lazy-import fake OpenAI/forwarding combination",
+      "mask": 1,
+      "sets": [
+        "patched",
+        "base",
+        "base",
+        "base",
+        "base"
+      ],
+      "mode": "disabled",
+      "result": {
+        "status": "passed",
+        "mode": "disabled",
+        "mainSet": "patched",
+        "consistent": false,
+        "cachedMainUnchanged": true,
+        "networkAndProcessesBlocked": true,
+        "outcomes": [
+          {
+            "abort": false,
+            "events": [
+              "start",
+              "done"
+            ],
+            "stopReason": "stop",
+            "resultIdentity": true,
+            "callbackIdentity": true
+          },
+          {
+            "abort": true,
+            "events": [
+              "start",
+              "error"
+            ],
+            "stopReason": "aborted",
+            "resultIdentity": true,
+            "callbackIdentity": true
+          }
+        ]
+      }
+    },
+    {
+      "name": "Bun cached-main/lazy-import fake OpenAI/forwarding combination",
+      "mask": 1,
+      "sets": [
+        "patched",
+        "base",
+        "base",
+        "base",
+        "base"
+      ],
+      "mode": "enabled",
+      "result": {
+        "status": "passed",
+        "mode": "enabled",
+        "mainSet": "patched",
+        "consistent": false,
+        "cachedMainUnchanged": true,
+        "networkAndProcessesBlocked": true,
+        "outcomes": [
+          {
+            "abort": false,
+            "events": [
+              "start",
+              "done"
+            ],
+            "stopReason": "stop",
+            "resultIdentity": true,
+            "callbackIdentity": true
+          },
+          {
+            "abort": true,
+            "events": [
+              "start",
+              "error"
+            ],
+            "stopReason": "aborted",
+            "resultIdentity": true,
+            "callbackIdentity": true
+          }
+        ]
+      }
+    },
+    {
+      "name": "Bun cached-main/lazy-import fake OpenAI/forwarding combination",
+      "mask": 2,
+      "sets": [
+        "base",
+        "patched",
+        "base",
+        "base",
+        "base"
+      ],
+      "mode": "disabled",
+      "result": {
+        "status": "passed",
+        "mode": "disabled",
+        "mainSet": "base",
+        "consistent": false,
+        "cachedMainUnchanged": true,
+        "networkAndProcessesBlocked": true,
+        "outcomes": [
+          {
+            "abort": false,
+            "events": [
+              "start",
+              "done"
+            ],
+            "stopReason": "stop",
+            "resultIdentity": true,
+            "callbackIdentity": true
+          },
+          {
+            "abort": true,
+            "events": [
+              "start",
+              "error"
+            ],
+            "stopReason": "aborted",
+            "resultIdentity": true,
+            "callbackIdentity": true
+          }
+        ]
+      }
+    },
+    {
+      "name": "Bun cached-main/lazy-import fake OpenAI/forwarding combination",
+      "mask": 2,
+      "sets": [
+        "base",
+        "patched",
+        "base",
+        "base",
+        "base"
+      ],
+      "mode": "enabled",
+      "result": {
+        "status": "passed",
+        "mode": "enabled",
+        "mainSet": "base",
+        "consistent": false,
+        "cachedMainUnchanged": true,
+        "networkAndProcessesBlocked": true,
+        "outcomes": [
+          {
+            "abort": false,
+            "events": [
+              "start",
+              "done"
+            ],
+            "stopReason": "stop",
+            "resultIdentity": true,
+            "callbackIdentity": true
+          },
+          {
+            "abort": true,
+            "events": [
+              "start",
+              "error"
+            ],
+            "stopReason": "aborted",
+            "resultIdentity": true,
+            "callbackIdentity": true
+          }
+        ]
+      }
+    },
+    {
+      "name": "Bun cached-main/lazy-import fake OpenAI/forwarding combination",
+      "mask": 3,
+      "sets": [
+        "patched",
+        "patched",
+        "base",
+        "base",
+        "base"
+      ],
+      "mode": "disabled",
+      "result": {
+        "status": "passed",
+        "mode": "disabled",
+        "mainSet": "patched",
+        "consistent": false,
+        "cachedMainUnchanged": true,
+        "networkAndProcessesBlocked": true,
+        "outcomes": [
+          {
+            "abort": false,
+            "events": [
+              "start",
+              "done"
+            ],
+            "stopReason": "stop",
+            "resultIdentity": true,
+            "callbackIdentity": true
+          },
+          {
+            "abort": true,
+            "events": [
+              "start",
+              "error"
+            ],
+            "stopReason": "aborted",
+            "resultIdentity": true,
+            "callbackIdentity": true
+          }
+        ]
+      }
+    },
+    {
+      "name": "Bun cached-main/lazy-import fake OpenAI/forwarding combination",
+      "mask": 3,
+      "sets": [
+        "patched",
+        "patched",
+        "base",
+        "base",
+        "base"
+      ],
+      "mode": "enabled",
+      "result": {
+        "status": "passed",
+        "mode": "enabled",
+        "mainSet": "patched",
+        "consistent": false,
+        "cachedMainUnchanged": true,
+        "networkAndProcessesBlocked": true,
+        "outcomes": [
+          {
+            "abort": false,
+            "events": [
+              "start",
+              "done"
+            ],
+            "stopReason": "stop",
+            "resultIdentity": true,
+            "callbackIdentity": true
+          },
+          {
+            "abort": true,
+            "events": [
+              "start",
+              "error"
+            ],
+            "stopReason": "aborted",
+            "resultIdentity": true,
+            "callbackIdentity": true
+          }
+        ]
+      }
+    },
+    {
+      "name": "Bun cached-main/lazy-import fake OpenAI/forwarding combination",
+      "mask": 4,
+      "sets": [
+        "base",
+        "base",
+        "patched",
+        "base",
+        "base"
+      ],
+      "mode": "disabled",
+      "result": {
+        "status": "passed",
+        "mode": "disabled",
+        "mainSet": "base",
+        "consistent": false,
+        "cachedMainUnchanged": true,
+        "networkAndProcessesBlocked": true,
+        "outcomes": [
+          {
+            "abort": false,
+            "events": [
+              "start",
+              "done"
+            ],
+            "stopReason": "stop",
+            "resultIdentity": true,
+            "callbackIdentity": true
+          },
+          {
+            "abort": true,
+            "events": [
+              "start",
+              "error"
+            ],
+            "stopReason": "aborted",
+            "resultIdentity": true,
+            "callbackIdentity": true
+          }
+        ]
+      }
+    },
+    {
+      "name": "Bun cached-main/lazy-import fake OpenAI/forwarding combination",
+      "mask": 4,
+      "sets": [
+        "base",
+        "base",
+        "patched",
+        "base",
+        "base"
+      ],
+      "mode": "enabled",
+      "result": {
+        "status": "passed",
+        "mode": "enabled",
+        "mainSet": "base",
+        "consistent": false,
+        "cachedMainUnchanged": true,
+        "networkAndProcessesBlocked": true,
+        "outcomes": [
+          {
+            "abort": false,
+            "events": [
+              "start",
+              "done"
+            ],
+            "stopReason": "stop",
+            "resultIdentity": true,
+            "callbackIdentity": true
+          },
+          {
+            "abort": true,
+            "events": [
+              "start",
+              "error"
+            ],
+            "stopReason": "aborted",
+            "resultIdentity": true,
+            "callbackIdentity": true
+          }
+        ]
+      }
+    },
+    {
+      "name": "Bun cached-main/lazy-import fake OpenAI/forwarding combination",
+      "mask": 5,
+      "sets": [
+        "patched",
+        "base",
+        "patched",
+        "base",
+        "base"
+      ],
+      "mode": "disabled",
+      "result": {
+        "status": "passed",
+        "mode": "disabled",
+        "mainSet": "patched",
+        "consistent": false,
+        "cachedMainUnchanged": true,
+        "networkAndProcessesBlocked": true,
+        "outcomes": [
+          {
+            "abort": false,
+            "events": [
+              "start",
+              "done"
+            ],
+            "stopReason": "stop",
+            "resultIdentity": true,
+            "callbackIdentity": true
+          },
+          {
+            "abort": true,
+            "events": [
+              "start",
+              "error"
+            ],
+            "stopReason": "aborted",
+            "resultIdentity": true,
+            "callbackIdentity": true
+          }
+        ]
+      }
+    },
+    {
+      "name": "Bun cached-main/lazy-import fake OpenAI/forwarding combination",
+      "mask": 5,
+      "sets": [
+        "patched",
+        "base",
+        "patched",
+        "base",
+        "base"
+      ],
+      "mode": "enabled",
+      "result": {
+        "status": "passed",
+        "mode": "enabled",
+        "mainSet": "patched",
+        "consistent": false,
+        "cachedMainUnchanged": true,
+        "networkAndProcessesBlocked": true,
+        "outcomes": [
+          {
+            "abort": false,
+            "events": [
+              "start",
+              "done"
+            ],
+            "stopReason": "stop",
+            "resultIdentity": true,
+            "callbackIdentity": true
+          },
+          {
+            "abort": true,
+            "events": [
+              "start",
+              "error"
+            ],
+            "stopReason": "aborted",
+            "resultIdentity": true,
+            "callbackIdentity": true
+          }
+        ]
+      }
+    },
+    {
+      "name": "Bun cached-main/lazy-import fake OpenAI/forwarding combination",
+      "mask": 6,
+      "sets": [
+        "base",
+        "patched",
+        "patched",
+        "base",
+        "base"
+      ],
+      "mode": "disabled",
+      "result": {
+        "status": "passed",
+        "mode": "disabled",
+        "mainSet": "base",
+        "consistent": false,
+        "cachedMainUnchanged": true,
+        "networkAndProcessesBlocked": true,
+        "outcomes": [
+          {
+            "abort": false,
+            "events": [
+              "start",
+              "done"
+            ],
+            "stopReason": "stop",
+            "resultIdentity": true,
+            "callbackIdentity": true
+          },
+          {
+            "abort": true,
+            "events": [
+              "start",
+              "error"
+            ],
+            "stopReason": "aborted",
+            "resultIdentity": true,
+            "callbackIdentity": true
+          }
+        ]
+      }
+    },
+    {
+      "name": "Bun cached-main/lazy-import fake OpenAI/forwarding combination",
+      "mask": 6,
+      "sets": [
+        "base",
+        "patched",
+        "patched",
+        "base",
+        "base"
+      ],
+      "mode": "enabled",
+      "result": {
+        "status": "passed",
+        "mode": "enabled",
+        "mainSet": "base",
+        "consistent": false,
+        "cachedMainUnchanged": true,
+        "networkAndProcessesBlocked": true,
+        "outcomes": [
+          {
+            "abort": false,
+            "events": [
+              "start",
+              "done"
+            ],
+            "stopReason": "stop",
+            "resultIdentity": true,
+            "callbackIdentity": true
+          },
+          {
+            "abort": true,
+            "events": [
+              "start",
+              "error"
+            ],
+            "stopReason": "aborted",
+            "resultIdentity": true,
+            "callbackIdentity": true
+          }
+        ]
+      }
+    },
+    {
+      "name": "Bun cached-main/lazy-import fake OpenAI/forwarding combination",
+      "mask": 7,
+      "sets": [
+        "patched",
+        "patched",
+        "patched",
+        "base",
+        "base"
+      ],
+      "mode": "disabled",
+      "result": {
+        "status": "passed",
+        "mode": "disabled",
+        "mainSet": "patched",
+        "consistent": false,
+        "cachedMainUnchanged": true,
+        "networkAndProcessesBlocked": true,
+        "outcomes": [
+          {
+            "abort": false,
+            "events": [
+              "start",
+              "done"
+            ],
+            "stopReason": "stop",
+            "resultIdentity": true,
+            "callbackIdentity": true
+          },
+          {
+            "abort": true,
+            "events": [
+              "start",
+              "error"
+            ],
+            "stopReason": "aborted",
+            "resultIdentity": true,
+            "callbackIdentity": true
+          }
+        ]
+      }
+    },
+    {
+      "name": "Bun cached-main/lazy-import fake OpenAI/forwarding combination",
+      "mask": 7,
+      "sets": [
+        "patched",
+        "patched",
+        "patched",
+        "base",
+        "base"
+      ],
+      "mode": "enabled",
+      "result": {
+        "status": "passed",
+        "mode": "enabled",
+        "mainSet": "patched",
+        "consistent": false,
+        "cachedMainUnchanged": true,
+        "networkAndProcessesBlocked": true,
+        "outcomes": [
+          {
+            "abort": false,
+            "events": [
+              "start",
+              "done"
+            ],
+            "stopReason": "stop",
+            "resultIdentity": true,
+            "callbackIdentity": true
+          },
+          {
+            "abort": true,
+            "events": [
+              "start",
+              "error"
+            ],
+            "stopReason": "aborted",
+            "resultIdentity": true,
+            "callbackIdentity": true
+          }
+        ]
+      }
+    },
+    {
+      "name": "Bun cached-main/lazy-import fake OpenAI/forwarding combination",
+      "mask": 8,
+      "sets": [
+        "base",
+        "base",
+        "base",
+        "patched",
+        "base"
+      ],
+      "mode": "disabled",
+      "result": {
+        "status": "passed",
+        "mode": "disabled",
+        "mainSet": "base",
+        "consistent": false,
+        "cachedMainUnchanged": true,
+        "networkAndProcessesBlocked": true,
+        "outcomes": [
+          {
+            "abort": false,
+            "events": [
+              "start",
+              "done"
+            ],
+            "stopReason": "stop",
+            "resultIdentity": true,
+            "callbackIdentity": true
+          },
+          {
+            "abort": true,
+            "events": [
+              "start",
+              "error"
+            ],
+            "stopReason": "aborted",
+            "resultIdentity": true,
+            "callbackIdentity": true
+          }
+        ]
+      }
+    },
+    {
+      "name": "Bun cached-main/lazy-import fake OpenAI/forwarding combination",
+      "mask": 8,
+      "sets": [
+        "base",
+        "base",
+        "base",
+        "patched",
+        "base"
+      ],
+      "mode": "enabled",
+      "result": {
+        "status": "passed",
+        "mode": "enabled",
+        "mainSet": "base",
+        "consistent": false,
+        "cachedMainUnchanged": true,
+        "networkAndProcessesBlocked": true,
+        "outcomes": [
+          {
+            "abort": false,
+            "events": [
+              "start",
+              "done"
+            ],
+            "stopReason": "stop",
+            "resultIdentity": true,
+            "callbackIdentity": true
+          },
+          {
+            "abort": true,
+            "events": [
+              "start",
+              "error"
+            ],
+            "stopReason": "aborted",
+            "resultIdentity": true,
+            "callbackIdentity": true
+          }
+        ]
+      }
+    },
+    {
+      "name": "Bun cached-main/lazy-import fake OpenAI/forwarding combination",
+      "mask": 9,
+      "sets": [
+        "patched",
+        "base",
+        "base",
+        "patched",
+        "base"
+      ],
+      "mode": "disabled",
+      "result": {
+        "status": "passed",
+        "mode": "disabled",
+        "mainSet": "patched",
+        "consistent": false,
+        "cachedMainUnchanged": true,
+        "networkAndProcessesBlocked": true,
+        "outcomes": [
+          {
+            "abort": false,
+            "events": [
+              "start",
+              "done"
+            ],
+            "stopReason": "stop",
+            "resultIdentity": true,
+            "callbackIdentity": true
+          },
+          {
+            "abort": true,
+            "events": [
+              "start",
+              "error"
+            ],
+            "stopReason": "aborted",
+            "resultIdentity": true,
+            "callbackIdentity": true
+          }
+        ]
+      }
+    },
+    {
+      "name": "Bun cached-main/lazy-import fake OpenAI/forwarding combination",
+      "mask": 9,
+      "sets": [
+        "patched",
+        "base",
+        "base",
+        "patched",
+        "base"
+      ],
+      "mode": "enabled",
+      "result": {
+        "status": "passed",
+        "mode": "enabled",
+        "mainSet": "patched",
+        "consistent": false,
+        "cachedMainUnchanged": true,
+        "networkAndProcessesBlocked": true,
+        "outcomes": [
+          {
+            "abort": false,
+            "events": [
+              "start",
+              "done"
+            ],
+            "stopReason": "stop",
+            "resultIdentity": true,
+            "callbackIdentity": true
+          },
+          {
+            "abort": true,
+            "events": [
+              "start",
+              "error"
+            ],
+            "stopReason": "aborted",
+            "resultIdentity": true,
+            "callbackIdentity": true
+          }
+        ]
+      }
+    },
+    {
+      "name": "Bun cached-main/lazy-import fake OpenAI/forwarding combination",
+      "mask": 10,
+      "sets": [
+        "base",
+        "patched",
+        "base",
+        "patched",
+        "base"
+      ],
+      "mode": "disabled",
+      "result": {
+        "status": "passed",
+        "mode": "disabled",
+        "mainSet": "base",
+        "consistent": false,
+        "cachedMainUnchanged": true,
+        "networkAndProcessesBlocked": true,
+        "outcomes": [
+          {
+            "abort": false,
+            "events": [
+              "start",
+              "done"
+            ],
+            "stopReason": "stop",
+            "resultIdentity": true,
+            "callbackIdentity": true
+          },
+          {
+            "abort": true,
+            "events": [
+              "start",
+              "error"
+            ],
+            "stopReason": "aborted",
+            "resultIdentity": true,
+            "callbackIdentity": true
+          }
+        ]
+      }
+    },
+    {
+      "name": "Bun cached-main/lazy-import fake OpenAI/forwarding combination",
+      "mask": 10,
+      "sets": [
+        "base",
+        "patched",
+        "base",
+        "patched",
+        "base"
+      ],
+      "mode": "enabled",
+      "result": {
+        "status": "passed",
+        "mode": "enabled",
+        "mainSet": "base",
+        "consistent": false,
+        "cachedMainUnchanged": true,
+        "networkAndProcessesBlocked": true,
+        "outcomes": [
+          {
+            "abort": false,
+            "events": [
+              "start",
+              "done"
+            ],
+            "stopReason": "stop",
+            "resultIdentity": true,
+            "callbackIdentity": true
+          },
+          {
+            "abort": true,
+            "events": [
+              "start",
+              "error"
+            ],
+            "stopReason": "aborted",
+            "resultIdentity": true,
+            "callbackIdentity": true
+          }
+        ]
+      }
+    },
+    {
+      "name": "Bun cached-main/lazy-import fake OpenAI/forwarding combination",
+      "mask": 11,
+      "sets": [
+        "patched",
+        "patched",
+        "base",
+        "patched",
+        "base"
+      ],
+      "mode": "disabled",
+      "result": {
+        "status": "passed",
+        "mode": "disabled",
+        "mainSet": "patched",
+        "consistent": false,
+        "cachedMainUnchanged": true,
+        "networkAndProcessesBlocked": true,
+        "outcomes": [
+          {
+            "abort": false,
+            "events": [
+              "start",
+              "done"
+            ],
+            "stopReason": "stop",
+            "resultIdentity": true,
+            "callbackIdentity": true
+          },
+          {
+            "abort": true,
+            "events": [
+              "start",
+              "error"
+            ],
+            "stopReason": "aborted",
+            "resultIdentity": true,
+            "callbackIdentity": true
+          }
+        ]
+      }
+    },
+    {
+      "name": "Bun cached-main/lazy-import fake OpenAI/forwarding combination",
+      "mask": 11,
+      "sets": [
+        "patched",
+        "patched",
+        "base",
+        "patched",
+        "base"
+      ],
+      "mode": "enabled",
+      "result": {
+        "status": "passed",
+        "mode": "enabled",
+        "mainSet": "patched",
+        "consistent": false,
+        "cachedMainUnchanged": true,
+        "networkAndProcessesBlocked": true,
+        "outcomes": [
+          {
+            "abort": false,
+            "events": [
+              "start",
+              "done"
+            ],
+            "stopReason": "stop",
+            "resultIdentity": true,
+            "callbackIdentity": true
+          },
+          {
+            "abort": true,
+            "events": [
+              "start",
+              "error"
+            ],
+            "stopReason": "aborted",
+            "resultIdentity": true,
+            "callbackIdentity": true
+          }
+        ]
+      }
+    },
+    {
+      "name": "Bun cached-main/lazy-import fake OpenAI/forwarding combination",
+      "mask": 12,
+      "sets": [
+        "base",
+        "base",
+        "patched",
+        "patched",
+        "base"
+      ],
+      "mode": "disabled",
+      "result": {
+        "status": "passed",
+        "mode": "disabled",
+        "mainSet": "base",
+        "consistent": false,
+        "cachedMainUnchanged": true,
+        "networkAndProcessesBlocked": true,
+        "outcomes": [
+          {
+            "abort": false,
+            "events": [
+              "start",
+              "done"
+            ],
+            "stopReason": "stop",
+            "resultIdentity": true,
+            "callbackIdentity": true
+          },
+          {
+            "abort": true,
+            "events": [
+              "start",
+              "error"
+            ],
+            "stopReason": "aborted",
+            "resultIdentity": true,
+            "callbackIdentity": true
+          }
+        ]
+      }
+    },
+    {
+      "name": "Bun cached-main/lazy-import fake OpenAI/forwarding combination",
+      "mask": 12,
+      "sets": [
+        "base",
+        "base",
+        "patched",
+        "patched",
+        "base"
+      ],
+      "mode": "enabled",
+      "result": {
+        "status": "passed",
+        "mode": "enabled",
+        "mainSet": "base",
+        "consistent": false,
+        "cachedMainUnchanged": true,
+        "networkAndProcessesBlocked": true,
+        "outcomes": [
+          {
+            "abort": false,
+            "events": [
+              "start",
+              "done"
+            ],
+            "stopReason": "stop",
+            "resultIdentity": true,
+            "callbackIdentity": true
+          },
+          {
+            "abort": true,
+            "events": [
+              "start",
+              "error"
+            ],
+            "stopReason": "aborted",
+            "resultIdentity": true,
+            "callbackIdentity": true
+          }
+        ]
+      }
+    },
+    {
+      "name": "Bun cached-main/lazy-import fake OpenAI/forwarding combination",
+      "mask": 13,
+      "sets": [
+        "patched",
+        "base",
+        "patched",
+        "patched",
+        "base"
+      ],
+      "mode": "disabled",
+      "result": {
+        "status": "passed",
+        "mode": "disabled",
+        "mainSet": "patched",
+        "consistent": false,
+        "cachedMainUnchanged": true,
+        "networkAndProcessesBlocked": true,
+        "outcomes": [
+          {
+            "abort": false,
+            "events": [
+              "start",
+              "done"
+            ],
+            "stopReason": "stop",
+            "resultIdentity": true,
+            "callbackIdentity": true
+          },
+          {
+            "abort": true,
+            "events": [
+              "start",
+              "error"
+            ],
+            "stopReason": "aborted",
+            "resultIdentity": true,
+            "callbackIdentity": true
+          }
+        ]
+      }
+    },
+    {
+      "name": "Bun cached-main/lazy-import fake OpenAI/forwarding combination",
+      "mask": 13,
+      "sets": [
+        "patched",
+        "base",
+        "patched",
+        "patched",
+        "base"
+      ],
+      "mode": "enabled",
+      "result": {
+        "status": "passed",
+        "mode": "enabled",
+        "mainSet": "patched",
+        "consistent": false,
+        "cachedMainUnchanged": true,
+        "networkAndProcessesBlocked": true,
+        "outcomes": [
+          {
+            "abort": false,
+            "events": [
+              "start",
+              "done"
+            ],
+            "stopReason": "stop",
+            "resultIdentity": true,
+            "callbackIdentity": true
+          },
+          {
+            "abort": true,
+            "events": [
+              "start",
+              "error"
+            ],
+            "stopReason": "aborted",
+            "resultIdentity": true,
+            "callbackIdentity": true
+          }
+        ]
+      }
+    },
+    {
+      "name": "Bun cached-main/lazy-import fake OpenAI/forwarding combination",
+      "mask": 14,
+      "sets": [
+        "base",
+        "patched",
+        "patched",
+        "patched",
+        "base"
+      ],
+      "mode": "disabled",
+      "result": {
+        "status": "passed",
+        "mode": "disabled",
+        "mainSet": "base",
+        "consistent": false,
+        "cachedMainUnchanged": true,
+        "networkAndProcessesBlocked": true,
+        "outcomes": [
+          {
+            "abort": false,
+            "events": [
+              "start",
+              "done"
+            ],
+            "stopReason": "stop",
+            "resultIdentity": true,
+            "callbackIdentity": true
+          },
+          {
+            "abort": true,
+            "events": [
+              "start",
+              "error"
+            ],
+            "stopReason": "aborted",
+            "resultIdentity": true,
+            "callbackIdentity": true
+          }
+        ]
+      }
+    },
+    {
+      "name": "Bun cached-main/lazy-import fake OpenAI/forwarding combination",
+      "mask": 14,
+      "sets": [
+        "base",
+        "patched",
+        "patched",
+        "patched",
+        "base"
+      ],
+      "mode": "enabled",
+      "result": {
+        "status": "passed",
+        "mode": "enabled",
+        "mainSet": "base",
+        "consistent": false,
+        "cachedMainUnchanged": true,
+        "networkAndProcessesBlocked": true,
+        "outcomes": [
+          {
+            "abort": false,
+            "events": [
+              "start",
+              "done"
+            ],
+            "stopReason": "stop",
+            "resultIdentity": true,
+            "callbackIdentity": true
+          },
+          {
+            "abort": true,
+            "events": [
+              "start",
+              "error"
+            ],
+            "stopReason": "aborted",
+            "resultIdentity": true,
+            "callbackIdentity": true
+          }
+        ]
+      }
+    },
+    {
+      "name": "Bun cached-main/lazy-import fake OpenAI/forwarding combination",
+      "mask": 15,
+      "sets": [
+        "patched",
+        "patched",
+        "patched",
+        "patched",
+        "base"
+      ],
+      "mode": "disabled",
+      "result": {
+        "status": "passed",
+        "mode": "disabled",
+        "mainSet": "patched",
+        "consistent": false,
+        "cachedMainUnchanged": true,
+        "networkAndProcessesBlocked": true,
+        "outcomes": [
+          {
+            "abort": false,
+            "events": [
+              "start",
+              "done"
+            ],
+            "stopReason": "stop",
+            "resultIdentity": true,
+            "callbackIdentity": true
+          },
+          {
+            "abort": true,
+            "events": [
+              "start",
+              "error"
+            ],
+            "stopReason": "aborted",
+            "resultIdentity": true,
+            "callbackIdentity": true
+          }
+        ]
+      }
+    },
+    {
+      "name": "Bun cached-main/lazy-import fake OpenAI/forwarding combination",
+      "mask": 15,
+      "sets": [
+        "patched",
+        "patched",
+        "patched",
+        "patched",
+        "base"
+      ],
+      "mode": "enabled",
+      "result": {
+        "status": "passed",
+        "mode": "enabled",
+        "mainSet": "patched",
+        "consistent": false,
+        "cachedMainUnchanged": true,
+        "networkAndProcessesBlocked": true,
+        "outcomes": [
+          {
+            "abort": false,
+            "events": [
+              "start",
+              "done"
+            ],
+            "stopReason": "stop",
+            "resultIdentity": true,
+            "callbackIdentity": true
+          },
+          {
+            "abort": true,
+            "events": [
+              "start",
+              "error"
+            ],
+            "stopReason": "aborted",
+            "resultIdentity": true,
+            "callbackIdentity": true
+          }
+        ]
+      }
+    },
+    {
+      "name": "Offline-6 install/repeat/rollback/repeat regression"
+    },
+    {
+      "name": "Known mixture and stale-success journal recover before separate installation",
+      "mask": 1
+    },
+    {
+      "name": "Known mixture and stale-success journal recover before separate installation",
+      "mask": 2
+    },
+    {
+      "name": "Known mixture and stale-success journal recover before separate installation",
+      "mask": 3
+    },
+    {
+      "name": "Known mixture and stale-success journal recover before separate installation",
+      "mask": 4
+    },
+    {
+      "name": "Known mixture and stale-success journal recover before separate installation",
+      "mask": 5
+    },
+    {
+      "name": "Known mixture and stale-success journal recover before separate installation",
+      "mask": 6
+    },
+    {
+      "name": "Known mixture and stale-success journal recover before separate installation",
+      "mask": 7
+    },
+    {
+      "name": "Known mixture and stale-success journal recover before separate installation",
+      "mask": 8
+    },
+    {
+      "name": "Known mixture and stale-success journal recover before separate installation",
+      "mask": 9
+    },
+    {
+      "name": "Known mixture and stale-success journal recover before separate installation",
+      "mask": 10
+    },
+    {
+      "name": "Known mixture and stale-success journal recover before separate installation",
+      "mask": 11
+    },
+    {
+      "name": "Known mixture and stale-success journal recover before separate installation",
+      "mask": 12
+    },
+    {
+      "name": "Known mixture and stale-success journal recover before separate installation",
+      "mask": 13
+    },
+    {
+      "name": "Known mixture and stale-success journal recover before separate installation",
+      "mask": 14
+    },
+    {
+      "name": "Between-write selector drift refuses unsafe recovery"
+    },
+    {
+      "name": "Between-write mapping drift refuses unsafe recovery"
+    },
+    {
+      "name": "Between-write readonly drift refuses unsafe recovery"
+    },
+    {
+      "name": "Between-write journal-link drift refuses unsafe recovery"
+    },
+    {
+      "name": "Consistent base provider-free OpenAI/forwarding smoke",
+      "mode": "disabled",
+      "result": {
+        "status": "passed",
+        "mode": "disabled",
+        "mainSet": "base",
+        "consistent": true,
+        "cachedMainUnchanged": true,
+        "networkAndProcessesBlocked": true,
+        "outcomes": [
+          {
+            "abort": false,
+            "events": [
+              "start",
+              "done"
+            ],
+            "stopReason": "stop",
+            "resultIdentity": true,
+            "callbackIdentity": true
+          },
+          {
+            "abort": true,
+            "events": [
+              "start",
+              "error"
+            ],
+            "stopReason": "aborted",
+            "resultIdentity": true,
+            "callbackIdentity": true
+          }
+        ]
+      }
+    },
+    {
+      "name": "Consistent base provider-free OpenAI/forwarding smoke",
+      "mode": "enabled",
+      "result": {
+        "status": "passed",
+        "mode": "enabled",
+        "mainSet": "base",
+        "consistent": true,
+        "cachedMainUnchanged": true,
+        "networkAndProcessesBlocked": true,
+        "outcomes": [
+          {
+            "abort": false,
+            "events": [
+              "start",
+              "done"
+            ],
+            "stopReason": "stop",
+            "resultIdentity": true,
+            "callbackIdentity": true
+          },
+          {
+            "abort": true,
+            "events": [
+              "start",
+              "error"
+            ],
+            "stopReason": "aborted",
+            "resultIdentity": true,
+            "callbackIdentity": true
+          }
+        ]
+      }
+    },
+    {
+      "name": "Consistent patched provider-free OpenAI/forwarding smoke",
+      "mode": "disabled",
+      "result": {
+        "status": "passed",
+        "mode": "disabled",
+        "mainSet": "patched",
+        "consistent": true,
+        "cachedMainUnchanged": true,
+        "networkAndProcessesBlocked": true,
+        "outcomes": [
+          {
+            "abort": false,
+            "events": [
+              "start",
+              "done"
+            ],
+            "stopReason": "stop",
+            "resultIdentity": true,
+            "callbackIdentity": true
+          },
+          {
+            "abort": true,
+            "events": [
+              "start",
+              "error"
+            ],
+            "stopReason": "aborted",
+            "resultIdentity": true,
+            "callbackIdentity": true
+          }
+        ]
+      }
+    },
+    {
+      "name": "Consistent patched provider-free OpenAI/forwarding smoke",
+      "mode": "enabled",
+      "result": {
+        "status": "passed",
+        "mode": "enabled",
+        "mainSet": "patched",
+        "consistent": true,
+        "cachedMainUnchanged": true,
+        "networkAndProcessesBlocked": true,
+        "outcomes": [
+          {
+            "abort": false,
+            "events": [
+              "start",
+              "done"
+            ],
+            "stopReason": "stop",
+            "resultIdentity": true,
+            "callbackIdentity": true
+          },
+          {
+            "abort": true,
+            "events": [
+              "start",
+              "error"
+            ],
+            "stopReason": "aborted",
+            "resultIdentity": true,
+            "callbackIdentity": true
+          }
+        ]
+      }
+    },
+    {
+      "name": "Consistent original provider-free OpenAI/forwarding smoke",
+      "mode": "disabled",
+      "result": {
+        "status": "passed",
+        "mode": "disabled",
+        "mainSet": "original",
+        "consistent": true,
+        "cachedMainUnchanged": true,
+        "networkAndProcessesBlocked": true,
+        "outcomes": [
+          {
+            "abort": false,
+            "events": [
+              "start",
+              "done"
+            ],
+            "stopReason": "stop",
+            "resultIdentity": true,
+            "callbackIdentity": true
+          },
+          {
+            "abort": true,
+            "events": [
+              "start",
+              "error"
+            ],
+            "stopReason": "aborted",
+            "resultIdentity": true,
+            "callbackIdentity": true
+          }
+        ]
+      }
+    },
+    {
+      "name": "Consistent original provider-free OpenAI/forwarding smoke",
+      "mode": "enabled",
+      "result": {
+        "status": "passed",
+        "mode": "enabled",
+        "mainSet": "original",
+        "consistent": true,
+        "cachedMainUnchanged": true,
+        "networkAndProcessesBlocked": true,
+        "outcomes": [
+          {
+            "abort": false,
+            "events": [
+              "start",
+              "done"
+            ],
+            "stopReason": "stop",
+            "resultIdentity": true,
+            "callbackIdentity": true
+          },
+          {
+            "abort": true,
+            "events": [
+              "start",
+              "error"
+            ],
+            "stopReason": "aborted",
+            "resultIdentity": true,
+            "callbackIdentity": true
+          }
+        ]
+      }
+    }
+  ],
+  "t3EvidenceHash": "35ffd78307b6510304e300168b1aad495f810c5706ee8a1b34b6b85607f89afb",
+  "reusedKitHashes": {
+    "check-awaits.mjs": "490256f8186268fea9eac7441e47ac0eaee98c1e7000fe8b893869e9968ee3fc",
+    "awaits.mjs": "6003b9c8a3d16b2443bd6949877e0e984836142c8f71a255efbe3ff44c6d4524",
+    "check-await-runtime.mjs": "38d0eed9112bbcd38b314305504e84b47283765fb267abc6c81c677917a74e42",
+    "check-await-boundaries.mjs": "188419ea56b1d593052b0d5c198ba656c24b9944385516169bf45aa46d7f995b",
+    "check-await-cost.mjs": "eab8d0629fcb133bcd3d741e0501ab1e03b0f0c0137f1bd243930609e29c888c",
+    "stage.mjs": "37aa6a72cea8726c66f5ae37bcb45eab5b84e1e683356ac8a6c9922528d3726f",
+    "logger.mjs": "bb82a426532a67f3cc6744c2d621984036ce1ef35622f30325f21e04f8de92dd",
+    "smoke.mjs": "3e7d4dec673978d1cc211d0a6c18d5e5e116b42cd7d17eb1b4d0466a10c46587"
+  },
+  "missing": [],
+  "fixture": "C:\\Users\\WINDOWS\\AppData\\Local\\Temp\\pi-stall-pair-bIyDgt",
+  "manifest": {
+    "revision": "offline-7-awaits",
+    "activationAllowed": false,
+    "root": "C:\\Users\\WINDOWS\\AppData\\Local\\Temp\\pi-stall-pair-bIyDgt\\fixture",
+    "version": "0.87.1",
+    "entryHash": "e79626f2dd6f94aa45d30f3fa63cd84319a6eefcd150b353cfaf274366926774",
+    "runtimeHash": "9ca136a7caa977d936aa789d7448a3dfb17851677ff5ac8c0dbcf23c31a02142",
+    "sourceGuards": [
+      {
+        "target": "C:\\Users\\WINDOWS\\AppData\\Local\\Temp\\pi-stall-pair-bIyDgt\\fixture\\dist\\bundle\\chunks\\chunk-WIUZI2CJ.js",
+        "sha256": "a85d542043c502be8f1c204929762774b5373fae0f3a21b918bf2df151a1edb8"
+      },
+      {
+        "target": "C:\\Users\\WINDOWS\\AppData\\Local\\Temp\\pi-stall-pair-bIyDgt\\fixture\\dist\\bundle\\chunks\\chunk-A3JYRWB6.js",
+        "sha256": "39a18bfbaf6a8edd098844da7988e1ff4a5551520e47c4aacbfc95e7c669a843"
+      }
+    ],
+    "targets": [
+      {
+        "target": "C:\\Users\\WINDOWS\\AppData\\Local\\Temp\\pi-stall-pair-bIyDgt\\fixture\\dist\\bundle\\chunks\\chunk-OJP47DM6.js",
+        "originalHash": "81c81a21ec81e84200205f561687408ff5e3738fbbbb3c2a6c186b348d376020",
+        "baseHash": "b1c6995246bb393df5fda23dc3a286f7d8f26814a09fc2aa140760ba78207d3c",
+        "patchedHash": "ded16555bcb4f06e7a5c4feabbfadac044abb89a86ab866a2617d74eaaec54d7",
+        "backup": "C:\\Users\\WINDOWS\\AppData\\Local\\Temp\\pi-stall-pair-bIyDgt\\stage\\chunk-OJP47DM6.js.original",
+        "staged": "C:\\Users\\WINDOWS\\AppData\\Local\\Temp\\pi-stall-pair-bIyDgt\\stage\\chunk-OJP47DM6.js.mjs",
+        "selectors": [
+          {
+            "excerpt": "let __sdTerminal=false;const __sdOp=__sd.next();",
+            "sha256": "5f0e60c26de4b4a89393bb4aa4c01b56c502b3be8f314d24007b86e708cff879"
+          },
+          {
+            "excerpt": "__sd.emit(\"assistant.exit\",__sdOp)",
+            "sha256": "7f29887786de1da36335ad39e1659ae9725586cdab1defed2cefa93c5b8e1b84"
+          },
+          {
+            "excerpt": "response=(__sd.emit(\"provider.request\",__sdOp),await",
+            "sha256": "9893859104e2a3530b01889eddf3e9dce250c3c65750ab4a638798c03056f5b4"
+          },
+          {
+            "excerpt": "partialMessage=null,addedPartial=!1;for await(let event of response)switch(event.type)",
+            "sha256": "669353bde66528b154b5780c5e38a09161f195b4bd42cb7ec487d5c3a88260bc"
+          },
+          {
+            "excerpt": "finalMessage2}}let finalMessage=await response.result();",
+            "sha256": "dc89d3b97549db11972fd7cefebcfc64ae58868fa36a8f5d95142dc64aac804d"
+          },
+          {
+            "excerpt": "let finalMessage2=await response.result();",
+            "sha256": "dc8029eb536cc7e9d4f761acc05a4423d9a79320c4eb5cc2ed9cccdc1a7a9b9f"
+          },
+          {
+            "excerpt": "async emit(event){let ctx=this.createContext(),result;for(let{ext:ext2,handlers}of snapshotEventHandlers(this.extensions,event.type))for(let handler of handlers)try{let handlerResult=await handler(event,ctx);if(this.isSessionBeforeEvent(event)&&handlerResult&&(result=handlerResult,result.cancel))return result}catch(err2){let message=err2 instanceof Error?err2.message:String(err2),stack=err2 instanceof Error?err2.stack:void 0;this.emitError({extensionPath:ext2.path,event:event.type,error:message,stack})}return result}",
+            "sha256": "eb511c7667816c104ee836a31cc8b2b137a631050133a326ef7037501023a1ee"
+          },
+          {
+            "excerpt": "abort(){return __sd.scope(__sd.owner(this.sessionManager?.sessionId),async()=>{const __sdOp=__sd.next();__sd.emit(\"abort.enter\",__sdOp);try{this._isAgentRunActive&&(this._agentRunAbortRequested=!0),this.abortRetry(),this.abortCompaction(),this.abortBranchSummary(),this._isBeforeSettle&&(this._abortDuringBeforeSettle=!0),this.agent.abort(),await this.waitForIdle()}catch(__sdError){__sd.emit(\"abort.error\",__sdOp);throw __sdError}finally{__sd.emit(\"abort.exit\",__sdOp)}})}",
+            "sha256": "b7715052f479f370b9d018351c20f2dfcda8dc39f070ed67683fcccf4801b9bc"
+          },
+          {
+            "excerpt": "abort(){this.activeRun?.abortController.abort()}",
+            "sha256": "a65036fe5591836c034589de0407c57d2f20b998efbcef83d7c5d6a8eca7b47b"
+          },
+          {
+            "excerpt": "return {emit(){},id(){}",
+            "sha256": "bbd44d6aef0d719a891e3ff965988c7f67c26c9dbb8ce2e0ef5780d0875c3ae5"
+          }
+        ],
+        "baseline": "C:\\Users\\WINDOWS\\AppData\\Local\\Temp\\pi-stall-pair-bIyDgt\\stage\\chunk-OJP47DM6.js.baseline"
+      },
+      {
+        "target": "C:\\Users\\WINDOWS\\AppData\\Local\\Temp\\pi-stall-pair-bIyDgt\\fixture\\dist\\bundle\\chunks\\openai-responses-HWEUZ6WZ.js",
+        "originalHash": "4ebfa8cec003119c431c92b8306f28f5b9359bde82e213bc8afa6ed764d5bde8",
+        "baseHash": "4ebfa8cec003119c431c92b8306f28f5b9359bde82e213bc8afa6ed764d5bde8",
+        "patchedHash": "464a0fe16527006e378ceaeb19a221bfed39923d457c56e0b8ce8ea26c4ff454",
+        "backup": "C:\\Users\\WINDOWS\\AppData\\Local\\Temp\\pi-stall-pair-bIyDgt\\stage\\openai-responses-HWEUZ6WZ.js.original",
+        "staged": "C:\\Users\\WINDOWS\\AppData\\Local\\Temp\\pi-stall-pair-bIyDgt\\stage\\openai-responses-HWEUZ6WZ.js.mjs",
+        "selectors": [
+          {
+            "excerpt": "return(async()=>{let output=",
+            "sha256": "46e60d76bec4ff42d0b9208fa7bc081d639ee8200f60579cf80e4f67f54777bb"
+          },
+          {
+            "excerpt": "if(await options?.onResponse?.(",
+            "sha256": "db4e37e7539b0889a13027d69f536cfa558c8580cdfc1daf60c3748a69406ef3"
+          },
+          {
+            "excerpt": "},model),stream2.push({type:\"start\"",
+            "sha256": "a5f448efd915061c0b77522f68a2fe40a48634b3789dc1caf0b5bce15ea0ee23"
+          },
+          {
+            "excerpt": "await processResponsesStream(",
+            "sha256": "afad7722fbce135202a7fa049cdeaddab2342769493380bc8fcc65aaaa9f1de5"
+          },
+          {
+            "excerpt": "),options?.signal?.aborted)",
+            "sha256": "0237fbd2b5d78db26f4ba843771105ada2b6fed1b85cbc6e8b61ec88b5387ff3"
+          },
+          {
+            "excerpt": "stream2.push({type:\"done\"",
+            "sha256": "c8682710918e551f43edc6dd0647c538d4dfef06e123a431353a60c6083e21cb"
+          },
+          {
+            "excerpt": "catch(error){for(let block",
+            "sha256": "90427c9a866e9a330cee8e84713af4e9dedba2b989e2b428e17ab37ae995b32d"
+          },
+          {
+            "excerpt": "stream2.push({type:\"error\"",
+            "sha256": "b6a7892fbb35492ac4638fa410b9075ef84f02de54ce6b8a06305c88d9439461"
+          }
+        ],
+        "baseline": "C:\\Users\\WINDOWS\\AppData\\Local\\Temp\\pi-stall-pair-bIyDgt\\stage\\openai-responses-HWEUZ6WZ.js.baseline"
+      },
+      {
+        "target": "C:\\Users\\WINDOWS\\AppData\\Local\\Temp\\pi-stall-pair-bIyDgt\\fixture\\dist\\bundle\\chunks\\chunk-NUHFSC37.js",
+        "originalHash": "9b724435ac1da15eaa4465e7eaca0aa9a23617c6f1efa7b6261db6d17dbe755b",
+        "baseHash": "9b724435ac1da15eaa4465e7eaca0aa9a23617c6f1efa7b6261db6d17dbe755b",
+        "patchedHash": "6ff38d5389f66b75728d9bf38e7c0d12e51e9766f056c7e8cca771527562ea4a",
+        "backup": "C:\\Users\\WINDOWS\\AppData\\Local\\Temp\\pi-stall-pair-bIyDgt\\stage\\chunk-NUHFSC37.js.original",
+        "staged": "C:\\Users\\WINDOWS\\AppData\\Local\\Temp\\pi-stall-pair-bIyDgt\\stage\\chunk-NUHFSC37.js.mjs",
+        "selectors": [
+          {
+            "excerpt": "static fromSSEResponse(response,controller,client,synthesizeEventData){let consumed=",
+            "sha256": "5965f0c85cbdc6ca531d349a1aa0e5791ffa6fed2124075dbd09e6a607da5cc8"
+          },
+          {
+            "excerpt": "if(sse.data.startsWith(\"[DONE]\")){done=!0;",
+            "sha256": "1c3482b2cbe53a6f27b4bd814e121398330a76b3ddf2cfee8cf12aac0a3e41c4"
+          },
+          {
+            "excerpt": "if(data&&data.error)throw",
+            "sha256": "039a1093262225e52f80ebd3ad9277c837517b7f10ee8b3d58ec151eead3d442"
+          },
+          {
+            "excerpt": "async function*iterSSEChunks(iterator){let data=new Uint8Array;for await(let chunk of iterator){",
+            "sha256": "032f7b0d97369a53a03b049af989e5de3759a3cf53c4043630b5f52632e32795"
+          },
+          {
+            "excerpt": "data.length>0&&(yield data)}var SSEDecoder=",
+            "sha256": "71de7fc1ee097aa60ebe7834266e41ac64d58a5a1e6cbc7a59615ca1263bf7b7"
+          }
+        ],
+        "baseline": "C:\\Users\\WINDOWS\\AppData\\Local\\Temp\\pi-stall-pair-bIyDgt\\stage\\chunk-NUHFSC37.js.baseline"
+      },
+      {
+        "target": "C:\\Users\\WINDOWS\\AppData\\Local\\Temp\\pi-stall-pair-bIyDgt\\fixture\\dist\\bundle\\chunks\\chunk-RCZIEVGO.js",
+        "originalHash": "7b2c0b36b01c1cedb11e7ab525a3fade0967f56b0cbd286fc32ffa25f5965055",
+        "baseHash": "7b2c0b36b01c1cedb11e7ab525a3fade0967f56b0cbd286fc32ffa25f5965055",
+        "patchedHash": "7c0c2febc280d5c0f3e38b2f542d72ed312053825ec66cad6f0ed8cde9c71e18",
+        "backup": "C:\\Users\\WINDOWS\\AppData\\Local\\Temp\\pi-stall-pair-bIyDgt\\stage\\chunk-RCZIEVGO.js.original",
+        "staged": "C:\\Users\\WINDOWS\\AppData\\Local\\Temp\\pi-stall-pair-bIyDgt\\stage\\chunk-RCZIEVGO.js.mjs",
+        "selectors": [
+          {
+            "excerpt": "async function forwardStream(target,source){for await(let event of source)target.push(event);target.end(hasResult(source)?await source.result():void 0)}",
+            "sha256": "bc4d564b06a782a853821803e9f699c282d1961bbfa0117eeefe46c3be4c52ca"
+          },
+          {
+            "excerpt": "function lazyStream(model,setup){let outer=new AssistantMessageEventStream;return setup().then(inner=>forwardStream(outer,inner)).catch(error=>{",
+            "sha256": "2c74795cd9a4bfaca3b96a4e7cc82ff9657ca39e86a2242e47642942be211dc0"
+          }
+        ],
+        "baseline": "C:\\Users\\WINDOWS\\AppData\\Local\\Temp\\pi-stall-pair-bIyDgt\\stage\\chunk-RCZIEVGO.js.baseline"
+      },
+      {
+        "target": "C:\\Users\\WINDOWS\\AppData\\Local\\Temp\\pi-stall-pair-bIyDgt\\fixture\\dist\\bundle\\chunks\\chunk-FUXEF6JQ.js",
+        "originalHash": "b7d0697d0f4c7d3b54c6aee545d3b27c5981c27d0470e1c79876898f28f2c472",
+        "baseHash": "32b6ff866b6a64fc2613fa12474f7ada5ca1483a362d0be7680735bdaedc1200",
+        "patchedHash": "32b6ff866b6a64fc2613fa12474f7ada5ca1483a362d0be7680735bdaedc1200",
+        "backup": "C:\\Users\\WINDOWS\\AppData\\Local\\Temp\\pi-stall-pair-bIyDgt\\stage\\chunk-FUXEF6JQ.js.original",
+        "staged": "C:\\Users\\WINDOWS\\AppData\\Local\\Temp\\pi-stall-pair-bIyDgt\\stage\\chunk-FUXEF6JQ.js.mjs",
+        "selectors": [
+          {
+            "selector": "response=this.apiClient.requestStream({path:path2,queryParams,body:JSON.stringify(body),httpMethod:\"POST\",httpOptions:(_a2=params.config)===null||_a2===void 0?void 0:_a2.httpOptions,abortSignal:(_b=params.config)===null||_b===void 0?void 0:_b.abortSignal})",
+            "sha256": "31eb29154c66d14d0d01c774ee25b31697c5f153b0d814b8a15939212ac791f7"
+          },
+          {
+            "selector": "response=this.apiClient.requestStream({path:path2,queryParams,body:JSON.stringify(body),httpMethod:\"POST\",httpOptions:(_c=params.config)===null||_c===void 0?void 0:_c.httpOptions,abortSignal:(_d=params.config)===null||_d===void 0?void 0:_d.abortSignal})",
+            "sha256": "e152a7e887d336ed56864aa719e2ba239306f1c2539631379250c46736fc4579"
+          },
+          {
+            "selector": "async requestStream(request){",
+            "sha256": "1ed62caf62ae737b63e5cf055e2fd4ba9975f707fad2f913309d35a8f12fd8d8"
+          },
+          {
+            "selector": "this.streamApiCall(url,requestInit,request.httpMethod,patchedHttpOptions.retryOptions,patchedHttpOptions.timeout,request.abortSignal)",
+            "sha256": "138ce916be3d9ae9c4722728ad7ff664f3c79e3483cd82c635e0a6b57a96cef8"
+          },
+          {
+            "selector": "async streamApiCall(url,requestInit,httpMethod,retryOptions,timeout,abortSignal){return this.apiCall(url.toString(),Object.assign(Object.assign({},requestInit),{method:httpMethod}),retryOptions,timeout,abortSignal).then(async response=>(await throwErrorIfNotOK(response),this.processStreamResponse(response))).catch(e=>{throw e instanceof Error?e:new Error(`exception ${e} sending request`,{cause:e})})}",
+            "sha256": "11a6a8c19007831fb54c91ec089642dd64815acf03d4df04c20c47067a722e56"
+          },
+          {
+            "selector": "async apiCall(url,requestInit,retryOptions,timeout,abortSignal){",
+            "sha256": "e92994cb5312874d391ac42e78f4c67f3513d4cc676cf12465f8891fc1495fe6"
+          },
+          {
+            "selector": "runFetch=async()=>{let attempt=createAttemptSignal(timeout,abortSignal),response;try{response=await fetch(url,Object.assign(Object.assign({},requestInit),{signal:attempt.signal}))}catch(e){throw attempt.dispose(),e}",
+            "sha256": "422d27b8fa79bfa947a7b0eb601558008498af468b7a172f9b8b99cf9ffe81fa"
+          }
+        ],
+        "baseline": "C:\\Users\\WINDOWS\\AppData\\Local\\Temp\\pi-stall-pair-bIyDgt\\stage\\chunk-FUXEF6JQ.js.baseline"
+      }
+    ]
+  },
+  "activationRequirements": [
+    "Separately selected activation; no live operation executed by acceptance",
+    "Fresh canonical source/version/runtime/import and all-five material/hash guards",
+    "New recovery directory preserving pristine and baseline bytes",
+    "Bun 1.4.0 compatible runtime and hash-matching offline acceptance",
+    "Consistent-set isolated provider-free smoke after real installation"
+  ],
+  "limitations": [
+    "Voluntary worker exit tests are not power-loss durability proof",
+    "The five replacements are serialized, not atomic",
+    "Mixed revisions provide partial diagnostic coverage; existing incident processes gain no claimed probes",
+    "Live prepare/install/rollback dispatch remains unexecuted; only disposable replacement was tested"
+  ],
+  "readSourceUnchanged": true,
+  "recoveryUnchanged": true,
+  "mappingUnchanged": true,
+  "kitHashes": {
+    "install.mjs": "aa24b8113684c40dd5028e43fbbddfb87d59bd05785f48a00d4e48cd4a5e5b4c",
+    "activate.mjs": "ecab03ecefbc66af2a062847607ccfbf54f1419d761d769f5c585ee9652d4240",
+    "check-await-install.mjs": "bf6fe2c3d5a64069a5e6f474fe3137d3c1bb129901b117bb8f85f490104bff7f",
+    "check-await-mixed.mjs": "941fbb618c0b47ba2148460697bc0242f9ad44b205c1673700d1e390f5fc7046"
+  },
+  "incidentProcess": {
+    "before": {
+      "pid": 265264,
+      "available": false,
+      "startTime": null
+    },
+    "after": {
+      "pid": 265264,
+      "available": false,
+      "startTime": null
+    },
+    "limitation": "Read-only identity observation. An absent PID cannot be claimed preserved. No process termination, debugger attachment, inspector change or session operation is performed."
+  }
+}

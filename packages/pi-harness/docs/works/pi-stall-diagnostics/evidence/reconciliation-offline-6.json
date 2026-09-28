@@ -1,0 +1,158 @@
+{
+  "status": "passed",
+  "revision": "offline-6-google",
+  "activationAllowed": false,
+  "t1GComplete": true,
+  "t1Complete": false,
+  "sourceHashes": {
+    "check-correlation.mjs": "1b8e5b847ef5f57cf9ea62f08343d578f8881490b6bb61004c06ac52a78dccb2",
+    "check-google.mjs": "b49fb6ae067c7243ca9240b4bf9b28599a53052e063e24c37994be11d16dc783",
+    "check-stage.mjs": "ec7f55ebdf11cfe4a90643c545a5669c3726fc507c5417c3aaa525c24e24a895",
+    "check-turns.mjs": "19da01dcf1a5358e71fe93d46cce97c1fd93cf7866af3e5ad7634e9153395f01",
+    "check.mjs": "7f32a59bc3c228af0f570622d02d5383e7c2bf3604fd4b80e38b798f564c1928",
+    "install.mjs": "c1123d18a7a01c1355701ef2973980c4859ce98916ccbdbc86b69d0b3e833243",
+    "logger.mjs": "bb82a426532a67f3cc6744c2d621984036ce1ef35622f30325f21e04f8de92dd",
+    "stage.mjs": "37aa6a72cea8726c66f5ae37bcb45eab5b84e1e683356ac8a6c9922528d3726f"
+  },
+  "evidenceHashes": {
+    "google-offline-6.json": "ef5513a77cc5a8333f97544e85dd9e1529ec0917c5a80c0ab25d74fd5aed08b8",
+    "correlation-offline-6.json": "d3365bd4dbeae718ed9ddbd8e993eda2dbd07cfa3af8b4c5026fd6067e38e8db",
+    "staging-offline-6.json": "0b84d23f997723499fac612efde8f46c11a4496bdc58df41ca6ac4d0a35da498",
+    "turns-offline-6.json": "5aae543140c26ad5b9dace44de688d2bd35fb7ff9219772a762f2181266abb53"
+  },
+  "historicalEvidenceHashes": {
+    "google-http-0.87.1.json": "d374863c3f32afd3dbf466b6d7748f19f05b135e8fdb38dbe35e3c83820159b2",
+    "correlation-0.87.1.json": "ca26ca64522dcf6491fed56663213bde142f3729c13a7e992b24a3de9a2bc06a",
+    "runtime-0.87.1.json": "f1e1b5e270ce27caedbe2ef4a9718be0d9623dda678ee4e8a3453b1b8cb08754",
+    "staging-0.87.1.json": "1f66816c95df2c4cd1d3c64dbe597ab5060fe23e0cf98844a297cc519651fd5a",
+    "turns-0.87.1.json": "0aa38195aac978628eaeafd661db340c99d35269205fe46fddead2135abe3bc3",
+    "readiness-0.87.1.md": "bf294d7af868d35725fd508c59036567362c0b31442f8949c1157d183f1187a6",
+    "reconciliation-0.87.1.json": "94feb5cd63e94510ad340cbf57729828c3aca6e003c87199189ff4aff21206d4"
+  },
+  "targets": [
+    {
+      "target": "D:\\Applications\\Scoop\\apps\\pi-coding-agent-bun\\0.87.1\\node_modules\\@earendil-works\\pi-coding-agent\\dist\\bundle\\chunks\\chunk-OJP47DM6.js",
+      "originalHash": "81c81a21ec81e84200205f561687408ff5e3738fbbbb3c2a6c186b348d376020",
+      "patchedHash": "b1c6995246bb393df5fda23dc3a286f7d8f26814a09fc2aa140760ba78207d3c",
+      "backup": "C:\\Users\\WINDOWS\\AppData\\Local\\Temp\\pi-google-OL3Ye4\\original.js",
+      "staged": "C:\\Users\\WINDOWS\\AppData\\Local\\Temp\\pi-google-OL3Ye4\\patched.mjs",
+      "boundaries": [
+        {
+          "start": "async function runAgentLoop(",
+          "end": "async function runAgentLoopContinue(",
+          "sha256": "cb29a892dc35a50cc9ffd3023f9fa07b3a000f14ede23f18b04a9ba12543b5e1"
+        },
+        {
+          "start": "async function runAgentLoopContinue(",
+          "end": "function createAgentStream(",
+          "sha256": "8f52f97e91bae494cae3080497e650abcb1da91026ccf0cfe633a47c5ce07e74"
+        },
+        {
+          "start": "async function runLoop(initialContext,",
+          "end": "function declareToolChanges(",
+          "sha256": "6c5c345f969b2c4f6d540045b3f14cfeaa110322ba126936cb1c1288b6107dff"
+        },
+        {
+          "start": "async function streamAssistantResponse(",
+          "end": "async function failToolCallsFromTruncatedMessage(",
+          "sha256": "eca7a776e638712886a77cae8e72bc4c8cd3f68e77ba1b18a608a3232a31d2f2"
+        },
+        {
+          "start": "async emitMessageEnd(event){",
+          "end": "async emitToolResult(",
+          "sha256": "ac8d63b8d510b2f91e0628aaa2891ece1da8811c0d346e4698565ea9e3cbaa78"
+        },
+        {
+          "start": "appendMessage(message){",
+          "end": "appendThinkingLevelChange(thinkingLevel){",
+          "sha256": "3ff98ffa61a4036769028c4e0c0dd3bbe81a8da47d7a02128e7293a437814551"
+        },
+        {
+          "start": "async emitToolCall(event){",
+          "end": "async emitUserBash(event){",
+          "sha256": "2de35120f22a21a256f351bbf706afd2fe9df8feccd0079a05cadb535bfdc47c"
+        },
+        {
+          "start": "async function executePreparedToolCall(",
+          "end": "async function finalizeExecutedToolCall(",
+          "sha256": "d0d7117b03a98e66213b4ab74726ec8ea55a407fe0ddcc6943ab4a87c4177835"
+        },
+        {
+          "start": "async abort(){this._isAgentRunActive",
+          "end": "async waitForIdle(){this.isIdle",
+          "sha256": "1ed1e083602bda0076301dba5e6b115ba240d8f9fc15197b435df18851c70e7b"
+        }
+      ]
+    },
+    {
+      "target": "D:\\Applications\\Scoop\\apps\\pi-coding-agent-bun\\0.87.1\\node_modules\\@earendil-works\\pi-coding-agent\\dist\\bundle\\chunks\\chunk-FUXEF6JQ.js",
+      "originalHash": "b7d0697d0f4c7d3b54c6aee545d3b27c5981c27d0470e1c79876898f28f2c472",
+      "patchedHash": "32b6ff866b6a64fc2613fa12474f7ada5ca1483a362d0be7680735bdaedc1200",
+      "backup": "C:\\Users\\WINDOWS\\AppData\\Local\\Temp\\pi-google-OL3Ye4\\google-original.js",
+      "staged": "C:\\Users\\WINDOWS\\AppData\\Local\\Temp\\pi-google-OL3Ye4\\google-patched.mjs",
+      "boundaries": [
+        {
+          "selector": "response=this.apiClient.requestStream({path:path2,queryParams,body:JSON.stringify(body),httpMethod:\"POST\",httpOptions:(_a2=params.config)===null||_a2===void 0?void 0:_a2.httpOptions,abortSignal:(_b=params.config)===null||_b===void 0?void 0:_b.abortSignal})",
+          "sha256": "31eb29154c66d14d0d01c774ee25b31697c5f153b0d814b8a15939212ac791f7"
+        },
+        {
+          "selector": "response=this.apiClient.requestStream({path:path2,queryParams,body:JSON.stringify(body),httpMethod:\"POST\",httpOptions:(_c=params.config)===null||_c===void 0?void 0:_c.httpOptions,abortSignal:(_d=params.config)===null||_d===void 0?void 0:_d.abortSignal})",
+          "sha256": "e152a7e887d336ed56864aa719e2ba239306f1c2539631379250c46736fc4579"
+        },
+        {
+          "selector": "async requestStream(request){",
+          "sha256": "1ed62caf62ae737b63e5cf055e2fd4ba9975f707fad2f913309d35a8f12fd8d8"
+        },
+        {
+          "selector": "this.streamApiCall(url,requestInit,request.httpMethod,patchedHttpOptions.retryOptions,patchedHttpOptions.timeout,request.abortSignal)",
+          "sha256": "138ce916be3d9ae9c4722728ad7ff664f3c79e3483cd82c635e0a6b57a96cef8"
+        },
+        {
+          "selector": "async streamApiCall(url,requestInit,httpMethod,retryOptions,timeout,abortSignal){return this.apiCall(url.toString(),Object.assign(Object.assign({},requestInit),{method:httpMethod}),retryOptions,timeout,abortSignal).then(async response=>(await throwErrorIfNotOK(response),this.processStreamResponse(response))).catch(e=>{throw e instanceof Error?e:new Error(`exception ${e} sending request`,{cause:e})})}",
+          "sha256": "11a6a8c19007831fb54c91ec089642dd64815acf03d4df04c20c47067a722e56"
+        },
+        {
+          "selector": "async apiCall(url,requestInit,retryOptions,timeout,abortSignal){",
+          "sha256": "e92994cb5312874d391ac42e78f4c67f3513d4cc676cf12465f8891fc1495fe6"
+        },
+        {
+          "selector": "runFetch=async()=>{let attempt=createAttemptSignal(timeout,abortSignal),response;try{response=await fetch(url,Object.assign(Object.assign({},requestInit),{signal:attempt.signal}))}catch(e){throw attempt.dispose(),e}",
+          "sha256": "422d27b8fa79bfa947a7b0eb601558008498af468b7a172f9b8b99cf9ffe81fa"
+        }
+      ]
+    }
+  ],
+  "eligibility": [
+    {
+      "file": "dist/bundle/chunks/chunk-OJP47DM6.js",
+      "excerpt": "[\"google-generative-ai\",googleGenerativeAIApi()],[\"google-vertex\",googleVertexApi()]",
+      "sha256": "6ad974697f937939bde83b183892bfeb8c832677f536ccdae1e90c84f3bcb394"
+    },
+    {
+      "file": "dist/bundle/chunks/chunk-OJP47DM6.js",
+      "excerpt": "function getBuiltinProviderForModel(model){if(getApiProvider(model.api)!==builtinApiProviderInstances.get(model.api))return;let provider=compatModels.getProvider(model.provider);return provider?.getModels().some(candidate=>candidate.api===model.api)?provider:void 0}",
+      "sha256": "e76d54cf3f9aa17cdbd9cfe5f92fd6b690bdfd69a1bd2a1e3a6f1bed7af82887"
+    },
+    {
+      "file": "dist/bundle/chunks/chunk-OJP47DM6.js",
+      "excerpt": "function stream(model,context,options){let transcript=normalizeContext(context),builtinProvider=getBuiltinProviderForModel(model);return builtinProvider?model.provider.startsWith(\"cloudflare-\")&&!hasResolvedCloudflareAuth(options)?compatModels.stream(model,transcript,options):builtinProvider.stream(model,transcript,withEnvApiKey(model,options)):resolveApiProvider(model.api).stream(model,transcript,withEnvApiKey(model,options))}",
+      "sha256": "1a7c14fdfa40cb3e7116930c5c2514728d3210407c5dc4b620ff587f55eaabf2"
+    }
+  ],
+  "verification": [
+    "All eight kit modules parse",
+    "Current Google/correlation/benchmark source hashes match passing evidence",
+    "All four current evidence files agree on staged hashes and disabled activation",
+    "Exact installed main/SDK/adapter/entry/runtime guards revalidated",
+    "Current pair backups and stages rehashed",
+    "Additional eligibility selectors unique",
+    "Historical correlation evidence hash retained",
+    "Markdown links and explicit source/document trailing-whitespace checks passed",
+    "git diff --check passed"
+  ],
+  "limits": [
+    "No paired installer recovery or real-target inactivity proof",
+    "No real provider requests, installed mutation, process interruption or user-session changes",
+    "Synthetic cost and extracted-boundary correctness only; full adapter/SDK runtime dependencies remain fake"
+  ]
+}

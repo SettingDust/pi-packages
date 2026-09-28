@@ -1,0 +1,142 @@
+{
+  "observedAt": "2026-09-23T20:13:57.216Z",
+  "root": "D:\\Applications\\Scoop\\apps\\pi-coding-agent-bun\\0.87.1\\node_modules\\@earendil-works\\pi-coding-agent",
+  "states": [
+    {
+      "file": "chunk-OJP47DM6.js",
+      "hash": "81c81a21ec81e84200205f561687408ff5e3738fbbbb3c2a6c186b348d376020",
+      "state": "original"
+    },
+    {
+      "file": "chunk-FUXEF6JQ.js",
+      "hash": "b7d0697d0f4c7d3b54c6aee545d3b27c5981c27d0470e1c79876898f28f2c472",
+      "state": "original"
+    }
+  ],
+  "blockers": [
+    {
+      "pid": 270124,
+      "name": "bun.exe",
+      "executable": null
+    },
+    {
+      "pid": 272124,
+      "name": "bun.exe",
+      "executable": "D:\\Applications\\Scoop\\shims\\bun.exe"
+    },
+    {
+      "pid": 271952,
+      "name": "bun.exe",
+      "executable": "D:\\Applications\\Scoop\\apps\\bun\\current\\bun.exe"
+    },
+    {
+      "pid": 284640,
+      "name": "bun.exe",
+      "executable": "D:\\Applications\\Scoop\\apps\\bun\\current\\bun.exe"
+    },
+    {
+      "pid": 289592,
+      "name": "node.exe",
+      "executable": "D:\\Applications\\Scoop\\apps\\nodejs-lts\\current\\node.exe"
+    },
+    {
+      "pid": 265688,
+      "name": "bun.exe",
+      "executable": "D:\\Applications\\Scoop\\shims\\bun.exe"
+    },
+    {
+      "pid": 264852,
+      "name": "bun.exe",
+      "executable": "D:\\Applications\\Scoop\\apps\\bun\\current\\bun.exe"
+    },
+    {
+      "pid": 274364,
+      "name": "bun.exe",
+      "executable": "D:\\Applications\\Scoop\\shims\\bun.exe"
+    },
+    {
+      "pid": 288080,
+      "name": "bun.exe",
+      "executable": "D:\\Applications\\Scoop\\apps\\bun\\current\\bun.exe"
+    },
+    {
+      "pid": 265452,
+      "name": "bun.exe",
+      "executable": "D:\\Applications\\Scoop\\shims\\bun.exe"
+    },
+    {
+      "pid": 287948,
+      "name": "bun.exe",
+      "executable": "D:\\Applications\\Scoop\\apps\\bun\\current\\bun.exe"
+    },
+    {
+      "pid": 278156,
+      "name": "bun.exe",
+      "executable": "D:\\Applications\\Scoop\\apps\\bun\\1.4.0\\bun.exe"
+    },
+    {
+      "pid": 280388,
+      "name": "bun.exe",
+      "executable": "D:\\Applications\\Scoop\\apps\\bun\\1.4.0\\bun.exe"
+    },
+    {
+      "pid": 274720,
+      "name": "node.exe",
+      "executable": "D:\\Applications\\Scoop\\apps\\nodejs-lts\\current\\node.exe"
+    },
+    {
+      "pid": 288092,
+      "name": "node.exe",
+      "executable": "D:\\Applications\\Scoop\\apps\\nodejs-lts\\current\\node.exe"
+    },
+    {
+      "pid": 284848,
+      "name": "node.exe",
+      "executable": "D:\\Applications\\Scoop\\apps\\nodejs-lts\\current\\node.exe"
+    },
+    {
+      "pid": 289880,
+      "name": "node.exe",
+      "executable": "D:\\Applications\\Scoop\\apps\\nodejs-lts\\current\\node.exe"
+    },
+    {
+      "pid": 282380,
+      "name": "node.exe",
+      "executable": "D:\\Applications\\Scoop\\apps\\nodejs-lts\\current\\node.exe"
+    },
+    {
+      "pid": 281224,
+      "name": "node.exe",
+      "executable": "D:\\Applications\\Scoop\\apps\\nodejs-lts\\current\\node.exe"
+    },
+    {
+      "pid": 262564,
+      "name": "node.exe",
+      "executable": "D:\\Applications\\Scoop\\apps\\nodejs-lts\\current\\node.exe"
+    },
+    {
+      "pid": 269044,
+      "name": "node.exe",
+      "executable": "D:\\Applications\\Scoop\\apps\\nodejs-lts\\current\\node.exe"
+    },
+    {
+      "pid": 272132,
+      "name": "bun.exe",
+      "executable": "D:\\Applications\\Scoop\\apps\\bun\\1.4.0\\bun.exe"
+    }
+  ],
+  "inactivityEstablished": false,
+  "loggingEnabled": false,
+  "loggingNote": "Original bytes contain no kit logger. Patched bytes require opt-in in a new process; existing process environments are not inspected.",
+  "source": {
+    "version": "0.87.1",
+    "entryHash": "e79626f2dd6f94aa45d30f3fa63cd84319a6eefcd150b353cfaf274366926774",
+    "runtimeHash": "9ca136a7caa977d936aa789d7448a3dfb17851677ff5ac8c0dbcf23c31a02142",
+    "mainBoundaries": 9,
+    "googleBoundaries": 7,
+    "stagedHashes": [
+      "b1c6995246bb393df5fda23dc3a286f7d8f26814a09fc2aa140760ba78207d3c",
+      "32b6ff866b6a64fc2613fa12474f7ada5ca1483a362d0be7680735bdaedc1200"
+    ]
+  }
+}

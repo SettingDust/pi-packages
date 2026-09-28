@@ -1,0 +1,58 @@
+{
+  "status": "blocked",
+  "activationAllowed": false,
+  "reason": "Explicit current target resolves to 0.87.1; recovered patcher supports only 0.86.1. No selectors or hash guards changed.",
+  "target": {
+    "requestedRoot": "D:/Applications/Scoop/apps/pi-coding-agent-bun/current/node_modules/@earendil-works/pi-coding-agent",
+    "canonicalRoot": "D:\\Applications\\Scoop\\apps\\pi-coding-agent-bun\\0.87.1\\node_modules\\@earendil-works\\pi-coding-agent",
+    "version": "0.87.1",
+    "packageMetadataSha256": "627631b613ba4ca29eba8df793f5280fd20b19f01d73826e9ffda14c15def5dc"
+  },
+  "verification": {
+    "call": "inspect(requestedRoot)",
+    "expectedFailure": "Unsupported package/version/entry",
+    "refusalAsserted": true,
+    "providerCalls": 0,
+    "installedWrites": 0
+  },
+  "recoveredKit": {
+    "revision": "offline-3",
+    "files": {
+      "stage.mjs": "dcafe28ea1fca0a5ec5fdbc2a915bc2db4e744088d43cc21c8a42ef0a954c8f3",
+      "logger.mjs": "83722580d4631e2f5a38879520b8850b2f35277363196ae862225d1a71b8d222",
+      "check.mjs": "9b25962e3a28d62df20a2deb273f4c44692f4c93aab86317dafd00f295e9e732",
+      "install.mjs": "8e93d44eceed9cb5fa324985c4a4fbfe05e01b6983c5a7260d2270623c7d529a",
+      "README.md": "f05bb473e7480aaf063330dab0440b9aa3decfed0182e1d6b047974ef54f7aec"
+    }
+  },
+  "historicalEvidence": {
+    "provenance": "Recovered prior evidence.json from pi-stall-check-91DSB2; historical claims only, not rerun and not evidence for offline-3.",
+    "stage": "C:\\Users\\WINDOWS\\AppData\\Local\\Temp\\pi-stall-check-91DSB2",
+    "version": "0.86.1",
+    "originalHash": "2d5dc2025bf5cb9632f83491472677a281f8bfa375840bf785d38a9d7f103e1b",
+    "patchedHash": "020e8b848a4545525876897f060af29dada27944d7b9d20cbdf763563852c155",
+    "boundaries": 6,
+    "benchmark": {
+      "off": {
+        "medianMs": 0.00020000000006348273,
+        "p95Ms": 0.0004000000000132786
+      },
+      "on": {
+        "medianMs": 0.929300000000012,
+        "p95Ms": 1.8179999999999836
+      },
+      "events": 5000,
+      "bytes": 754707
+    },
+    "activationAllowed": false,
+    "smoke": "0.86.1",
+    "checks": "syntax, extracted actual boundaries, stream success/error/reject/abort, pending second handler, append/error, tool hook wait/error, tool execute/error, abort order, sentinels, rotation, logger setup/write failure, process isolation, disposable install/idempotence/drift/rollback, patched provider-free CLI --version, unchanged installed hash"
+  },
+  "remainingGates": [
+    "Current target mapping, selectors and exact original hash require reconciliation before staging.",
+    "Recovered offline-3 ALS correlation edits have no persisted concurrency or actual-boundary verification.",
+    "Google HTTP response coverage and single-file feasibility remain unverified in this execution.",
+    "Baseline/patched representative whole-turn benchmark remains absent; historical timings are logger-only.",
+    "No staged CLI smoke for current target or recovered offline-3."
+  ]
+}

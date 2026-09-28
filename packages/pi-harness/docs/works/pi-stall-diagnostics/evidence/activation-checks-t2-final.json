@@ -1,0 +1,170 @@
+{
+  "status": "passed",
+  "observedAt": "2026-09-23T20:11:58.526Z",
+  "checks": [
+    "Metadata classifier refuses every other JS/Pi runtime including inaccessible paths and rejects incomplete snapshots",
+    "Occupied real installation refuses live admission, including attempted extra inactivity/disposable options; hashes unchanged",
+    "Shared pair engine install/idempotence/rollback with new fixed isolated smoke succeeds on disposable bytes",
+    "Known-byte drift during smoke cannot report stale successful state; guarded restoration returns both originals"
+  ],
+  "sourceHashes": {
+    "install.mjs": "6152079e728866767f4b6f6de4529b175ba38008523d54315ab6a3fbf58ab151",
+    "activate.mjs": "96b7d89f077df308bd97e4a871a5f4215bc20218e4a4158b1dcb51f9d123f973",
+    "smoke.mjs": "968cd6c5ca6ae6926f4d2193e554ecfc2eb9bc7a8eb42f17725f6b9058175f4a",
+    "check-activation.mjs": "ff7657260b83f64a9eaf41aca71568b6a36bbc8d32b3d27428cdb3a2cfc9ea86"
+  },
+  "blockers": [
+    {
+      "pid": 270124,
+      "name": "bun.exe",
+      "executable": null
+    },
+    {
+      "pid": 272124,
+      "name": "bun.exe",
+      "executable": "D:\\Applications\\Scoop\\shims\\bun.exe"
+    },
+    {
+      "pid": 271952,
+      "name": "bun.exe",
+      "executable": "D:\\Applications\\Scoop\\apps\\bun\\current\\bun.exe"
+    },
+    {
+      "pid": 284640,
+      "name": "bun.exe",
+      "executable": "D:\\Applications\\Scoop\\apps\\bun\\current\\bun.exe"
+    },
+    {
+      "pid": 289592,
+      "name": "node.exe",
+      "executable": "D:\\Applications\\Scoop\\apps\\nodejs-lts\\current\\node.exe"
+    },
+    {
+      "pid": 265688,
+      "name": "bun.exe",
+      "executable": "D:\\Applications\\Scoop\\shims\\bun.exe"
+    },
+    {
+      "pid": 264852,
+      "name": "bun.exe",
+      "executable": "D:\\Applications\\Scoop\\apps\\bun\\current\\bun.exe"
+    },
+    {
+      "pid": 274364,
+      "name": "bun.exe",
+      "executable": "D:\\Applications\\Scoop\\shims\\bun.exe"
+    },
+    {
+      "pid": 288080,
+      "name": "bun.exe",
+      "executable": "D:\\Applications\\Scoop\\apps\\bun\\current\\bun.exe"
+    },
+    {
+      "pid": 265452,
+      "name": "bun.exe",
+      "executable": "D:\\Applications\\Scoop\\shims\\bun.exe"
+    },
+    {
+      "pid": 287948,
+      "name": "bun.exe",
+      "executable": "D:\\Applications\\Scoop\\apps\\bun\\current\\bun.exe"
+    },
+    {
+      "pid": 278156,
+      "name": "bun.exe",
+      "executable": "D:\\Applications\\Scoop\\apps\\bun\\1.4.0\\bun.exe"
+    },
+    {
+      "pid": 280388,
+      "name": "bun.exe",
+      "executable": "D:\\Applications\\Scoop\\apps\\bun\\1.4.0\\bun.exe"
+    },
+    {
+      "pid": 274720,
+      "name": "node.exe",
+      "executable": "D:\\Applications\\Scoop\\apps\\nodejs-lts\\current\\node.exe"
+    },
+    {
+      "pid": 288092,
+      "name": "node.exe",
+      "executable": "D:\\Applications\\Scoop\\apps\\nodejs-lts\\current\\node.exe"
+    },
+    {
+      "pid": 284848,
+      "name": "node.exe",
+      "executable": "D:\\Applications\\Scoop\\apps\\nodejs-lts\\current\\node.exe"
+    },
+    {
+      "pid": 289880,
+      "name": "node.exe",
+      "executable": "D:\\Applications\\Scoop\\apps\\nodejs-lts\\current\\node.exe"
+    },
+    {
+      "pid": 282380,
+      "name": "node.exe",
+      "executable": "D:\\Applications\\Scoop\\apps\\nodejs-lts\\current\\node.exe"
+    },
+    {
+      "pid": 281224,
+      "name": "node.exe",
+      "executable": "D:\\Applications\\Scoop\\apps\\nodejs-lts\\current\\node.exe"
+    },
+    {
+      "pid": 262564,
+      "name": "node.exe",
+      "executable": "D:\\Applications\\Scoop\\apps\\nodejs-lts\\current\\node.exe"
+    },
+    {
+      "pid": 269044,
+      "name": "node.exe",
+      "executable": "D:\\Applications\\Scoop\\apps\\nodejs-lts\\current\\node.exe"
+    },
+    {
+      "pid": 283592,
+      "name": "bun.exe",
+      "executable": "D:\\Applications\\Scoop\\apps\\bun\\1.4.0\\bun.exe"
+    }
+  ],
+  "finalRealStates": [
+    {
+      "file": "chunk-OJP47DM6.js",
+      "hash": "81c81a21ec81e84200205f561687408ff5e3738fbbbb3c2a6c186b348d376020",
+      "state": "original"
+    },
+    {
+      "file": "chunk-FUXEF6JQ.js",
+      "hash": "b7d0697d0f4c7d3b54c6aee545d3b27c5981c27d0470e1c79876898f28f2c472",
+      "state": "original"
+    }
+  ],
+  "finalDisposableStates": [
+    {
+      "file": "chunk-OJP47DM6.js",
+      "hash": "81c81a21ec81e84200205f561687408ff5e3738fbbbb3c2a6c186b348d376020",
+      "state": "original"
+    },
+    {
+      "file": "chunk-FUXEF6JQ.js",
+      "hash": "b7d0697d0f4c7d3b54c6aee545d3b27c5981c27d0470e1c79876898f28f2c472",
+      "state": "original"
+    }
+  ],
+  "patchedSmoke": {
+    "version": "0.87.1",
+    "isolatedHomeEmpty": true,
+    "networkAndProcessesBlocked": true,
+    "work": "C:\\Users\\WINDOWS\\AppData\\Local\\Temp\\pi-stall-smoke-sWuhdC"
+  },
+  "restoredSmoke": {
+    "version": "0.87.1",
+    "isolatedHomeEmpty": true,
+    "networkAndProcessesBlocked": true,
+    "work": "C:\\Users\\WINDOWS\\AppData\\Local\\Temp\\pi-stall-smoke-LuY9LN"
+  },
+  "loggingEnabled": false,
+  "limitations": [
+    "Live successful writes and live rollback drill not executed: host occupied.",
+    "Inactivity snapshots require a user-maintained launch-free maintenance interval; mutex serializes installers only.",
+    "Conservative refusal includes unrelated Node/Bun processes; metadata alone cannot prove they do not load Pi."
+  ]
+}

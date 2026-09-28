@@ -1,0 +1,545 @@
+{
+  "status": "passed",
+  "activationAllowed": false,
+  "t1Complete": false,
+  "revision": "offline-6-google",
+  "command": [
+    "node",
+    "packages/pi-harness/tools/pi-stall-diagnostics/check-google.mjs",
+    "D:/Applications/Scoop/apps/pi-coding-agent-bun/current/node_modules/@earendil-works/pi-coding-agent",
+    "packages/pi-harness/docs/works/pi-stall-diagnostics/evidence/google-offline-6.json"
+  ],
+  "manifest": {
+    "revision": "offline-6-google",
+    "activationAllowed": false,
+    "gaps": [
+      "Paired installer/recovery remains T1-P; activation remains disabled."
+    ],
+    "version": "0.87.1",
+    "root": "D:\\Applications\\Scoop\\apps\\pi-coding-agent-bun\\0.87.1\\node_modules\\@earendil-works\\pi-coding-agent",
+    "entryHash": "e79626f2dd6f94aa45d30f3fa63cd84319a6eefcd150b353cfaf274366926774",
+    "runtimeHash": "9ca136a7caa977d936aa789d7448a3dfb17851677ff5ac8c0dbcf23c31a02142",
+    "targets": [
+      {
+        "target": "D:\\Applications\\Scoop\\apps\\pi-coding-agent-bun\\0.87.1\\node_modules\\@earendil-works\\pi-coding-agent\\dist\\bundle\\chunks\\chunk-OJP47DM6.js",
+        "originalHash": "81c81a21ec81e84200205f561687408ff5e3738fbbbb3c2a6c186b348d376020",
+        "patchedHash": "b1c6995246bb393df5fda23dc3a286f7d8f26814a09fc2aa140760ba78207d3c",
+        "backup": "C:\\Users\\WINDOWS\\AppData\\Local\\Temp\\pi-google-OL3Ye4\\original.js",
+        "staged": "C:\\Users\\WINDOWS\\AppData\\Local\\Temp\\pi-google-OL3Ye4\\patched.mjs",
+        "boundaries": [
+          {
+            "start": "async function runAgentLoop(",
+            "end": "async function runAgentLoopContinue(",
+            "sha256": "cb29a892dc35a50cc9ffd3023f9fa07b3a000f14ede23f18b04a9ba12543b5e1"
+          },
+          {
+            "start": "async function runAgentLoopContinue(",
+            "end": "function createAgentStream(",
+            "sha256": "8f52f97e91bae494cae3080497e650abcb1da91026ccf0cfe633a47c5ce07e74"
+          },
+          {
+            "start": "async function runLoop(initialContext,",
+            "end": "function declareToolChanges(",
+            "sha256": "6c5c345f969b2c4f6d540045b3f14cfeaa110322ba126936cb1c1288b6107dff"
+          },
+          {
+            "start": "async function streamAssistantResponse(",
+            "end": "async function failToolCallsFromTruncatedMessage(",
+            "sha256": "eca7a776e638712886a77cae8e72bc4c8cd3f68e77ba1b18a608a3232a31d2f2"
+          },
+          {
+            "start": "async emitMessageEnd(event){",
+            "end": "async emitToolResult(",
+            "sha256": "ac8d63b8d510b2f91e0628aaa2891ece1da8811c0d346e4698565ea9e3cbaa78"
+          },
+          {
+            "start": "appendMessage(message){",
+            "end": "appendThinkingLevelChange(thinkingLevel){",
+            "sha256": "3ff98ffa61a4036769028c4e0c0dd3bbe81a8da47d7a02128e7293a437814551"
+          },
+          {
+            "start": "async emitToolCall(event){",
+            "end": "async emitUserBash(event){",
+            "sha256": "2de35120f22a21a256f351bbf706afd2fe9df8feccd0079a05cadb535bfdc47c"
+          },
+          {
+            "start": "async function executePreparedToolCall(",
+            "end": "async function finalizeExecutedToolCall(",
+            "sha256": "d0d7117b03a98e66213b4ab74726ec8ea55a407fe0ddcc6943ab4a87c4177835"
+          },
+          {
+            "start": "async abort(){this._isAgentRunActive",
+            "end": "async waitForIdle(){this.isIdle",
+            "sha256": "1ed1e083602bda0076301dba5e6b115ba240d8f9fc15197b435df18851c70e7b"
+          }
+        ]
+      },
+      {
+        "target": "D:\\Applications\\Scoop\\apps\\pi-coding-agent-bun\\0.87.1\\node_modules\\@earendil-works\\pi-coding-agent\\dist\\bundle\\chunks\\chunk-FUXEF6JQ.js",
+        "originalHash": "b7d0697d0f4c7d3b54c6aee545d3b27c5981c27d0470e1c79876898f28f2c472",
+        "patchedHash": "32b6ff866b6a64fc2613fa12474f7ada5ca1483a362d0be7680735bdaedc1200",
+        "backup": "C:\\Users\\WINDOWS\\AppData\\Local\\Temp\\pi-google-OL3Ye4\\google-original.js",
+        "staged": "C:\\Users\\WINDOWS\\AppData\\Local\\Temp\\pi-google-OL3Ye4\\google-patched.mjs",
+        "boundaries": [
+          {
+            "selector": "response=this.apiClient.requestStream({path:path2,queryParams,body:JSON.stringify(body),httpMethod:\"POST\",httpOptions:(_a2=params.config)===null||_a2===void 0?void 0:_a2.httpOptions,abortSignal:(_b=params.config)===null||_b===void 0?void 0:_b.abortSignal})",
+            "sha256": "31eb29154c66d14d0d01c774ee25b31697c5f153b0d814b8a15939212ac791f7"
+          },
+          {
+            "selector": "response=this.apiClient.requestStream({path:path2,queryParams,body:JSON.stringify(body),httpMethod:\"POST\",httpOptions:(_c=params.config)===null||_c===void 0?void 0:_c.httpOptions,abortSignal:(_d=params.config)===null||_d===void 0?void 0:_d.abortSignal})",
+            "sha256": "e152a7e887d336ed56864aa719e2ba239306f1c2539631379250c46736fc4579"
+          },
+          {
+            "selector": "async requestStream(request){",
+            "sha256": "1ed62caf62ae737b63e5cf055e2fd4ba9975f707fad2f913309d35a8f12fd8d8"
+          },
+          {
+            "selector": "this.streamApiCall(url,requestInit,request.httpMethod,patchedHttpOptions.retryOptions,patchedHttpOptions.timeout,request.abortSignal)",
+            "sha256": "138ce916be3d9ae9c4722728ad7ff664f3c79e3483cd82c635e0a6b57a96cef8"
+          },
+          {
+            "selector": "async streamApiCall(url,requestInit,httpMethod,retryOptions,timeout,abortSignal){return this.apiCall(url.toString(),Object.assign(Object.assign({},requestInit),{method:httpMethod}),retryOptions,timeout,abortSignal).then(async response=>(await throwErrorIfNotOK(response),this.processStreamResponse(response))).catch(e=>{throw e instanceof Error?e:new Error(`exception ${e} sending request`,{cause:e})})}",
+            "sha256": "11a6a8c19007831fb54c91ec089642dd64815acf03d4df04c20c47067a722e56"
+          },
+          {
+            "selector": "async apiCall(url,requestInit,retryOptions,timeout,abortSignal){",
+            "sha256": "e92994cb5312874d391ac42e78f4c67f3513d4cc676cf12465f8891fc1495fe6"
+          },
+          {
+            "selector": "runFetch=async()=>{let attempt=createAttemptSignal(timeout,abortSignal),response;try{response=await fetch(url,Object.assign(Object.assign({},requestInit),{signal:attempt.signal}))}catch(e){throw attempt.dispose(),e}",
+            "sha256": "422d27b8fa79bfa947a7b0eb601558008498af468b7a172f9b8b99cf9ffe81fa"
+          }
+        ]
+      }
+    ],
+    "sourceGuards": [
+      {
+        "file": "dist/bundle/chunks/chunk-OJP47DM6.js",
+        "sha256": "81c81a21ec81e84200205f561687408ff5e3738fbbbb3c2a6c186b348d376020"
+      },
+      {
+        "file": "dist/bundle/chunks/google-generative-ai-IMS5EK2Y.js",
+        "sha256": "075e745faaeed61ea2ef0350b0227cc1983232a3289ad8be830350ad85c38cb6"
+      },
+      {
+        "file": "dist/bundle/chunks/google-vertex-O4YJEQUW.js",
+        "sha256": "10c917f7884cb7d97b1e0945f646480bfdc461ca465e6761458cbecead1ffd2e"
+      },
+      {
+        "file": "dist/bundle/chunks/chunk-FUXEF6JQ.js",
+        "sha256": "b7d0697d0f4c7d3b54c6aee545d3b27c5981c27d0470e1c79876898f28f2c472"
+      }
+    ],
+    "target": "D:\\Applications\\Scoop\\apps\\pi-coding-agent-bun\\0.87.1\\node_modules\\@earendil-works\\pi-coding-agent\\dist\\bundle\\chunks\\chunk-OJP47DM6.js",
+    "originalHash": "81c81a21ec81e84200205f561687408ff5e3738fbbbb3c2a6c186b348d376020",
+    "patchedHash": "b1c6995246bb393df5fda23dc3a286f7d8f26814a09fc2aa140760ba78207d3c",
+    "boundaries": [
+      {
+        "start": "async function runAgentLoop(",
+        "end": "async function runAgentLoopContinue(",
+        "sha256": "cb29a892dc35a50cc9ffd3023f9fa07b3a000f14ede23f18b04a9ba12543b5e1"
+      },
+      {
+        "start": "async function runAgentLoopContinue(",
+        "end": "function createAgentStream(",
+        "sha256": "8f52f97e91bae494cae3080497e650abcb1da91026ccf0cfe633a47c5ce07e74"
+      },
+      {
+        "start": "async function runLoop(initialContext,",
+        "end": "function declareToolChanges(",
+        "sha256": "6c5c345f969b2c4f6d540045b3f14cfeaa110322ba126936cb1c1288b6107dff"
+      },
+      {
+        "start": "async function streamAssistantResponse(",
+        "end": "async function failToolCallsFromTruncatedMessage(",
+        "sha256": "eca7a776e638712886a77cae8e72bc4c8cd3f68e77ba1b18a608a3232a31d2f2"
+      },
+      {
+        "start": "async emitMessageEnd(event){",
+        "end": "async emitToolResult(",
+        "sha256": "ac8d63b8d510b2f91e0628aaa2891ece1da8811c0d346e4698565ea9e3cbaa78"
+      },
+      {
+        "start": "appendMessage(message){",
+        "end": "appendThinkingLevelChange(thinkingLevel){",
+        "sha256": "3ff98ffa61a4036769028c4e0c0dd3bbe81a8da47d7a02128e7293a437814551"
+      },
+      {
+        "start": "async emitToolCall(event){",
+        "end": "async emitUserBash(event){",
+        "sha256": "2de35120f22a21a256f351bbf706afd2fe9df8feccd0079a05cadb535bfdc47c"
+      },
+      {
+        "start": "async function executePreparedToolCall(",
+        "end": "async function finalizeExecutedToolCall(",
+        "sha256": "d0d7117b03a98e66213b4ab74726ec8ea55a407fe0ddcc6943ab4a87c4177835"
+      },
+      {
+        "start": "async abort(){this._isAgentRunActive",
+        "end": "async waitForIdle(){this.isIdle",
+        "sha256": "1ed1e083602bda0076301dba5e6b115ba240d8f9fc15197b435df18851c70e7b"
+      }
+    ]
+  },
+  "lazyGuard": {
+    "file": "dist/bundle/chunks/chunk-RCZIEVGO.js",
+    "sha256": "7b2c0b36b01c1cedb11e7ab525a3fade0967f56b0cbd286fc32ffa25f5965055",
+    "selectorSha256": "f900db6df1863d31686eec6b5a24c7e866e0efd6979862ce05b601862c9acc74"
+  },
+  "checks": [
+    "Both stages parse; two verified backups/stages; legacy installer refuses pair before mutation",
+    "Both adapter call sites through actual lazyApi (fake load/stream forwarding) and Models/requestStream/streamApiCall/apiCall: success, retry, non-OK, rejection, abort, signal/error identity and request linkage",
+    "Concurrent Google/non-Google isolation; unrelated SDK/auth/user callback/expired context exclusion; invalid statuses; raw Response identity",
+    "Subscriber body failure, SDK channel setup/publication failure and logger write failure isolated; disabled/no-active subscription cleanup",
+    "Callback receiver/argument/return-Promise/error identity preserved",
+    "Actual extracted request/SDK baseline, enabled and disabled microtask traces identical for success/retry/non-OK/rejection/abort",
+    "Forced rotation failure leaves requests successful and subscriber cleanup intact",
+    "Fixed-schema sentinel privacy; three-file bounded rotation; all installed source guards unchanged"
+  ],
+  "asyncTraces": [
+    {
+      "api": "google-generative-ai",
+      "scenario": "200",
+      "trace": [
+        [
+          "adapter.retry",
+          5
+        ],
+        [
+          "auth",
+          5
+        ],
+        [
+          "fetch",
+          8
+        ],
+        [
+          "status",
+          13
+        ],
+        [
+          "decode",
+          16
+        ],
+        [
+          "emit",
+          35
+        ],
+        [
+          "emit",
+          38
+        ],
+        [
+          "return",
+          47
+        ]
+      ]
+    },
+    {
+      "api": "google-generative-ai",
+      "scenario": "503,200",
+      "trace": [
+        [
+          "adapter.retry",
+          5
+        ],
+        [
+          "auth",
+          5
+        ],
+        [
+          "fetch",
+          8
+        ],
+        [
+          "status",
+          11
+        ],
+        [
+          "dispose",
+          14
+        ],
+        [
+          "fetch",
+          16
+        ],
+        [
+          "status",
+          23
+        ],
+        [
+          "decode",
+          26
+        ],
+        [
+          "emit",
+          45
+        ],
+        [
+          "emit",
+          48
+        ],
+        [
+          "return",
+          57
+        ]
+      ]
+    },
+    {
+      "api": "google-generative-ai",
+      "scenario": "400",
+      "trace": [
+        [
+          "adapter.retry",
+          5
+        ],
+        [
+          "auth",
+          5
+        ],
+        [
+          "fetch",
+          8
+        ],
+        [
+          "status",
+          13
+        ],
+        [
+          "reject",
+          32
+        ]
+      ]
+    },
+    {
+      "api": "google-generative-ai",
+      "scenario": "reject",
+      "trace": [
+        [
+          "adapter.retry",
+          5
+        ],
+        [
+          "auth",
+          5
+        ],
+        [
+          "fetch",
+          8
+        ],
+        [
+          "dispose",
+          11
+        ],
+        [
+          "reject",
+          28
+        ]
+      ]
+    },
+    {
+      "api": "google-generative-ai",
+      "scenario": "abort",
+      "trace": [
+        [
+          "adapter.retry",
+          5
+        ],
+        [
+          "auth",
+          5
+        ],
+        [
+          "fetch",
+          8
+        ],
+        [
+          "dispose",
+          11
+        ],
+        [
+          "reject",
+          28
+        ]
+      ]
+    },
+    {
+      "api": "google-vertex",
+      "scenario": "200",
+      "trace": [
+        [
+          "adapter.retry",
+          5
+        ],
+        [
+          "auth",
+          5
+        ],
+        [
+          "fetch",
+          8
+        ],
+        [
+          "status",
+          13
+        ],
+        [
+          "decode",
+          16
+        ],
+        [
+          "emit",
+          35
+        ],
+        [
+          "emit",
+          38
+        ],
+        [
+          "return",
+          47
+        ]
+      ]
+    },
+    {
+      "api": "google-vertex",
+      "scenario": "503,200",
+      "trace": [
+        [
+          "adapter.retry",
+          5
+        ],
+        [
+          "auth",
+          5
+        ],
+        [
+          "fetch",
+          8
+        ],
+        [
+          "status",
+          11
+        ],
+        [
+          "dispose",
+          14
+        ],
+        [
+          "fetch",
+          16
+        ],
+        [
+          "status",
+          23
+        ],
+        [
+          "decode",
+          26
+        ],
+        [
+          "emit",
+          45
+        ],
+        [
+          "emit",
+          48
+        ],
+        [
+          "return",
+          57
+        ]
+      ]
+    },
+    {
+      "api": "google-vertex",
+      "scenario": "400",
+      "trace": [
+        [
+          "adapter.retry",
+          5
+        ],
+        [
+          "auth",
+          5
+        ],
+        [
+          "fetch",
+          8
+        ],
+        [
+          "status",
+          13
+        ],
+        [
+          "reject",
+          32
+        ]
+      ]
+    },
+    {
+      "api": "google-vertex",
+      "scenario": "reject",
+      "trace": [
+        [
+          "adapter.retry",
+          5
+        ],
+        [
+          "auth",
+          5
+        ],
+        [
+          "fetch",
+          8
+        ],
+        [
+          "dispose",
+          11
+        ],
+        [
+          "reject",
+          28
+        ]
+      ]
+    },
+    {
+      "api": "google-vertex",
+      "scenario": "abort",
+      "trace": [
+        [
+          "adapter.retry",
+          5
+        ],
+        [
+          "auth",
+          5
+        ],
+        [
+          "fetch",
+          8
+        ],
+        [
+          "dispose",
+          11
+        ],
+        [
+          "reject",
+          28
+        ]
+      ]
+    }
+  ],
+  "sourceHashes": {
+    "stage.mjs": "37aa6a72cea8726c66f5ae37bcb45eab5b84e1e683356ac8a6c9922528d3726f",
+    "logger.mjs": "bb82a426532a67f3cc6744c2d621984036ce1ef35622f30325f21e04f8de92dd",
+    "check-google.mjs": "b49fb6ae067c7243ca9240b4bf9b28599a53052e063e24c37994be11d16dc783",
+    "install.mjs": "c1123d18a7a01c1355701ef2973980c4859ce98916ccbdbc86b69d0b3e833243"
+  },
+  "events": 136,
+  "limitations": [
+    "Extracted actual boundaries with fake transport/auth/retry scheduler/decoding, not real providers or full CLI runtime.",
+    "Arbitrary external diagnostics-channel subscribers are outside ownership; this logger catches its own entire subscriber body.",
+    "T1-P paired recovery and independent T2 activation remain excluded."
+  ]
+}

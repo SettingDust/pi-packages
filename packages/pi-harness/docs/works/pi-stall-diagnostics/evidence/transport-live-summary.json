@@ -1,0 +1,60 @@
+{
+  "captured": "2026-09-26T03:42:10.8426348+08:00",
+  "log": "c:/Users/WINDOWS/AppData/Local/pi-stall-logs/265708-42670dcb-4598-4e59-a7b2-cd02dbab4f48.0.jsonl",
+  "request": 158542,
+  "postCancelSnapshots": 286,
+  "lastSequence": 7008,
+  "flags": [
+    "response.completed",
+    "signal.aborted",
+    "cancel.delivered"
+  ],
+  "overflow": false,
+  "progress": {
+    "acquire": 1,
+    "forward.setup": 3,
+    "handler.response": 2,
+    "handler.dispatch": 171,
+    "callback": 1,
+    "forward.next": 510,
+    "assistant.next": 170,
+    "handler.start": 2,
+    "body.next": 178,
+    "handler.update": 338,
+    "cancel.retry": 1,
+    "cancel.compaction": 1,
+    "cancel.summary": 1,
+    "cancel.controller": 1
+  },
+  "pending": [
+    {
+      "phase": "producer",
+      "age": 3701805
+    },
+    {
+      "phase": "forward.next",
+      "age": 3696385
+    },
+    {
+      "phase": "forward.next",
+      "age": 3696385
+    },
+    {
+      "phase": "forward.next",
+      "age": 3696385
+    },
+    {
+      "phase": "assistant.next",
+      "age": 3696385
+    },
+    {
+      "phase": "body.next",
+      "age": 3611814
+    },
+    {
+      "phase": "cancel.idle",
+      "age": 3606358
+    }
+  ],
+  "note": "Snapshot flags identify SDK/agent observations; no direct fetch identity or transport abort event was instrumented."
+}

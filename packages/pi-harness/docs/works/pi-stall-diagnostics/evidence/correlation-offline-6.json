@@ -1,0 +1,428 @@
+{
+  "status": "passed",
+  "scope": "Offline extracted actual 0.87.1 correlation boundaries; no provider or installed activation",
+  "revision": "offline-6-google",
+  "activationAllowed": false,
+  "t1Complete": false,
+  "node": "v24.15.0",
+  "originalHash": "81c81a21ec81e84200205f561687408ff5e3738fbbbb3c2a6c186b348d376020",
+  "patchedHash": "b1c6995246bb393df5fda23dc3a286f7d8f26814a09fc2aa140760ba78207d3c",
+  "sourceHashes": {
+    "logger.mjs": "bb82a426532a67f3cc6744c2d621984036ce1ef35622f30325f21e04f8de92dd",
+    "stage.mjs": "37aa6a72cea8726c66f5ae37bcb45eab5b84e1e683356ac8a6c9922528d3726f",
+    "check-correlation.mjs": "1b8e5b847ef5f57cf9ea62f08343d578f8881490b6bb61004c06ac52a78dccb2"
+  },
+  "boundaries": [
+    {
+      "start": "async function runAgentLoop(",
+      "end": "async function runAgentLoopContinue(",
+      "sha256": "cb29a892dc35a50cc9ffd3023f9fa07b3a000f14ede23f18b04a9ba12543b5e1"
+    },
+    {
+      "start": "async function runAgentLoopContinue(",
+      "end": "function createAgentStream(",
+      "sha256": "8f52f97e91bae494cae3080497e650abcb1da91026ccf0cfe633a47c5ce07e74"
+    },
+    {
+      "start": "async function runLoop(initialContext,",
+      "end": "function declareToolChanges(",
+      "sha256": "6c5c345f969b2c4f6d540045b3f14cfeaa110322ba126936cb1c1288b6107dff"
+    },
+    {
+      "start": "async function streamAssistantResponse(",
+      "end": "async function failToolCallsFromTruncatedMessage(",
+      "sha256": "eca7a776e638712886a77cae8e72bc4c8cd3f68e77ba1b18a608a3232a31d2f2"
+    },
+    {
+      "start": "async emitMessageEnd(event){",
+      "end": "async emitToolResult(",
+      "sha256": "ac8d63b8d510b2f91e0628aaa2891ece1da8811c0d346e4698565ea9e3cbaa78"
+    },
+    {
+      "start": "appendMessage(message){",
+      "end": "appendThinkingLevelChange(thinkingLevel){",
+      "sha256": "3ff98ffa61a4036769028c4e0c0dd3bbe81a8da47d7a02128e7293a437814551"
+    },
+    {
+      "start": "async emitToolCall(event){",
+      "end": "async emitUserBash(event){",
+      "sha256": "2de35120f22a21a256f351bbf706afd2fe9df8feccd0079a05cadb535bfdc47c"
+    },
+    {
+      "start": "async function executePreparedToolCall(",
+      "end": "async function finalizeExecutedToolCall(",
+      "sha256": "d0d7117b03a98e66213b4ab74726ec8ea55a407fe0ddcc6943ab4a87c4177835"
+    },
+    {
+      "start": "async abort(){this._isAgentRunActive",
+      "end": "async waitForIdle(){this.isIdle",
+      "sha256": "1ed1e083602bda0076301dba5e6b115ba240d8f9fc15197b435df18851c70e7b"
+    }
+  ],
+  "events": 226,
+  "checks": [
+    "patched bundle syntax",
+    "concurrent sessions and requests",
+    "stable session across copied contexts",
+    "nested run restoration",
+    "initial user append before provider request",
+    "request through dispatch/handler/append/tool",
+    "tool ID reused across sessions remains isolated",
+    "response callbacks invoked externally retain request",
+    "turn snapshots survive deferred work",
+    "rejection/abort/error identity and pending handler",
+    "external abort correlates active scope and clears unrelated IDs",
+    "fixed schema and sentinel privacy",
+    "original/patched enabled/disabled microtask trace equality",
+    "installed SHA-256 unchanged"
+  ],
+  "command": [
+    "node",
+    "packages/pi-harness/tools/pi-stall-diagnostics/check-correlation.mjs",
+    "D:/Applications/Scoop/apps/pi-coding-agent-bun/current/node_modules/@earendil-works/pi-coding-agent",
+    "packages/pi-harness/docs/works/pi-stall-diagnostics/evidence/correlation-offline-6.json"
+  ],
+  "correlation": [
+    {
+      "session": 142412004744857,
+      "turn": 1,
+      "request": 6,
+      "events": [
+        {
+          "event": "assistant.enter",
+          "operation": 7
+        },
+        {
+          "event": "provider.request",
+          "operation": 7
+        },
+        {
+          "event": "abort.enter",
+          "operation": 8
+        },
+        {
+          "event": "abort.exit",
+          "operation": 8
+        },
+        {
+          "event": "stream.end",
+          "operation": 7
+        },
+        {
+          "event": "message.dispatch.enter",
+          "operation": 22
+        },
+        {
+          "event": "handler.enter",
+          "operation": 22,
+          "handler": 3
+        },
+        {
+          "event": "handler.exit",
+          "operation": 22,
+          "handler": 3
+        },
+        {
+          "event": "handler.enter",
+          "operation": 22,
+          "handler": 4
+        },
+        {
+          "event": "handler.exit",
+          "operation": 22,
+          "handler": 4
+        },
+        {
+          "event": "message.dispatch.exit",
+          "operation": 22
+        },
+        {
+          "event": "append.enter",
+          "operation": 23
+        },
+        {
+          "event": "append.exit",
+          "operation": 23
+        },
+        {
+          "event": "assistant.exit",
+          "operation": 7
+        },
+        {
+          "event": "tool.hooks.enter",
+          "operation": 24,
+          "tool": 220135932422373
+        },
+        {
+          "event": "tool.hook.enter",
+          "operation": 25,
+          "tool": 220135932422373
+        },
+        {
+          "event": "tool.hooks.enter",
+          "operation": 26,
+          "tool": 140984523418370
+        },
+        {
+          "event": "tool.hook.enter",
+          "operation": 27,
+          "tool": 140984523418370
+        },
+        {
+          "event": "tool.hook.exit",
+          "operation": 25,
+          "tool": 220135932422373
+        },
+        {
+          "event": "tool.hooks.exit",
+          "operation": 24,
+          "tool": 220135932422373
+        },
+        {
+          "event": "tool.hook.exit",
+          "operation": 27,
+          "tool": 140984523418370
+        },
+        {
+          "event": "tool.hooks.exit",
+          "operation": 26,
+          "tool": 140984523418370
+        },
+        {
+          "event": "tool.execute.enter",
+          "operation": 28,
+          "tool": 220135932422373
+        },
+        {
+          "event": "tool.execute.enter",
+          "operation": 29,
+          "tool": 140984523418370
+        },
+        {
+          "event": "tool.execute.exit",
+          "operation": 28,
+          "tool": 220135932422373
+        },
+        {
+          "event": "tool.execute.exit",
+          "operation": 29,
+          "tool": 140984523418370
+        },
+        {
+          "event": "provider.response",
+          "operation": 7,
+          "status": 201
+        }
+      ]
+    },
+    {
+      "session": 62365396552828,
+      "turn": 9,
+      "request": 10,
+      "events": [
+        {
+          "event": "assistant.enter",
+          "operation": 11
+        },
+        {
+          "event": "provider.request",
+          "operation": 11
+        },
+        {
+          "event": "stream.end",
+          "operation": 11
+        },
+        {
+          "event": "message.dispatch.enter",
+          "operation": 12
+        },
+        {
+          "event": "handler.enter",
+          "operation": 12,
+          "handler": 13
+        },
+        {
+          "event": "handler.exit",
+          "operation": 12,
+          "handler": 13
+        },
+        {
+          "event": "handler.enter",
+          "operation": 12,
+          "handler": 14
+        },
+        {
+          "event": "handler.exit",
+          "operation": 12,
+          "handler": 14
+        },
+        {
+          "event": "message.dispatch.exit",
+          "operation": 12
+        },
+        {
+          "event": "append.enter",
+          "operation": 15
+        },
+        {
+          "event": "append.exit",
+          "operation": 15
+        },
+        {
+          "event": "assistant.exit",
+          "operation": 11
+        },
+        {
+          "event": "tool.hooks.enter",
+          "operation": 16,
+          "tool": 44448516957046
+        },
+        {
+          "event": "tool.hook.enter",
+          "operation": 17,
+          "tool": 44448516957046
+        },
+        {
+          "event": "tool.hooks.enter",
+          "operation": 18,
+          "tool": 163596957054993
+        },
+        {
+          "event": "tool.hook.enter",
+          "operation": 19,
+          "tool": 163596957054993
+        },
+        {
+          "event": "tool.hook.exit",
+          "operation": 17,
+          "tool": 44448516957046
+        },
+        {
+          "event": "tool.hooks.exit",
+          "operation": 16,
+          "tool": 44448516957046
+        },
+        {
+          "event": "tool.hook.exit",
+          "operation": 19,
+          "tool": 163596957054993
+        },
+        {
+          "event": "tool.hooks.exit",
+          "operation": 18,
+          "tool": 163596957054993
+        },
+        {
+          "event": "tool.execute.enter",
+          "operation": 20,
+          "tool": 44448516957046
+        },
+        {
+          "event": "tool.execute.enter",
+          "operation": 21,
+          "tool": 163596957054993
+        },
+        {
+          "event": "tool.execute.exit",
+          "operation": 20,
+          "tool": 44448516957046
+        },
+        {
+          "event": "tool.execute.exit",
+          "operation": 21,
+          "tool": 163596957054993
+        },
+        {
+          "event": "provider.response",
+          "operation": 11,
+          "status": 202
+        }
+      ]
+    }
+  ],
+  "activeAbort": {
+    "session": 142412004744857,
+    "turn": 1,
+    "request": 6
+  },
+  "privacy": {
+    "sentinelAbsent": true,
+    "fixedSchema": true,
+    "opaqueNumericIds": true
+  },
+  "asyncTrace": [
+    [
+      "handler",
+      9
+    ],
+    [
+      "handler2",
+      12
+    ],
+    [
+      "append",
+      17
+    ],
+    [
+      "provider",
+      22
+    ],
+    [
+      "handler",
+      34
+    ],
+    [
+      "handler2",
+      37
+    ],
+    [
+      "append",
+      42
+    ],
+    [
+      "run.return",
+      60
+    ],
+    [
+      "hook.return",
+      65
+    ],
+    [
+      "execute",
+      65
+    ],
+    [
+      "execute.return",
+      71
+    ],
+    [
+      "hook.error",
+      71
+    ],
+    [
+      "hook.reject",
+      78
+    ],
+    [
+      "execute.error",
+      78
+    ],
+    [
+      "execute.error.return",
+      84
+    ],
+    [
+      "provider.error",
+      85
+    ],
+    [
+      "provider.reject",
+      92
+    ]
+  ],
+  "limitations": [
+    "Extracted bundle functions run with fake surrounding dependencies; full CLI execution is not exercised here.",
+    "External abort omits unavailable or ambiguous turn/request IDs and does not guess a tool ID.",
+    "This correlation-only suite does not verify Google transport, performance or paired recovery; consult their separately recorded evidence."
+  ]
+}

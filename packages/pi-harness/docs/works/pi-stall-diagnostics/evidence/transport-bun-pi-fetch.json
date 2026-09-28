@@ -1,0 +1,2773 @@
+{
+  "runtime": "Bun 1.4.0",
+  "platform": "win32",
+  "pi": "0.87.1",
+  "sdk": "6.40.0",
+  "transport": "Pi configureHttpDispatcher / bundled undici 8.10.2",
+  "network": "HTTP/1.1 loopback only",
+  "observationMs": 100,
+  "settlementBoundMs": 1500,
+  "cases": [
+    {
+      "layer": "bare",
+      "mode": "native",
+      "scenario": "completed_open",
+      "before": {
+        "settled": false,
+        "outcome": null,
+        "transportAborted": false
+      },
+      "after": {
+        "settled": false,
+        "outcome": null,
+        "transportAborted": true,
+        "timedOut": true
+      },
+      "trace": [
+        {
+          "event": "headers",
+          "ms": 31.2
+        },
+        {
+          "event": "next.enter",
+          "ms": 31.3
+        },
+        {
+          "event": "next.settle",
+          "ms": 31.8,
+          "done": false
+        },
+        {
+          "event": "bare.chunk",
+          "ms": 31.8
+        },
+        {
+          "event": "next.enter",
+          "ms": 31.8
+        },
+        {
+          "event": "user.abort",
+          "ms": 132.9
+        },
+        {
+          "event": "fetch.signal.abort",
+          "ms": 133
+        },
+        {
+          "event": "server.response.close",
+          "ms": 136.2
+        },
+        {
+          "event": "cleanup.task.pending",
+          "ms": 3168.9
+        }
+      ]
+    },
+    {
+      "layer": "bare",
+      "mode": "native",
+      "scenario": "eof",
+      "before": {
+        "settled": true,
+        "outcome": "end",
+        "transportAborted": false
+      },
+      "after": {
+        "settled": true,
+        "outcome": "end",
+        "transportAborted": false,
+        "timedOut": false
+      },
+      "trace": [
+        {
+          "event": "server.response.close",
+          "ms": 6.1
+        },
+        {
+          "event": "headers",
+          "ms": 6.7
+        },
+        {
+          "event": "next.enter",
+          "ms": 6.7
+        },
+        {
+          "event": "next.settle",
+          "ms": 6.7,
+          "done": false
+        },
+        {
+          "event": "bare.chunk",
+          "ms": 6.7
+        },
+        {
+          "event": "next.enter",
+          "ms": 6.7
+        },
+        {
+          "event": "next.settle",
+          "ms": 6.9,
+          "done": true
+        },
+        {
+          "event": "settled",
+          "ms": 6.9,
+          "outcome": "end"
+        },
+        {
+          "event": "fetch.signal.abort",
+          "ms": 140
+        }
+      ]
+    },
+    {
+      "layer": "bare",
+      "mode": "native",
+      "scenario": "abort_before_completion",
+      "before": {
+        "settled": false,
+        "outcome": null,
+        "transportAborted": false
+      },
+      "after": {
+        "settled": false,
+        "outcome": null,
+        "transportAborted": true,
+        "timedOut": true
+      },
+      "trace": [
+        {
+          "event": "headers",
+          "ms": 4.5
+        },
+        {
+          "event": "next.enter",
+          "ms": 4.5
+        },
+        {
+          "event": "next.settle",
+          "ms": 4.6,
+          "done": false
+        },
+        {
+          "event": "bare.chunk",
+          "ms": 4.6
+        },
+        {
+          "event": "next.enter",
+          "ms": 4.6
+        },
+        {
+          "event": "user.abort",
+          "ms": 107.1
+        },
+        {
+          "event": "fetch.signal.abort",
+          "ms": 107.1
+        },
+        {
+          "event": "server.response.close",
+          "ms": 108.5
+        },
+        {
+          "event": "cleanup.task.pending",
+          "ms": 3142.1
+        }
+      ]
+    },
+    {
+      "layer": "bare",
+      "mode": "native",
+      "scenario": "disconnect",
+      "before": {
+        "settled": false,
+        "outcome": null,
+        "transportAborted": false
+      },
+      "after": {
+        "settled": false,
+        "outcome": null,
+        "transportAborted": false,
+        "timedOut": true
+      },
+      "trace": [
+        {
+          "event": "headers",
+          "ms": 6.9
+        },
+        {
+          "event": "next.enter",
+          "ms": 6.9
+        },
+        {
+          "event": "next.settle",
+          "ms": 7,
+          "done": false
+        },
+        {
+          "event": "bare.chunk",
+          "ms": 7
+        },
+        {
+          "event": "next.enter",
+          "ms": 7
+        },
+        {
+          "event": "server.destroy",
+          "ms": 108.6
+        },
+        {
+          "event": "server.response.close",
+          "ms": 108.8
+        },
+        {
+          "event": "fetch.signal.abort",
+          "ms": 1640.9
+        },
+        {
+          "event": "cleanup.task.pending",
+          "ms": 3143.4
+        }
+      ]
+    },
+    {
+      "layer": "bare",
+      "mode": "native",
+      "scenario": "failed_open",
+      "before": {
+        "settled": false,
+        "outcome": null,
+        "transportAborted": false
+      },
+      "after": {
+        "settled": false,
+        "outcome": null,
+        "transportAborted": true,
+        "timedOut": true
+      },
+      "trace": [
+        {
+          "event": "headers",
+          "ms": 5.5
+        },
+        {
+          "event": "next.enter",
+          "ms": 5.5
+        },
+        {
+          "event": "next.settle",
+          "ms": 5.6,
+          "done": false
+        },
+        {
+          "event": "bare.chunk",
+          "ms": 5.6
+        },
+        {
+          "event": "next.enter",
+          "ms": 5.6
+        },
+        {
+          "event": "user.abort",
+          "ms": 108.5
+        },
+        {
+          "event": "fetch.signal.abort",
+          "ms": 108.6
+        },
+        {
+          "event": "server.response.close",
+          "ms": 112.1
+        },
+        {
+          "event": "cleanup.task.pending",
+          "ms": 3143.9
+        }
+      ]
+    },
+    {
+      "layer": "bare",
+      "mode": "native",
+      "scenario": "error_open",
+      "before": {
+        "settled": false,
+        "outcome": null,
+        "transportAborted": false
+      },
+      "after": {
+        "settled": false,
+        "outcome": null,
+        "transportAborted": true,
+        "timedOut": true
+      },
+      "trace": [
+        {
+          "event": "headers",
+          "ms": 5.7
+        },
+        {
+          "event": "next.enter",
+          "ms": 5.7
+        },
+        {
+          "event": "next.settle",
+          "ms": 5.8,
+          "done": false
+        },
+        {
+          "event": "bare.chunk",
+          "ms": 5.8
+        },
+        {
+          "event": "next.enter",
+          "ms": 5.8
+        },
+        {
+          "event": "user.abort",
+          "ms": 108.4
+        },
+        {
+          "event": "fetch.signal.abort",
+          "ms": 108.4
+        },
+        {
+          "event": "server.response.close",
+          "ms": 110.1
+        },
+        {
+          "event": "cleanup.task.pending",
+          "ms": 3142.5
+        }
+      ]
+    },
+    {
+      "layer": "bare",
+      "mode": "native",
+      "scenario": "done_open",
+      "before": {
+        "settled": false,
+        "outcome": null,
+        "transportAborted": false
+      },
+      "after": {
+        "settled": false,
+        "outcome": null,
+        "transportAborted": true,
+        "timedOut": true
+      },
+      "trace": [
+        {
+          "event": "headers",
+          "ms": 6.9
+        },
+        {
+          "event": "next.enter",
+          "ms": 6.9
+        },
+        {
+          "event": "next.settle",
+          "ms": 7,
+          "done": false
+        },
+        {
+          "event": "bare.chunk",
+          "ms": 7
+        },
+        {
+          "event": "next.enter",
+          "ms": 7
+        },
+        {
+          "event": "next.settle",
+          "ms": 7,
+          "done": false
+        },
+        {
+          "event": "bare.chunk",
+          "ms": 7
+        },
+        {
+          "event": "next.enter",
+          "ms": 7
+        },
+        {
+          "event": "user.abort",
+          "ms": 107.7
+        },
+        {
+          "event": "fetch.signal.abort",
+          "ms": 107.8
+        },
+        {
+          "event": "server.response.close",
+          "ms": 109.2
+        },
+        {
+          "event": "cleanup.task.pending",
+          "ms": 3142.6
+        }
+      ]
+    },
+    {
+      "layer": "bare",
+      "mode": "native",
+      "scenario": "break_open",
+      "before": {
+        "settled": true,
+        "outcome": "end",
+        "transportAborted": false
+      },
+      "after": {
+        "settled": true,
+        "outcome": "end",
+        "transportAborted": false,
+        "timedOut": false
+      },
+      "trace": [
+        {
+          "event": "headers",
+          "ms": 7.6
+        },
+        {
+          "event": "next.enter",
+          "ms": 7.6
+        },
+        {
+          "event": "next.settle",
+          "ms": 7.6,
+          "done": false
+        },
+        {
+          "event": "bare.chunk",
+          "ms": 7.6
+        },
+        {
+          "event": "return.enter",
+          "ms": 7.7
+        },
+        {
+          "event": "return.settle",
+          "ms": 7.9,
+          "done": true
+        },
+        {
+          "event": "settled",
+          "ms": 7.9,
+          "outcome": "end"
+        },
+        {
+          "event": "server.response.close",
+          "ms": 8.9
+        },
+        {
+          "event": "fetch.signal.abort",
+          "ms": 141
+        }
+      ]
+    },
+    {
+      "layer": "sdk",
+      "mode": "native",
+      "scenario": "completed_open",
+      "before": {
+        "settled": false,
+        "outcome": null,
+        "transportAborted": false
+      },
+      "after": {
+        "settled": false,
+        "outcome": null,
+        "transportAborted": true,
+        "timedOut": true
+      },
+      "trace": [
+        {
+          "event": "headers",
+          "ms": 13.8
+        },
+        {
+          "event": "next.enter",
+          "ms": 15.2
+        },
+        {
+          "event": "next.settle",
+          "ms": 15.3,
+          "done": false
+        },
+        {
+          "event": "sdk.response.completed",
+          "ms": 15.6
+        },
+        {
+          "event": "next.enter",
+          "ms": 15.6
+        },
+        {
+          "event": "user.abort",
+          "ms": 117.4
+        },
+        {
+          "event": "fetch.signal.abort",
+          "ms": 117.5
+        },
+        {
+          "event": "server.response.close",
+          "ms": 118.8
+        },
+        {
+          "event": "cleanup.task.pending",
+          "ms": 3149.9
+        }
+      ]
+    },
+    {
+      "layer": "sdk",
+      "mode": "native",
+      "scenario": "eof",
+      "before": {
+        "settled": true,
+        "outcome": "end",
+        "transportAborted": false
+      },
+      "after": {
+        "settled": true,
+        "outcome": "end",
+        "transportAborted": false,
+        "timedOut": false
+      },
+      "trace": [
+        {
+          "event": "server.response.close",
+          "ms": 6.3
+        },
+        {
+          "event": "headers",
+          "ms": 6.9
+        },
+        {
+          "event": "next.enter",
+          "ms": 7
+        },
+        {
+          "event": "next.settle",
+          "ms": 7.1,
+          "done": false
+        },
+        {
+          "event": "sdk.response.completed",
+          "ms": 7.2
+        },
+        {
+          "event": "next.enter",
+          "ms": 7.2
+        },
+        {
+          "event": "next.settle",
+          "ms": 7.3,
+          "done": true
+        },
+        {
+          "event": "settled",
+          "ms": 7.4,
+          "outcome": "end"
+        },
+        {
+          "event": "fetch.signal.abort",
+          "ms": 141.1
+        }
+      ]
+    },
+    {
+      "layer": "sdk",
+      "mode": "native",
+      "scenario": "abort_before_completion",
+      "before": {
+        "settled": false,
+        "outcome": null,
+        "transportAborted": false
+      },
+      "after": {
+        "settled": false,
+        "outcome": null,
+        "transportAborted": true,
+        "timedOut": true
+      },
+      "trace": [
+        {
+          "event": "headers",
+          "ms": 5.7
+        },
+        {
+          "event": "next.enter",
+          "ms": 5.8
+        },
+        {
+          "event": "next.settle",
+          "ms": 5.9,
+          "done": false
+        },
+        {
+          "event": "sdk.response.created",
+          "ms": 6
+        },
+        {
+          "event": "next.enter",
+          "ms": 6
+        },
+        {
+          "event": "user.abort",
+          "ms": 106.9
+        },
+        {
+          "event": "fetch.signal.abort",
+          "ms": 106.9
+        },
+        {
+          "event": "server.response.close",
+          "ms": 108.4
+        },
+        {
+          "event": "cleanup.task.pending",
+          "ms": 3140.7
+        }
+      ]
+    },
+    {
+      "layer": "sdk",
+      "mode": "native",
+      "scenario": "disconnect",
+      "before": {
+        "settled": false,
+        "outcome": null,
+        "transportAborted": false
+      },
+      "after": {
+        "settled": false,
+        "outcome": null,
+        "transportAborted": false,
+        "timedOut": true
+      },
+      "trace": [
+        {
+          "event": "headers",
+          "ms": 5.7
+        },
+        {
+          "event": "next.enter",
+          "ms": 5.9
+        },
+        {
+          "event": "next.settle",
+          "ms": 6,
+          "done": false
+        },
+        {
+          "event": "sdk.response.completed",
+          "ms": 6
+        },
+        {
+          "event": "next.enter",
+          "ms": 6
+        },
+        {
+          "event": "server.destroy",
+          "ms": 108.5
+        },
+        {
+          "event": "server.response.close",
+          "ms": 108.7
+        },
+        {
+          "event": "fetch.signal.abort",
+          "ms": 1641.1
+        },
+        {
+          "event": "cleanup.task.pending",
+          "ms": 3141.7
+        }
+      ]
+    },
+    {
+      "layer": "sdk",
+      "mode": "native",
+      "scenario": "failed_open",
+      "before": {
+        "settled": false,
+        "outcome": null,
+        "transportAborted": false
+      },
+      "after": {
+        "settled": false,
+        "outcome": null,
+        "transportAborted": true,
+        "timedOut": true
+      },
+      "trace": [
+        {
+          "event": "headers",
+          "ms": 6
+        },
+        {
+          "event": "next.enter",
+          "ms": 6.1
+        },
+        {
+          "event": "next.settle",
+          "ms": 6.1,
+          "done": false
+        },
+        {
+          "event": "sdk.response.failed",
+          "ms": 6.2
+        },
+        {
+          "event": "next.enter",
+          "ms": 6.2
+        },
+        {
+          "event": "user.abort",
+          "ms": 108.4
+        },
+        {
+          "event": "fetch.signal.abort",
+          "ms": 108.5
+        },
+        {
+          "event": "server.response.close",
+          "ms": 111
+        },
+        {
+          "event": "cleanup.task.pending",
+          "ms": 3142.8
+        }
+      ]
+    },
+    {
+      "layer": "sdk",
+      "mode": "native",
+      "scenario": "error_open",
+      "before": {
+        "settled": false,
+        "outcome": null,
+        "transportAborted": false
+      },
+      "after": {
+        "settled": false,
+        "outcome": null,
+        "transportAborted": true,
+        "timedOut": true
+      },
+      "trace": [
+        {
+          "event": "headers",
+          "ms": 10.1
+        },
+        {
+          "event": "next.enter",
+          "ms": 10.4
+        },
+        {
+          "event": "next.settle",
+          "ms": 10.6,
+          "done": false
+        },
+        {
+          "event": "sdk.error",
+          "ms": 10.6
+        },
+        {
+          "event": "next.enter",
+          "ms": 10.6
+        },
+        {
+          "event": "user.abort",
+          "ms": 113.8
+        },
+        {
+          "event": "fetch.signal.abort",
+          "ms": 113.9
+        },
+        {
+          "event": "server.response.close",
+          "ms": 115.9
+        },
+        {
+          "event": "cleanup.task.pending",
+          "ms": 3147.3
+        }
+      ]
+    },
+    {
+      "layer": "sdk",
+      "mode": "native",
+      "scenario": "done_open",
+      "before": {
+        "settled": false,
+        "outcome": null,
+        "transportAborted": false
+      },
+      "after": {
+        "settled": false,
+        "outcome": null,
+        "transportAborted": true,
+        "timedOut": true
+      },
+      "trace": [
+        {
+          "event": "headers",
+          "ms": 5.6
+        },
+        {
+          "event": "next.enter",
+          "ms": 5.8
+        },
+        {
+          "event": "next.settle",
+          "ms": 5.8,
+          "done": false
+        },
+        {
+          "event": "sdk.response.completed",
+          "ms": 5.9
+        },
+        {
+          "event": "next.enter",
+          "ms": 5.9
+        },
+        {
+          "event": "next.settle",
+          "ms": 5.9,
+          "done": false
+        },
+        {
+          "event": "next.enter",
+          "ms": 5.9
+        },
+        {
+          "event": "user.abort",
+          "ms": 108.1
+        },
+        {
+          "event": "fetch.signal.abort",
+          "ms": 108.1
+        },
+        {
+          "event": "server.response.close",
+          "ms": 109.4
+        },
+        {
+          "event": "cleanup.task.pending",
+          "ms": 3140.4
+        }
+      ]
+    },
+    {
+      "layer": "sdk",
+      "mode": "native",
+      "scenario": "break_open",
+      "before": {
+        "settled": true,
+        "outcome": "end",
+        "transportAborted": true
+      },
+      "after": {
+        "settled": true,
+        "outcome": "end",
+        "transportAborted": true,
+        "timedOut": false
+      },
+      "trace": [
+        {
+          "event": "headers",
+          "ms": 7.3
+        },
+        {
+          "event": "next.enter",
+          "ms": 7.6
+        },
+        {
+          "event": "next.settle",
+          "ms": 7.6,
+          "done": false
+        },
+        {
+          "event": "sdk.response.completed",
+          "ms": 7.7
+        },
+        {
+          "event": "return.enter",
+          "ms": 7.7
+        },
+        {
+          "event": "return.settle",
+          "ms": 8,
+          "done": true
+        },
+        {
+          "event": "fetch.signal.abort",
+          "ms": 8
+        },
+        {
+          "event": "settled",
+          "ms": 8.1,
+          "outcome": "end"
+        },
+        {
+          "event": "server.response.close",
+          "ms": 9.3
+        }
+      ]
+    },
+    {
+      "layer": "pi",
+      "mode": "native",
+      "scenario": "completed_open",
+      "before": {
+        "settled": false,
+        "outcome": null,
+        "transportAborted": false
+      },
+      "after": {
+        "settled": false,
+        "outcome": null,
+        "transportAborted": true,
+        "timedOut": true
+      },
+      "trace": [
+        {
+          "event": "headers",
+          "ms": 9.3
+        },
+        {
+          "event": "next.enter",
+          "ms": 10.3
+        },
+        {
+          "event": "pi.start",
+          "ms": 10.3
+        },
+        {
+          "event": "next.settle",
+          "ms": 10.4,
+          "done": false
+        },
+        {
+          "event": "next.enter",
+          "ms": 10.7
+        },
+        {
+          "event": "user.abort",
+          "ms": 112.2
+        },
+        {
+          "event": "fetch.signal.abort",
+          "ms": 112.3
+        },
+        {
+          "event": "server.response.close",
+          "ms": 113.9
+        },
+        {
+          "event": "cleanup.task.pending",
+          "ms": 3145.5
+        }
+      ]
+    },
+    {
+      "layer": "pi",
+      "mode": "native",
+      "scenario": "eof",
+      "before": {
+        "settled": true,
+        "outcome": "stop",
+        "transportAborted": false
+      },
+      "after": {
+        "settled": true,
+        "outcome": "stop",
+        "transportAborted": false,
+        "timedOut": false
+      },
+      "trace": [
+        {
+          "event": "server.response.close",
+          "ms": 13.7
+        },
+        {
+          "event": "headers",
+          "ms": 15.2
+        },
+        {
+          "event": "next.enter",
+          "ms": 15.8
+        },
+        {
+          "event": "pi.start",
+          "ms": 16
+        },
+        {
+          "event": "next.settle",
+          "ms": 16,
+          "done": false
+        },
+        {
+          "event": "next.enter",
+          "ms": 16.2
+        },
+        {
+          "event": "next.settle",
+          "ms": 16.3,
+          "done": true
+        },
+        {
+          "event": "pi.done",
+          "ms": 16.5
+        },
+        {
+          "event": "settled",
+          "ms": 16.5,
+          "outcome": "stop"
+        },
+        {
+          "event": "fetch.signal.abort",
+          "ms": 149
+        }
+      ]
+    },
+    {
+      "layer": "pi",
+      "mode": "native",
+      "scenario": "abort_before_completion",
+      "before": {
+        "settled": false,
+        "outcome": null,
+        "transportAborted": false
+      },
+      "after": {
+        "settled": false,
+        "outcome": null,
+        "transportAborted": true,
+        "timedOut": true
+      },
+      "trace": [
+        {
+          "event": "headers",
+          "ms": 7.4
+        },
+        {
+          "event": "next.enter",
+          "ms": 7.6
+        },
+        {
+          "event": "pi.start",
+          "ms": 7.7
+        },
+        {
+          "event": "next.settle",
+          "ms": 7.7,
+          "done": false
+        },
+        {
+          "event": "next.enter",
+          "ms": 7.8
+        },
+        {
+          "event": "user.abort",
+          "ms": 110.7
+        },
+        {
+          "event": "fetch.signal.abort",
+          "ms": 110.7
+        },
+        {
+          "event": "server.response.close",
+          "ms": 112.4
+        },
+        {
+          "event": "cleanup.task.pending",
+          "ms": 3143.5
+        }
+      ]
+    },
+    {
+      "layer": "pi",
+      "mode": "native",
+      "scenario": "disconnect",
+      "before": {
+        "settled": false,
+        "outcome": null,
+        "transportAborted": false
+      },
+      "after": {
+        "settled": false,
+        "outcome": null,
+        "transportAborted": false,
+        "timedOut": true
+      },
+      "trace": [
+        {
+          "event": "headers",
+          "ms": 6.8
+        },
+        {
+          "event": "next.enter",
+          "ms": 7.1
+        },
+        {
+          "event": "pi.start",
+          "ms": 7.1
+        },
+        {
+          "event": "next.settle",
+          "ms": 7.2,
+          "done": false
+        },
+        {
+          "event": "next.enter",
+          "ms": 7.3
+        },
+        {
+          "event": "server.destroy",
+          "ms": 109.8
+        },
+        {
+          "event": "server.response.close",
+          "ms": 110
+        },
+        {
+          "event": "fetch.signal.abort",
+          "ms": 1642.4
+        },
+        {
+          "event": "cleanup.task.pending",
+          "ms": 3142.7
+        }
+      ]
+    },
+    {
+      "layer": "pi",
+      "mode": "native",
+      "scenario": "failed_open",
+      "before": {
+        "settled": true,
+        "outcome": "error",
+        "transportAborted": true
+      },
+      "after": {
+        "settled": true,
+        "outcome": "error",
+        "transportAborted": true,
+        "timedOut": false
+      },
+      "trace": [
+        {
+          "event": "headers",
+          "ms": 8.5
+        },
+        {
+          "event": "next.enter",
+          "ms": 8.7
+        },
+        {
+          "event": "pi.start",
+          "ms": 8.7
+        },
+        {
+          "event": "next.settle",
+          "ms": 8.7,
+          "done": false
+        },
+        {
+          "event": "return.enter",
+          "ms": 9
+        },
+        {
+          "event": "return.settle",
+          "ms": 9.2,
+          "done": true
+        },
+        {
+          "event": "fetch.signal.abort",
+          "ms": 9.2
+        },
+        {
+          "event": "pi.error",
+          "ms": 9.5
+        },
+        {
+          "event": "settled",
+          "ms": 9.5,
+          "outcome": "error"
+        },
+        {
+          "event": "server.response.close",
+          "ms": 10.7
+        }
+      ]
+    },
+    {
+      "layer": "pi",
+      "mode": "native",
+      "scenario": "error_open",
+      "before": {
+        "settled": true,
+        "outcome": "error",
+        "transportAborted": true
+      },
+      "after": {
+        "settled": true,
+        "outcome": "error",
+        "transportAborted": true,
+        "timedOut": false
+      },
+      "trace": [
+        {
+          "event": "headers",
+          "ms": 7.8
+        },
+        {
+          "event": "next.enter",
+          "ms": 8
+        },
+        {
+          "event": "pi.start",
+          "ms": 8.1
+        },
+        {
+          "event": "next.settle",
+          "ms": 8.1,
+          "done": false
+        },
+        {
+          "event": "return.enter",
+          "ms": 8.2
+        },
+        {
+          "event": "return.settle",
+          "ms": 8.4,
+          "done": true
+        },
+        {
+          "event": "fetch.signal.abort",
+          "ms": 8.5
+        },
+        {
+          "event": "pi.error",
+          "ms": 8.6
+        },
+        {
+          "event": "settled",
+          "ms": 8.6,
+          "outcome": "error"
+        },
+        {
+          "event": "server.response.close",
+          "ms": 9.9
+        }
+      ]
+    },
+    {
+      "layer": "pi",
+      "mode": "native",
+      "scenario": "done_open",
+      "before": {
+        "settled": false,
+        "outcome": null,
+        "transportAborted": false
+      },
+      "after": {
+        "settled": false,
+        "outcome": null,
+        "transportAborted": true,
+        "timedOut": true
+      },
+      "trace": [
+        {
+          "event": "headers",
+          "ms": 7.6
+        },
+        {
+          "event": "next.enter",
+          "ms": 7.8
+        },
+        {
+          "event": "pi.start",
+          "ms": 7.9
+        },
+        {
+          "event": "next.settle",
+          "ms": 7.9,
+          "done": false
+        },
+        {
+          "event": "next.enter",
+          "ms": 7.9
+        },
+        {
+          "event": "next.settle",
+          "ms": 7.9,
+          "done": false
+        },
+        {
+          "event": "next.enter",
+          "ms": 7.9
+        },
+        {
+          "event": "user.abort",
+          "ms": 109.7
+        },
+        {
+          "event": "fetch.signal.abort",
+          "ms": 109.7
+        },
+        {
+          "event": "server.response.close",
+          "ms": 110.9
+        },
+        {
+          "event": "cleanup.task.pending",
+          "ms": 3145.3
+        }
+      ]
+    },
+    {
+      "layer": "pi_break",
+      "mode": "native",
+      "scenario": "completed_open",
+      "before": {
+        "settled": true,
+        "outcome": "stop",
+        "transportAborted": true
+      },
+      "after": {
+        "settled": true,
+        "outcome": "stop",
+        "transportAborted": true,
+        "timedOut": false
+      },
+      "trace": [
+        {
+          "event": "headers",
+          "ms": 8.3
+        },
+        {
+          "event": "next.enter",
+          "ms": 9.2
+        },
+        {
+          "event": "pi.start",
+          "ms": 9.3
+        },
+        {
+          "event": "next.settle",
+          "ms": 9.3,
+          "done": false
+        },
+        {
+          "event": "return.enter",
+          "ms": 9.6
+        },
+        {
+          "event": "return.settle",
+          "ms": 9.8,
+          "done": true
+        },
+        {
+          "event": "fetch.signal.abort",
+          "ms": 9.8
+        },
+        {
+          "event": "pi.done",
+          "ms": 9.8
+        },
+        {
+          "event": "settled",
+          "ms": 9.8,
+          "outcome": "stop"
+        },
+        {
+          "event": "server.response.close",
+          "ms": 10.6
+        }
+      ]
+    },
+    {
+      "layer": "bare",
+      "mode": "fallback",
+      "scenario": "completed_open",
+      "before": {
+        "settled": false,
+        "outcome": null,
+        "transportAborted": false
+      },
+      "after": {
+        "settled": false,
+        "outcome": null,
+        "transportAborted": true,
+        "timedOut": true
+      },
+      "trace": [
+        {
+          "event": "headers",
+          "ms": 5.9
+        },
+        {
+          "event": "read.enter",
+          "ms": 6.1
+        },
+        {
+          "event": "read.settle",
+          "ms": 6.2,
+          "done": false
+        },
+        {
+          "event": "bare.chunk",
+          "ms": 6.2
+        },
+        {
+          "event": "read.enter",
+          "ms": 6.2
+        },
+        {
+          "event": "user.abort",
+          "ms": 108.3
+        },
+        {
+          "event": "fetch.signal.abort",
+          "ms": 108.4
+        },
+        {
+          "event": "server.response.close",
+          "ms": 111.4
+        },
+        {
+          "event": "cleanup.task.pending",
+          "ms": 3140.9
+        }
+      ]
+    },
+    {
+      "layer": "bare",
+      "mode": "fallback",
+      "scenario": "eof",
+      "before": {
+        "settled": true,
+        "outcome": "end",
+        "transportAborted": false
+      },
+      "after": {
+        "settled": true,
+        "outcome": "end",
+        "transportAborted": false,
+        "timedOut": false
+      },
+      "trace": [
+        {
+          "event": "server.response.close",
+          "ms": 6.5
+        },
+        {
+          "event": "headers",
+          "ms": 6.8
+        },
+        {
+          "event": "read.enter",
+          "ms": 6.9
+        },
+        {
+          "event": "read.settle",
+          "ms": 6.9,
+          "done": false
+        },
+        {
+          "event": "bare.chunk",
+          "ms": 6.9
+        },
+        {
+          "event": "read.enter",
+          "ms": 6.9
+        },
+        {
+          "event": "read.settle",
+          "ms": 7,
+          "done": true
+        },
+        {
+          "event": "settled",
+          "ms": 7,
+          "outcome": "end"
+        },
+        {
+          "event": "fetch.signal.abort",
+          "ms": 139.2
+        }
+      ]
+    },
+    {
+      "layer": "bare",
+      "mode": "fallback",
+      "scenario": "abort_before_completion",
+      "before": {
+        "settled": false,
+        "outcome": null,
+        "transportAborted": false
+      },
+      "after": {
+        "settled": false,
+        "outcome": null,
+        "transportAborted": true,
+        "timedOut": true
+      },
+      "trace": [
+        {
+          "event": "headers",
+          "ms": 5.1
+        },
+        {
+          "event": "read.enter",
+          "ms": 5.1
+        },
+        {
+          "event": "read.settle",
+          "ms": 5.1,
+          "done": false
+        },
+        {
+          "event": "bare.chunk",
+          "ms": 5.1
+        },
+        {
+          "event": "read.enter",
+          "ms": 5.1
+        },
+        {
+          "event": "user.abort",
+          "ms": 107.6
+        },
+        {
+          "event": "fetch.signal.abort",
+          "ms": 107.6
+        },
+        {
+          "event": "server.response.close",
+          "ms": 109
+        },
+        {
+          "event": "cleanup.task.pending",
+          "ms": 3141.4
+        }
+      ]
+    },
+    {
+      "layer": "bare",
+      "mode": "fallback",
+      "scenario": "disconnect",
+      "before": {
+        "settled": false,
+        "outcome": null,
+        "transportAborted": false
+      },
+      "after": {
+        "settled": false,
+        "outcome": null,
+        "transportAborted": false,
+        "timedOut": true
+      },
+      "trace": [
+        {
+          "event": "headers",
+          "ms": 6
+        },
+        {
+          "event": "read.enter",
+          "ms": 6
+        },
+        {
+          "event": "read.settle",
+          "ms": 6.1,
+          "done": false
+        },
+        {
+          "event": "bare.chunk",
+          "ms": 6.1
+        },
+        {
+          "event": "read.enter",
+          "ms": 6.1
+        },
+        {
+          "event": "server.destroy",
+          "ms": 108.1
+        },
+        {
+          "event": "server.response.close",
+          "ms": 108.4
+        },
+        {
+          "event": "fetch.signal.abort",
+          "ms": 1640.3
+        },
+        {
+          "event": "cleanup.task.pending",
+          "ms": 3142.5
+        }
+      ]
+    },
+    {
+      "layer": "bare",
+      "mode": "fallback",
+      "scenario": "failed_open",
+      "before": {
+        "settled": false,
+        "outcome": null,
+        "transportAborted": false
+      },
+      "after": {
+        "settled": false,
+        "outcome": null,
+        "transportAborted": true,
+        "timedOut": true
+      },
+      "trace": [
+        {
+          "event": "headers",
+          "ms": 5
+        },
+        {
+          "event": "read.enter",
+          "ms": 5
+        },
+        {
+          "event": "read.settle",
+          "ms": 5.1,
+          "done": false
+        },
+        {
+          "event": "bare.chunk",
+          "ms": 5.1
+        },
+        {
+          "event": "read.enter",
+          "ms": 5.1
+        },
+        {
+          "event": "user.abort",
+          "ms": 108.1
+        },
+        {
+          "event": "fetch.signal.abort",
+          "ms": 108.2
+        },
+        {
+          "event": "server.response.close",
+          "ms": 110.6
+        },
+        {
+          "event": "cleanup.task.pending",
+          "ms": 3142.9
+        }
+      ]
+    },
+    {
+      "layer": "bare",
+      "mode": "fallback",
+      "scenario": "error_open",
+      "before": {
+        "settled": false,
+        "outcome": null,
+        "transportAborted": false
+      },
+      "after": {
+        "settled": false,
+        "outcome": null,
+        "transportAborted": true,
+        "timedOut": true
+      },
+      "trace": [
+        {
+          "event": "headers",
+          "ms": 5.4
+        },
+        {
+          "event": "read.enter",
+          "ms": 5.4
+        },
+        {
+          "event": "read.settle",
+          "ms": 5.5,
+          "done": false
+        },
+        {
+          "event": "bare.chunk",
+          "ms": 5.5
+        },
+        {
+          "event": "read.enter",
+          "ms": 5.5
+        },
+        {
+          "event": "user.abort",
+          "ms": 108.6
+        },
+        {
+          "event": "fetch.signal.abort",
+          "ms": 108.7
+        },
+        {
+          "event": "server.response.close",
+          "ms": 110.1
+        },
+        {
+          "event": "cleanup.task.pending",
+          "ms": 3143.2
+        }
+      ]
+    },
+    {
+      "layer": "bare",
+      "mode": "fallback",
+      "scenario": "done_open",
+      "before": {
+        "settled": false,
+        "outcome": null,
+        "transportAborted": false
+      },
+      "after": {
+        "settled": false,
+        "outcome": null,
+        "transportAborted": true,
+        "timedOut": true
+      },
+      "trace": [
+        {
+          "event": "headers",
+          "ms": 4.9
+        },
+        {
+          "event": "read.enter",
+          "ms": 4.9
+        },
+        {
+          "event": "read.settle",
+          "ms": 5,
+          "done": false
+        },
+        {
+          "event": "bare.chunk",
+          "ms": 5
+        },
+        {
+          "event": "read.enter",
+          "ms": 5
+        },
+        {
+          "event": "read.settle",
+          "ms": 5,
+          "done": false
+        },
+        {
+          "event": "bare.chunk",
+          "ms": 5
+        },
+        {
+          "event": "read.enter",
+          "ms": 5
+        },
+        {
+          "event": "user.abort",
+          "ms": 108.3
+        },
+        {
+          "event": "fetch.signal.abort",
+          "ms": 108.4
+        },
+        {
+          "event": "server.response.close",
+          "ms": 109.6
+        },
+        {
+          "event": "cleanup.task.pending",
+          "ms": 3142.9
+        }
+      ]
+    },
+    {
+      "layer": "bare",
+      "mode": "fallback",
+      "scenario": "break_open",
+      "before": {
+        "settled": true,
+        "outcome": "end",
+        "transportAborted": false
+      },
+      "after": {
+        "settled": true,
+        "outcome": "end",
+        "transportAborted": false,
+        "timedOut": false
+      },
+      "trace": [
+        {
+          "event": "headers",
+          "ms": 5
+        },
+        {
+          "event": "read.enter",
+          "ms": 5.1
+        },
+        {
+          "event": "read.settle",
+          "ms": 5.1,
+          "done": false
+        },
+        {
+          "event": "bare.chunk",
+          "ms": 5.1
+        },
+        {
+          "event": "cancel.enter",
+          "ms": 5.1
+        },
+        {
+          "event": "cancel.settle",
+          "ms": 5.3
+        },
+        {
+          "event": "settled",
+          "ms": 5.3,
+          "outcome": "end"
+        },
+        {
+          "event": "server.response.close",
+          "ms": 6.1
+        },
+        {
+          "event": "fetch.signal.abort",
+          "ms": 137.2
+        }
+      ]
+    },
+    {
+      "layer": "sdk",
+      "mode": "fallback",
+      "scenario": "completed_open",
+      "before": {
+        "settled": false,
+        "outcome": null,
+        "transportAborted": false
+      },
+      "after": {
+        "settled": false,
+        "outcome": null,
+        "transportAborted": true,
+        "timedOut": true
+      },
+      "trace": [
+        {
+          "event": "headers",
+          "ms": 7.2
+        },
+        {
+          "event": "read.enter",
+          "ms": 7.5
+        },
+        {
+          "event": "read.settle",
+          "ms": 7.6,
+          "done": false
+        },
+        {
+          "event": "sdk.response.completed",
+          "ms": 7.6
+        },
+        {
+          "event": "read.enter",
+          "ms": 7.6
+        },
+        {
+          "event": "user.abort",
+          "ms": 110
+        },
+        {
+          "event": "fetch.signal.abort",
+          "ms": 110
+        },
+        {
+          "event": "server.response.close",
+          "ms": 111.7
+        },
+        {
+          "event": "cleanup.task.pending",
+          "ms": 3143.2
+        }
+      ]
+    },
+    {
+      "layer": "sdk",
+      "mode": "fallback",
+      "scenario": "eof",
+      "before": {
+        "settled": true,
+        "outcome": "end",
+        "transportAborted": false
+      },
+      "after": {
+        "settled": true,
+        "outcome": "end",
+        "transportAborted": false,
+        "timedOut": false
+      },
+      "trace": [
+        {
+          "event": "server.response.close",
+          "ms": 6.3
+        },
+        {
+          "event": "headers",
+          "ms": 6.7
+        },
+        {
+          "event": "read.enter",
+          "ms": 6.9
+        },
+        {
+          "event": "read.settle",
+          "ms": 6.9,
+          "done": false
+        },
+        {
+          "event": "sdk.response.completed",
+          "ms": 7
+        },
+        {
+          "event": "read.enter",
+          "ms": 7
+        },
+        {
+          "event": "read.settle",
+          "ms": 7,
+          "done": true
+        },
+        {
+          "event": "settled",
+          "ms": 7,
+          "outcome": "end"
+        },
+        {
+          "event": "fetch.signal.abort",
+          "ms": 140.5
+        }
+      ]
+    },
+    {
+      "layer": "sdk",
+      "mode": "fallback",
+      "scenario": "abort_before_completion",
+      "before": {
+        "settled": false,
+        "outcome": null,
+        "transportAborted": false
+      },
+      "after": {
+        "settled": false,
+        "outcome": null,
+        "transportAborted": true,
+        "timedOut": true
+      },
+      "trace": [
+        {
+          "event": "headers",
+          "ms": 7.9
+        },
+        {
+          "event": "read.enter",
+          "ms": 8.1
+        },
+        {
+          "event": "read.settle",
+          "ms": 8.1,
+          "done": false
+        },
+        {
+          "event": "sdk.response.created",
+          "ms": 8.2
+        },
+        {
+          "event": "read.enter",
+          "ms": 8.2
+        },
+        {
+          "event": "user.abort",
+          "ms": 110
+        },
+        {
+          "event": "fetch.signal.abort",
+          "ms": 110.1
+        },
+        {
+          "event": "server.response.close",
+          "ms": 112.2
+        },
+        {
+          "event": "cleanup.task.pending",
+          "ms": 3144
+        }
+      ]
+    },
+    {
+      "layer": "sdk",
+      "mode": "fallback",
+      "scenario": "disconnect",
+      "before": {
+        "settled": false,
+        "outcome": null,
+        "transportAborted": false
+      },
+      "after": {
+        "settled": false,
+        "outcome": null,
+        "transportAborted": false,
+        "timedOut": true
+      },
+      "trace": [
+        {
+          "event": "headers",
+          "ms": 8
+        },
+        {
+          "event": "read.enter",
+          "ms": 8.2
+        },
+        {
+          "event": "read.settle",
+          "ms": 8.2,
+          "done": false
+        },
+        {
+          "event": "sdk.response.completed",
+          "ms": 8.3
+        },
+        {
+          "event": "read.enter",
+          "ms": 8.3
+        },
+        {
+          "event": "server.destroy",
+          "ms": 110.6
+        },
+        {
+          "event": "server.response.close",
+          "ms": 110.8
+        },
+        {
+          "event": "fetch.signal.abort",
+          "ms": 1643.1
+        },
+        {
+          "event": "cleanup.task.pending",
+          "ms": 3144.5
+        }
+      ]
+    },
+    {
+      "layer": "sdk",
+      "mode": "fallback",
+      "scenario": "failed_open",
+      "before": {
+        "settled": false,
+        "outcome": null,
+        "transportAborted": false
+      },
+      "after": {
+        "settled": false,
+        "outcome": null,
+        "transportAborted": true,
+        "timedOut": true
+      },
+      "trace": [
+        {
+          "event": "headers",
+          "ms": 5.2
+        },
+        {
+          "event": "read.enter",
+          "ms": 5.4
+        },
+        {
+          "event": "read.settle",
+          "ms": 5.4,
+          "done": false
+        },
+        {
+          "event": "sdk.response.failed",
+          "ms": 5.4
+        },
+        {
+          "event": "read.enter",
+          "ms": 5.4
+        },
+        {
+          "event": "user.abort",
+          "ms": 106.6
+        },
+        {
+          "event": "fetch.signal.abort",
+          "ms": 106.7
+        },
+        {
+          "event": "server.response.close",
+          "ms": 108.1
+        },
+        {
+          "event": "cleanup.task.pending",
+          "ms": 3138.7
+        }
+      ]
+    },
+    {
+      "layer": "sdk",
+      "mode": "fallback",
+      "scenario": "error_open",
+      "before": {
+        "settled": false,
+        "outcome": null,
+        "transportAborted": false
+      },
+      "after": {
+        "settled": false,
+        "outcome": null,
+        "transportAborted": true,
+        "timedOut": true
+      },
+      "trace": [
+        {
+          "event": "headers",
+          "ms": 5.5
+        },
+        {
+          "event": "read.enter",
+          "ms": 5.6
+        },
+        {
+          "event": "read.settle",
+          "ms": 5.7,
+          "done": false
+        },
+        {
+          "event": "sdk.error",
+          "ms": 5.7
+        },
+        {
+          "event": "read.enter",
+          "ms": 5.7
+        },
+        {
+          "event": "user.abort",
+          "ms": 107.5
+        },
+        {
+          "event": "fetch.signal.abort",
+          "ms": 107.6
+        },
+        {
+          "event": "server.response.close",
+          "ms": 109
+        },
+        {
+          "event": "cleanup.task.pending",
+          "ms": 3140.9
+        }
+      ]
+    },
+    {
+      "layer": "sdk",
+      "mode": "fallback",
+      "scenario": "done_open",
+      "before": {
+        "settled": false,
+        "outcome": null,
+        "transportAborted": false
+      },
+      "after": {
+        "settled": false,
+        "outcome": null,
+        "transportAborted": true,
+        "timedOut": true
+      },
+      "trace": [
+        {
+          "event": "headers",
+          "ms": 6.9
+        },
+        {
+          "event": "read.enter",
+          "ms": 7.1
+        },
+        {
+          "event": "read.settle",
+          "ms": 7.1,
+          "done": false
+        },
+        {
+          "event": "sdk.response.completed",
+          "ms": 7.2
+        },
+        {
+          "event": "read.enter",
+          "ms": 7.2
+        },
+        {
+          "event": "read.settle",
+          "ms": 7.2,
+          "done": false
+        },
+        {
+          "event": "read.enter",
+          "ms": 7.2
+        },
+        {
+          "event": "user.abort",
+          "ms": 110.7
+        },
+        {
+          "event": "fetch.signal.abort",
+          "ms": 110.8
+        },
+        {
+          "event": "server.response.close",
+          "ms": 112.5
+        },
+        {
+          "event": "cleanup.task.pending",
+          "ms": 3144
+        }
+      ]
+    },
+    {
+      "layer": "sdk",
+      "mode": "fallback",
+      "scenario": "break_open",
+      "before": {
+        "settled": true,
+        "outcome": "end",
+        "transportAborted": true
+      },
+      "after": {
+        "settled": true,
+        "outcome": "end",
+        "transportAborted": true,
+        "timedOut": false
+      },
+      "trace": [
+        {
+          "event": "headers",
+          "ms": 5.5
+        },
+        {
+          "event": "read.enter",
+          "ms": 5.6
+        },
+        {
+          "event": "read.settle",
+          "ms": 5.7,
+          "done": false
+        },
+        {
+          "event": "sdk.response.completed",
+          "ms": 5.7
+        },
+        {
+          "event": "cancel.enter",
+          "ms": 5.8
+        },
+        {
+          "event": "cancel.settle",
+          "ms": 6
+        },
+        {
+          "event": "fetch.signal.abort",
+          "ms": 6.1
+        },
+        {
+          "event": "settled",
+          "ms": 6.1,
+          "outcome": "end"
+        },
+        {
+          "event": "server.response.close",
+          "ms": 7
+        }
+      ]
+    },
+    {
+      "layer": "pi",
+      "mode": "fallback",
+      "scenario": "completed_open",
+      "before": {
+        "settled": false,
+        "outcome": null,
+        "transportAborted": false
+      },
+      "after": {
+        "settled": false,
+        "outcome": null,
+        "transportAborted": true,
+        "timedOut": true
+      },
+      "trace": [
+        {
+          "event": "headers",
+          "ms": 6.7
+        },
+        {
+          "event": "read.enter",
+          "ms": 6.8
+        },
+        {
+          "event": "pi.start",
+          "ms": 6.9
+        },
+        {
+          "event": "read.settle",
+          "ms": 6.9,
+          "done": false
+        },
+        {
+          "event": "read.enter",
+          "ms": 6.9
+        },
+        {
+          "event": "user.abort",
+          "ms": 109.2
+        },
+        {
+          "event": "fetch.signal.abort",
+          "ms": 109.3
+        },
+        {
+          "event": "server.response.close",
+          "ms": 110.8
+        },
+        {
+          "event": "cleanup.task.pending",
+          "ms": 3146.6
+        }
+      ]
+    },
+    {
+      "layer": "pi",
+      "mode": "fallback",
+      "scenario": "eof",
+      "before": {
+        "settled": true,
+        "outcome": "stop",
+        "transportAborted": false
+      },
+      "after": {
+        "settled": true,
+        "outcome": "stop",
+        "transportAborted": false,
+        "timedOut": false
+      },
+      "trace": [
+        {
+          "event": "server.response.close",
+          "ms": 8.7
+        },
+        {
+          "event": "headers",
+          "ms": 9.2
+        },
+        {
+          "event": "read.enter",
+          "ms": 9.6
+        },
+        {
+          "event": "pi.start",
+          "ms": 9.7
+        },
+        {
+          "event": "read.settle",
+          "ms": 9.7,
+          "done": false
+        },
+        {
+          "event": "read.enter",
+          "ms": 9.8
+        },
+        {
+          "event": "read.settle",
+          "ms": 9.9,
+          "done": true
+        },
+        {
+          "event": "pi.done",
+          "ms": 10
+        },
+        {
+          "event": "settled",
+          "ms": 10,
+          "outcome": "stop"
+        },
+        {
+          "event": "fetch.signal.abort",
+          "ms": 142.9
+        }
+      ]
+    },
+    {
+      "layer": "pi",
+      "mode": "fallback",
+      "scenario": "abort_before_completion",
+      "before": {
+        "settled": false,
+        "outcome": null,
+        "transportAborted": false
+      },
+      "after": {
+        "settled": false,
+        "outcome": null,
+        "transportAborted": true,
+        "timedOut": true
+      },
+      "trace": [
+        {
+          "event": "headers",
+          "ms": 7.2
+        },
+        {
+          "event": "read.enter",
+          "ms": 7.4
+        },
+        {
+          "event": "pi.start",
+          "ms": 7.5
+        },
+        {
+          "event": "read.settle",
+          "ms": 7.5,
+          "done": false
+        },
+        {
+          "event": "read.enter",
+          "ms": 7.5
+        },
+        {
+          "event": "user.abort",
+          "ms": 109.2
+        },
+        {
+          "event": "fetch.signal.abort",
+          "ms": 109.2
+        },
+        {
+          "event": "server.response.close",
+          "ms": 110.5
+        },
+        {
+          "event": "cleanup.task.pending",
+          "ms": 3142.6
+        }
+      ]
+    },
+    {
+      "layer": "pi",
+      "mode": "fallback",
+      "scenario": "disconnect",
+      "before": {
+        "settled": false,
+        "outcome": null,
+        "transportAborted": false
+      },
+      "after": {
+        "settled": false,
+        "outcome": null,
+        "transportAborted": false,
+        "timedOut": true
+      },
+      "trace": [
+        {
+          "event": "headers",
+          "ms": 6.8
+        },
+        {
+          "event": "read.enter",
+          "ms": 6.9
+        },
+        {
+          "event": "pi.start",
+          "ms": 7
+        },
+        {
+          "event": "read.settle",
+          "ms": 7,
+          "done": false
+        },
+        {
+          "event": "read.enter",
+          "ms": 7.1
+        },
+        {
+          "event": "server.destroy",
+          "ms": 110
+        },
+        {
+          "event": "server.response.close",
+          "ms": 110.2
+        },
+        {
+          "event": "fetch.signal.abort",
+          "ms": 1641.1
+        },
+        {
+          "event": "cleanup.task.pending",
+          "ms": 3141.9
+        }
+      ]
+    },
+    {
+      "layer": "pi",
+      "mode": "fallback",
+      "scenario": "failed_open",
+      "before": {
+        "settled": true,
+        "outcome": "error",
+        "transportAborted": true
+      },
+      "after": {
+        "settled": true,
+        "outcome": "error",
+        "transportAborted": true,
+        "timedOut": false
+      },
+      "trace": [
+        {
+          "event": "headers",
+          "ms": 6
+        },
+        {
+          "event": "read.enter",
+          "ms": 6.1
+        },
+        {
+          "event": "pi.start",
+          "ms": 6.1
+        },
+        {
+          "event": "read.settle",
+          "ms": 6.1,
+          "done": false
+        },
+        {
+          "event": "cancel.enter",
+          "ms": 6.2
+        },
+        {
+          "event": "cancel.settle",
+          "ms": 6.3
+        },
+        {
+          "event": "fetch.signal.abort",
+          "ms": 6.4
+        },
+        {
+          "event": "pi.error",
+          "ms": 6.4
+        },
+        {
+          "event": "settled",
+          "ms": 6.4,
+          "outcome": "error"
+        },
+        {
+          "event": "server.response.close",
+          "ms": 7.1
+        }
+      ]
+    },
+    {
+      "layer": "pi",
+      "mode": "fallback",
+      "scenario": "error_open",
+      "before": {
+        "settled": true,
+        "outcome": "error",
+        "transportAborted": true
+      },
+      "after": {
+        "settled": true,
+        "outcome": "error",
+        "transportAborted": true,
+        "timedOut": false
+      },
+      "trace": [
+        {
+          "event": "headers",
+          "ms": 7.1
+        },
+        {
+          "event": "read.enter",
+          "ms": 7.2
+        },
+        {
+          "event": "pi.start",
+          "ms": 7.2
+        },
+        {
+          "event": "read.settle",
+          "ms": 7.2,
+          "done": false
+        },
+        {
+          "event": "cancel.enter",
+          "ms": 7.3
+        },
+        {
+          "event": "cancel.settle",
+          "ms": 7.4
+        },
+        {
+          "event": "fetch.signal.abort",
+          "ms": 7.5
+        },
+        {
+          "event": "pi.error",
+          "ms": 7.5
+        },
+        {
+          "event": "settled",
+          "ms": 7.5,
+          "outcome": "error"
+        },
+        {
+          "event": "server.response.close",
+          "ms": 8.3
+        }
+      ]
+    },
+    {
+      "layer": "pi",
+      "mode": "fallback",
+      "scenario": "done_open",
+      "before": {
+        "settled": false,
+        "outcome": null,
+        "transportAborted": false
+      },
+      "after": {
+        "settled": false,
+        "outcome": null,
+        "transportAborted": true,
+        "timedOut": true
+      },
+      "trace": [
+        {
+          "event": "headers",
+          "ms": 7.6
+        },
+        {
+          "event": "read.enter",
+          "ms": 7.7
+        },
+        {
+          "event": "pi.start",
+          "ms": 7.8
+        },
+        {
+          "event": "read.settle",
+          "ms": 7.8,
+          "done": false
+        },
+        {
+          "event": "read.enter",
+          "ms": 7.8
+        },
+        {
+          "event": "read.settle",
+          "ms": 7.8,
+          "done": false
+        },
+        {
+          "event": "read.enter",
+          "ms": 7.9
+        },
+        {
+          "event": "user.abort",
+          "ms": 110.3
+        },
+        {
+          "event": "fetch.signal.abort",
+          "ms": 110.3
+        },
+        {
+          "event": "server.response.close",
+          "ms": 111.4
+        },
+        {
+          "event": "cleanup.task.pending",
+          "ms": 3145.8
+        }
+      ]
+    },
+    {
+      "layer": "pi_break",
+      "mode": "fallback",
+      "scenario": "completed_open",
+      "before": {
+        "settled": true,
+        "outcome": "stop",
+        "transportAborted": true
+      },
+      "after": {
+        "settled": true,
+        "outcome": "stop",
+        "transportAborted": true,
+        "timedOut": false
+      },
+      "trace": [
+        {
+          "event": "headers",
+          "ms": 6.4
+        },
+        {
+          "event": "read.enter",
+          "ms": 6.6
+        },
+        {
+          "event": "pi.start",
+          "ms": 6.7
+        },
+        {
+          "event": "read.settle",
+          "ms": 6.7,
+          "done": false
+        },
+        {
+          "event": "cancel.enter",
+          "ms": 6.8
+        },
+        {
+          "event": "cancel.settle",
+          "ms": 6.9
+        },
+        {
+          "event": "fetch.signal.abort",
+          "ms": 7
+        },
+        {
+          "event": "pi.done",
+          "ms": 7
+        },
+        {
+          "event": "settled",
+          "ms": 7,
+          "outcome": "stop"
+        },
+        {
+          "event": "server.response.close",
+          "ms": 7.7
+        }
+      ]
+    }
+  ]
+}

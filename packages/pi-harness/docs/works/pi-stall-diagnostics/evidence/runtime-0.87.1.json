@@ -1,0 +1,45 @@
+{
+  "status": "passed",
+  "rollbackSmoke": "0.87.1",
+  "isolatedHomeEmpty": true,
+  "networkAndChildProcessBlocked": true,
+  "finalDisposableHash": "81c81a21ec81e84200205f561687408ff5e3738fbbbb3c2a6c186b348d376020",
+  "installerChecks": [
+    "idempotence does not rewrite",
+    "backup drift refuses without mutation",
+    "install and rollback refuse unknown bytes without mutation",
+    "exact backup restoration",
+    "isolated restored CLI smoke"
+  ],
+  "stage": "C:\\Users\\WINDOWS\\AppData\\Local\\Temp\\pi-stall-check-xuFeQX",
+  "version": "0.87.1",
+  "originalHash": "81c81a21ec81e84200205f561687408ff5e3738fbbbb3c2a6c186b348d376020",
+  "patchedHash": "7db71a2ea905b0fdc495348d0c6cfc3c52e2acfd6d1a7caea78c890bbe65ddfd",
+  "boundaries": 9,
+  "benchmark": {
+    "off": {
+      "medianMs": 0.0003000000000383807,
+      "p95Ms": 0.0008000000000265572
+    },
+    "on": {
+      "medianMs": 1.1487999999999374,
+      "p95Ms": 2.2547000000000708
+    },
+    "events": 5000,
+    "bytes": 755638
+  },
+  "activationAllowed": false,
+  "smoke": "0.87.1",
+  "checks": "syntax, extracted actual boundaries, stream success/error/reject/abort, pending second handler, append/error, tool hook wait/error, tool execute/error, abort order, sentinels, rotation, logger setup/write failure, process isolation, disposable install/idempotence/drift/rollback, patched provider-free CLI --version, unchanged installed hash",
+  "command": [
+    "E:\\Projects\\pi-packages\\packages\\pi-harness\\tools\\pi-stall-diagnostics\\check.mjs",
+    "D:/Applications/Scoop/apps/pi-coding-agent-bun/current/node_modules/@earendil-works/pi-coding-agent",
+    "packages/pi-harness/docs/works/pi-stall-diagnostics/evidence/runtime-0.87.1.json"
+  ],
+  "sourceHashes": {
+    "check.mjs": "7f32a59bc3c228af0f570622d02d5383e7c2bf3604fd4b80e38b798f564c1928",
+    "stage.mjs": "2a96a0a3fae049b619792e5b0dbb9985ec9a1e93c38647bf3dc828b050d35876",
+    "logger.mjs": "a07bd0235e0f4daa2e35aabbd31896873556390d9b050d2ad3bdd0fed0f99f21",
+    "install.mjs": "8e93d44eceed9cb5fa324985c4a4fbfe05e01b6983c5a7260d2270623c7d529a"
+  }
+}

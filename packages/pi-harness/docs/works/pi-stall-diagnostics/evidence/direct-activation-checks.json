@@ -1,0 +1,157 @@
+{
+  "status": "passed",
+  "observedAt": "2026-09-24T04:21:14.881Z",
+  "checks": [
+    "Metadata classifier preserves informational runtime inventory and rejects incomplete snapshots",
+    "Compatibility admission succeeds despite occupancy; wrong root and disposable live manifest refuse without mutation",
+    "Shared pair engine install/idempotence/rollback with new fixed isolated smoke succeeds on disposable bytes",
+    "Known-byte drift during smoke cannot report stale successful state; guarded restoration returns both originals"
+  ],
+  "sourceHashes": {
+    "install.mjs": "ba4452af7cbbd6adfae281a303916d25a858d3c06f21a7ec65f2c5daaf00ee9b",
+    "activate.mjs": "e572e3414a6bdf20714d8f6c3ef8cb20777d95421035f0a84c0e078d04b351c0",
+    "smoke.mjs": "3e7d4dec673978d1cc211d0a6c18d5e5e116b42cd7d17eb1b4d0466a10c46587",
+    "check-activation.mjs": "9cceee376da81b3345b61a029834bad39defc7b2d711f4204b83e409b8cdd84a"
+  },
+  "blockers": [
+    {
+      "pid": 270124,
+      "name": "bun.exe",
+      "executable": null
+    },
+    {
+      "pid": 279148,
+      "name": "bun.exe",
+      "executable": "D:\\Applications\\Scoop\\shims\\bun.exe"
+    },
+    {
+      "pid": 288068,
+      "name": "bun.exe",
+      "executable": "D:\\Applications\\Scoop\\apps\\bun\\current\\bun.exe"
+    },
+    {
+      "pid": 285656,
+      "name": "bun.exe",
+      "executable": "D:\\Applications\\Scoop\\apps\\bun\\1.4.0\\bun.exe"
+    },
+    {
+      "pid": 267212,
+      "name": "bun.exe",
+      "executable": "D:\\Applications\\Scoop\\apps\\bun\\1.4.0\\bun.exe"
+    },
+    {
+      "pid": 269568,
+      "name": "node.exe",
+      "executable": "D:\\Applications\\Scoop\\apps\\nodejs-lts\\current\\node.exe"
+    },
+    {
+      "pid": 286772,
+      "name": "node.exe",
+      "executable": "D:\\Applications\\Scoop\\apps\\nodejs-lts\\current\\node.exe"
+    },
+    {
+      "pid": 263292,
+      "name": "node.exe",
+      "executable": "D:\\Applications\\Scoop\\apps\\nodejs-lts\\current\\node.exe"
+    },
+    {
+      "pid": 290620,
+      "name": "node.exe",
+      "executable": "D:\\Applications\\Scoop\\apps\\nodejs-lts\\current\\node.exe"
+    },
+    {
+      "pid": 264732,
+      "name": "node.exe",
+      "executable": "D:\\Applications\\Scoop\\apps\\nodejs-lts\\current\\node.exe"
+    },
+    {
+      "pid": 289920,
+      "name": "node.exe",
+      "executable": "D:\\Applications\\Scoop\\apps\\nodejs-lts\\current\\node.exe"
+    },
+    {
+      "pid": 262668,
+      "name": "node.exe",
+      "executable": "D:\\Applications\\Scoop\\apps\\nodejs-lts\\current\\node.exe"
+    },
+    {
+      "pid": 267432,
+      "name": "node.exe",
+      "executable": "D:\\Applications\\Scoop\\apps\\nodejs-lts\\current\\node.exe"
+    },
+    {
+      "pid": 279300,
+      "name": "bun.exe",
+      "executable": "D:\\Applications\\Scoop\\apps\\bun\\1.4.0\\bun.exe"
+    },
+    {
+      "pid": 282152,
+      "name": "bun.exe",
+      "executable": "D:\\Applications\\Scoop\\shims\\bun.exe"
+    }
+  ],
+  "finalRealStates": [
+    {
+      "file": "chunk-OJP47DM6.js",
+      "hash": "81c81a21ec81e84200205f561687408ff5e3738fbbbb3c2a6c186b348d376020",
+      "state": "original"
+    },
+    {
+      "file": "chunk-FUXEF6JQ.js",
+      "hash": "b7d0697d0f4c7d3b54c6aee545d3b27c5981c27d0470e1c79876898f28f2c472",
+      "state": "original"
+    }
+  ],
+  "finalDisposableStates": [
+    {
+      "file": "chunk-OJP47DM6.js",
+      "hash": "81c81a21ec81e84200205f561687408ff5e3738fbbbb3c2a6c186b348d376020",
+      "state": "original"
+    },
+    {
+      "file": "chunk-FUXEF6JQ.js",
+      "hash": "b7d0697d0f4c7d3b54c6aee545d3b27c5981c27d0470e1c79876898f28f2c472",
+      "state": "original"
+    }
+  ],
+  "patchedSmoke": {
+    "version": "0.87.1",
+    "runtime": {
+      "executable": "D:\\Applications\\Scoop\\apps\\bun\\1.4.0\\bun.exe",
+      "node": "v26.3.0",
+      "bun": "1.4.0"
+    },
+    "isolatedHomeEmpty": true,
+    "networkAndProcessesBlocked": true,
+    "probe": {
+      "mainAndBothLazyAdaptersImported": true,
+      "appendIdentityPreserved": true,
+      "loggingRecords": 2,
+      "sessionCreated": false
+    },
+    "work": "C:\\Users\\WINDOWS\\AppData\\Local\\Temp\\pi-stall-smoke-Qdlrza"
+  },
+  "restoredSmoke": {
+    "version": "0.87.1",
+    "runtime": {
+      "executable": "D:\\Applications\\Scoop\\apps\\bun\\1.4.0\\bun.exe",
+      "node": "v26.3.0",
+      "bun": "1.4.0"
+    },
+    "isolatedHomeEmpty": true,
+    "networkAndProcessesBlocked": true,
+    "probe": {
+      "mainAndBothLazyAdaptersImported": true,
+      "appendIdentityPreserved": true,
+      "loggingRecords": 0,
+      "sessionCreated": false
+    },
+    "work": "C:\\Users\\WINDOWS\\AppData\\Local\\Temp\\pi-stall-smoke-gb5jTg"
+  },
+  "loggingEnabled": false,
+  "limitations": [
+    "This check mutates only disposable targets; real manifest mismatch is rejected before writes.",
+    "Mutex serializes installers only; both known main/SDK combinations were independently checked.",
+    "Live rollback drill is not required by the latest authorization; disposable exact restoration remains verified."
+  ]
+}

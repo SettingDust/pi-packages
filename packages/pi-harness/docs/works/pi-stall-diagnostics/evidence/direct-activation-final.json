@@ -1,0 +1,97 @@
+{
+  "observedAt": "2026-09-24T04:22:15.245Z",
+  "root": "D:\\Applications\\Scoop\\apps\\pi-coding-agent-bun\\0.87.1\\node_modules\\@earendil-works\\pi-coding-agent",
+  "directory": "C:\\Users\\WINDOWS\\AppData\\Local\\pi-stall-recovery-0.87.1",
+  "before": [
+    {
+      "file": "chunk-OJP47DM6.js",
+      "hash": "81c81a21ec81e84200205f561687408ff5e3738fbbbb3c2a6c186b348d376020",
+      "state": "original"
+    },
+    {
+      "file": "chunk-FUXEF6JQ.js",
+      "hash": "b7d0697d0f4c7d3b54c6aee545d3b27c5981c27d0470e1c79876898f28f2c472",
+      "state": "original"
+    }
+  ],
+  "steps": [
+    "Exclusively staged two verified originals and patches outside installation"
+  ],
+  "status": "completed",
+  "install": {
+    "state": "install",
+    "activationAllowed": true,
+    "states": [
+      {
+        "file": "chunk-OJP47DM6.js",
+        "hash": "b1c6995246bb393df5fda23dc3a286f7d8f26814a09fc2aa140760ba78207d3c",
+        "state": "patched"
+      },
+      {
+        "file": "chunk-FUXEF6JQ.js",
+        "hash": "32b6ff866b6a64fc2613fa12474f7ada5ca1483a362d0be7680735bdaedc1200",
+        "state": "patched"
+      }
+    ]
+  },
+  "idempotence": {
+    "state": "already-install",
+    "activationAllowed": true,
+    "states": [
+      {
+        "file": "chunk-OJP47DM6.js",
+        "hash": "b1c6995246bb393df5fda23dc3a286f7d8f26814a09fc2aa140760ba78207d3c",
+        "state": "patched"
+      },
+      {
+        "file": "chunk-FUXEF6JQ.js",
+        "hash": "32b6ff866b6a64fc2613fa12474f7ada5ca1483a362d0be7680735bdaedc1200",
+        "state": "patched"
+      }
+    ]
+  },
+  "smoke": {
+    "version": "0.87.1",
+    "runtime": {
+      "executable": "D:\\Applications\\Scoop\\apps\\bun\\1.4.0\\bun.exe",
+      "node": "v26.3.0",
+      "bun": "1.4.0"
+    },
+    "isolatedHomeEmpty": true,
+    "networkAndProcessesBlocked": true,
+    "probe": {
+      "mainAndBothLazyAdaptersImported": true,
+      "appendIdentityPreserved": true,
+      "loggingRecords": 2,
+      "sessionCreated": false
+    },
+    "work": "C:\\Users\\WINDOWS\\AppData\\Local\\Temp\\pi-stall-smoke-TkJ9dS"
+  },
+  "final": [
+    {
+      "file": "chunk-OJP47DM6.js",
+      "hash": "b1c6995246bb393df5fda23dc3a286f7d8f26814a09fc2aa140760ba78207d3c",
+      "state": "patched"
+    },
+    {
+      "file": "chunk-FUXEF6JQ.js",
+      "hash": "32b6ff866b6a64fc2613fa12474f7ada5ca1483a362d0be7680735bdaedc1200",
+      "state": "patched"
+    }
+  ],
+  "logging": {
+    "scope": "Windows user environment for newly inherited environments; existing parents unchanged",
+    "directory": "C:/Users/WINDOWS/AppData/Local/pi-stall-logs",
+    "environmentBackup": "C:\\Users\\WINDOWS\\AppData\\Local\\pi-stall-recovery-0.87.1\\logging-environment.json",
+    "probe": {
+      "mainAndBothLazyAdaptersImported": true,
+      "appendIdentityPreserved": true,
+      "loggingRecords": 2,
+      "sessionCreated": false
+    },
+    "files": [
+      "276432-ef48e461-0e18-451c-aed8-851cbf10be37.0.jsonl"
+    ],
+    "currentSession": "Not instrumented or reconfigured by this task"
+  }
+}

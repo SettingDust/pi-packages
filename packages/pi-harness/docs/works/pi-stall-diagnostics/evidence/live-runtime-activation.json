@@ -1,0 +1,135 @@
+{
+  "runtime": {
+    "executable": "D:\\Applications\\Scoop\\apps\\bun\\1.4.0\\bun.exe",
+    "bun": "1.4.0"
+  },
+  "fixture": "C:\\Users\\WINDOWS\\AppData\\Local\\Temp\\pi-stall-pair-qBMyn4",
+  "sourceStates": [
+    {
+      "file": "chunk-OJP47DM6.js",
+      "hash": "81c81a21ec81e84200205f561687408ff5e3738fbbbb3c2a6c186b348d376020",
+      "state": "original"
+    },
+    {
+      "file": "chunk-FUXEF6JQ.js",
+      "hash": "b7d0697d0f4c7d3b54c6aee545d3b27c5981c27d0470e1c79876898f28f2c472",
+      "state": "original"
+    }
+  ],
+  "checks": [
+    {
+      "name": "Both export contracts byte-identical"
+    },
+    {
+      "name": "Actual Bun main/SDK combination",
+      "states": [
+        0,
+        0
+      ],
+      "smoke": {
+        "version": "0.87.1",
+        "runtime": {
+          "executable": "D:\\Applications\\Scoop\\apps\\bun\\1.4.0\\bun.exe",
+          "node": "v26.3.0",
+          "bun": "1.4.0"
+        },
+        "isolatedHomeEmpty": true,
+        "networkAndProcessesBlocked": true,
+        "probe": {
+          "mainAndBothLazyAdaptersImported": true,
+          "appendIdentityPreserved": true,
+          "loggingRecords": 0,
+          "sessionCreated": false
+        },
+        "work": "C:\\Users\\WINDOWS\\AppData\\Local\\Temp\\pi-stall-smoke-XJ1VP9"
+      }
+    },
+    {
+      "name": "Actual Bun main/SDK combination",
+      "states": [
+        0,
+        1
+      ],
+      "smoke": {
+        "version": "0.87.1",
+        "runtime": {
+          "executable": "D:\\Applications\\Scoop\\apps\\bun\\1.4.0\\bun.exe",
+          "node": "v26.3.0",
+          "bun": "1.4.0"
+        },
+        "isolatedHomeEmpty": true,
+        "networkAndProcessesBlocked": true,
+        "probe": {
+          "mainAndBothLazyAdaptersImported": true,
+          "appendIdentityPreserved": true,
+          "loggingRecords": 0,
+          "sessionCreated": false
+        },
+        "work": "C:\\Users\\WINDOWS\\AppData\\Local\\Temp\\pi-stall-smoke-8rgrhY"
+      }
+    },
+    {
+      "name": "Actual Bun main/SDK combination",
+      "states": [
+        1,
+        0
+      ],
+      "smoke": {
+        "version": "0.87.1",
+        "runtime": {
+          "executable": "D:\\Applications\\Scoop\\apps\\bun\\1.4.0\\bun.exe",
+          "node": "v26.3.0",
+          "bun": "1.4.0"
+        },
+        "isolatedHomeEmpty": true,
+        "networkAndProcessesBlocked": true,
+        "probe": {
+          "mainAndBothLazyAdaptersImported": true,
+          "appendIdentityPreserved": true,
+          "loggingRecords": 2,
+          "sessionCreated": false
+        },
+        "work": "C:\\Users\\WINDOWS\\AppData\\Local\\Temp\\pi-stall-smoke-SGqexF"
+      }
+    },
+    {
+      "name": "Actual Bun main/SDK combination",
+      "states": [
+        1,
+        1
+      ],
+      "smoke": {
+        "version": "0.87.1",
+        "runtime": {
+          "executable": "D:\\Applications\\Scoop\\apps\\bun\\1.4.0\\bun.exe",
+          "node": "v26.3.0",
+          "bun": "1.4.0"
+        },
+        "isolatedHomeEmpty": true,
+        "networkAndProcessesBlocked": true,
+        "probe": {
+          "mainAndBothLazyAdaptersImported": true,
+          "appendIdentityPreserved": true,
+          "loggingRecords": 2,
+          "sessionCreated": false
+        },
+        "work": "C:\\Users\\WINDOWS\\AppData\\Local\\Temp\\pi-stall-smoke-lctcjF"
+      }
+    },
+    {
+      "name": "Windows sharing and cached-module replacement",
+      "sharing": "open reader refuses replacement with EPERM and preserves original",
+      "cachedModuleUnchanged": true,
+      "queryDoesNotReloadBunModule": true,
+      "diskHasReplacement": true
+    }
+  ],
+  "sourceHashes": {
+    "stage.mjs": "37aa6a72cea8726c66f5ae37bcb45eab5b84e1e683356ac8a6c9922528d3726f",
+    "logger.mjs": "bb82a426532a67f3cc6744c2d621984036ce1ef35622f30325f21e04f8de92dd",
+    "smoke.mjs": "3e7d4dec673978d1cc211d0a6c18d5e5e116b42cd7d17eb1b4d0466a10c46587",
+    "smoke-probe.mjs": "792c94b77020d0d3890c0277d59c9c740d13b8f47c591610ed282280bef52a2a",
+    "check-live-runtime.mjs": "6fe85393856fc5a5b073245a1962e093674cc2880f29e752973197b30f1c80a6"
+  },
+  "status": "passed"
+}

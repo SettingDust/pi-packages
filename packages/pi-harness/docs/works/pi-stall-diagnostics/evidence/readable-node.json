@@ -1,0 +1,19 @@
+{
+  "runtime": "Node v24.15.0",
+  "open": {
+    "readable": true,
+    "errored": false,
+    "nodeReadableMarker": true
+  },
+  "locked": {
+    "readable": true,
+    "errored": false,
+    "nodeReadableMarker": true
+  },
+  "errored": {
+    "readable": false,
+    "errored": true,
+    "nodeReadableMarker": false
+  },
+  "manualControllerErrorRejectsRead": true
+}

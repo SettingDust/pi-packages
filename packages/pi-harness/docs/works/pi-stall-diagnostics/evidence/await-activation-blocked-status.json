@@ -1,0 +1,122 @@
+{
+  "observedAt": "2026-09-25T12:33:54.666Z",
+  "root": "D:\\Applications\\Scoop\\apps\\pi-coding-agent-bun\\0.87.1\\node_modules\\@earendil-works\\pi-coding-agent",
+  "states": [
+    {
+      "file": "chunk-OJP47DM6.js",
+      "hash": "b1c6995246bb393df5fda23dc3a286f7d8f26814a09fc2aa140760ba78207d3c",
+      "state": "base"
+    },
+    {
+      "file": "openai-responses-HWEUZ6WZ.js",
+      "hash": "4ebfa8cec003119c431c92b8306f28f5b9359bde82e213bc8afa6ed764d5bde8",
+      "state": "original/base"
+    },
+    {
+      "file": "chunk-NUHFSC37.js",
+      "hash": "9b724435ac1da15eaa4465e7eaca0aa9a23617c6f1efa7b6261db6d17dbe755b",
+      "state": "original/base"
+    },
+    {
+      "file": "chunk-RCZIEVGO.js",
+      "hash": "7b2c0b36b01c1cedb11e7ab525a3fade0967f56b0cbd286fc32ffa25f5965055",
+      "state": "original/base"
+    },
+    {
+      "file": "chunk-FUXEF6JQ.js",
+      "hash": "32b6ff866b6a64fc2613fa12474f7ada5ca1483a362d0be7680735bdaedc1200",
+      "state": "base/patched"
+    }
+  ],
+  "runtimeProcesses": [
+    {
+      "pid": 270124,
+      "name": "bun.exe",
+      "executable": null
+    },
+    {
+      "pid": 285288,
+      "name": "bun.exe",
+      "executable": "D:\\Applications\\Scoop\\shims\\bun.exe"
+    },
+    {
+      "pid": 275492,
+      "name": "bun.exe",
+      "executable": "D:\\Applications\\Scoop\\apps\\bun\\current\\bun.exe"
+    },
+    {
+      "pid": 276024,
+      "name": "bun.exe",
+      "executable": "D:\\Applications\\Scoop\\shims\\bun.exe"
+    },
+    {
+      "pid": 288168,
+      "name": "bun.exe",
+      "executable": "D:\\Applications\\Scoop\\apps\\bun\\current\\bun.exe"
+    },
+    {
+      "pid": 281096,
+      "name": "bun.exe",
+      "executable": "D:\\Applications\\Scoop\\apps\\bun\\1.4.0\\bun.exe"
+    },
+    {
+      "pid": 278052,
+      "name": "bun.exe",
+      "executable": "D:\\Applications\\Scoop\\apps\\bun\\1.4.0\\bun.exe"
+    },
+    {
+      "pid": 288296,
+      "name": "node.exe",
+      "executable": "D:\\Applications\\Scoop\\apps\\nodejs-lts\\current\\node.exe"
+    },
+    {
+      "pid": 276180,
+      "name": "node.exe",
+      "executable": "D:\\Applications\\Scoop\\apps\\nodejs-lts\\current\\node.exe"
+    },
+    {
+      "pid": 277232,
+      "name": "node.exe",
+      "executable": "D:\\Applications\\Scoop\\apps\\nodejs-lts\\current\\node.exe"
+    },
+    {
+      "pid": 270824,
+      "name": "node.exe",
+      "executable": "D:\\Applications\\Scoop\\apps\\nodejs-lts\\current\\node.exe"
+    },
+    {
+      "pid": 288552,
+      "name": "node.exe",
+      "executable": "D:\\Applications\\Scoop\\apps\\nodejs-lts\\current\\node.exe"
+    },
+    {
+      "pid": 270312,
+      "name": "node.exe",
+      "executable": "D:\\Applications\\Scoop\\apps\\nodejs-lts\\current\\node.exe"
+    },
+    {
+      "pid": 264184,
+      "name": "node.exe",
+      "executable": "D:\\Applications\\Scoop\\apps\\nodejs-lts\\current\\node.exe"
+    },
+    {
+      "pid": 286068,
+      "name": "node.exe",
+      "executable": "D:\\Applications\\Scoop\\apps\\nodejs-lts\\current\\node.exe"
+    },
+    {
+      "pid": 281960,
+      "name": "bun.exe",
+      "executable": "D:\\Applications\\Scoop\\apps\\bun\\1.4.0\\bun.exe"
+    },
+    {
+      "pid": 271396,
+      "name": "bun.exe",
+      "executable": "D:\\Applications\\Scoop\\shims\\bun.exe"
+    }
+  ],
+  "admission": "Known revisions are compatible across cached main and lazy SDK imports; process occupancy is informational.",
+  "inactivityEstablished": false,
+  "loggingEnabled": null,
+  "loggingNote": "Original bytes contain no kit logger. Patched bytes require opt-in in a new process; existing process environments are not inspected."
+}

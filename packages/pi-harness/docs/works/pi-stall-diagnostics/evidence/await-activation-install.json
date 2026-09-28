@@ -1,0 +1,31 @@
+{
+  "state": "install",
+  "activationAllowed": true,
+  "states": [
+    {
+      "file": "chunk-OJP47DM6.js",
+      "hash": "ded16555bcb4f06e7a5c4feabbfadac044abb89a86ab866a2617d74eaaec54d7",
+      "state": "patched"
+    },
+    {
+      "file": "openai-responses-HWEUZ6WZ.js",
+      "hash": "464a0fe16527006e378ceaeb19a221bfed39923d457c56e0b8ce8ea26c4ff454",
+      "state": "patched"
+    },
+    {
+      "file": "chunk-NUHFSC37.js",
+      "hash": "6ff38d5389f66b75728d9bf38e7c0d12e51e9766f056c7e8cca771527562ea4a",
+      "state": "patched"
+    },
+    {
+      "file": "chunk-RCZIEVGO.js",
+      "hash": "7c0c2febc280d5c0f3e38b2f542d72ed312053825ec66cad6f0ed8cde9c71e18",
+      "state": "patched"
+    },
+    {
+      "file": "chunk-FUXEF6JQ.js",
+      "hash": "32b6ff866b6a64fc2613fa12474f7ada5ca1483a362d0be7680735bdaedc1200",
+      "state": "base/patched"
+    }
+  ]
+}

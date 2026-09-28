@@ -1,0 +1,16 @@
+import assert from 'node:assert/strict';
+import { isReadable, isErrored } from 'node:stream';
+let controller;
+const body = new ReadableStream({ start(value) { controller = value; } });
+const inspect = () => ({ readable: isReadable(body), errored: isErrored(body), nodeReadableMarker: body[Symbol.for('nodejs.stream.readable')] ?? null });
+const open = inspect();
+const reader = body.getReader();
+const locked = inspect();
+const pending = reader.read().then(() => 'resolved', error => error.name);
+controller.error(new DOMException('local probe', 'AbortError'));
+assert.equal(await pending, 'AbortError');
+const errored = inspect();
+reader.releaseLock();
+if (process.versions.bun === '1.4.0') assert.equal(open.readable, null);
+if (!process.versions.bun) assert.equal(open.readable, true);
+console.log(JSON.stringify({ runtime: process.versions.bun ? `Bun ${process.versions.bun}` : `Node ${process.version}`, open, locked, errored, manualControllerErrorRejectsRead: true }, null, 2));

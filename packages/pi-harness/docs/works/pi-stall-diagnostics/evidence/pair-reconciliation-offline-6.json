@@ -1,0 +1,69 @@
+{
+  "status": "passed",
+  "revision": "offline-6-google",
+  "t1GComplete": true,
+  "t1PComplete": true,
+  "t1Complete": true,
+  "activationAllowed": false,
+  "pairCheck": {
+    "command": [
+      "node",
+      "packages/pi-harness/tools/pi-stall-diagnostics/check-pair.mjs",
+      "D:/Applications/Scoop/apps/pi-coding-agent-bun/current/node_modules/@earendil-works/pi-coding-agent",
+      "packages/pi-harness/docs/works/pi-stall-diagnostics/evidence/pair-offline-6.json"
+    ],
+    "recordedCases": 74,
+    "sha256": "5224c9774b21524ef96820d6e421a7848b237aaa47cb7205956490345bce40c2"
+  },
+  "sourceHashes": {
+    "install.mjs": "bca3490831a03c77b949fad57556d097d1bfc331fe6d5bd59b4c27f8a1ac6326",
+    "check-pair.mjs": "66a822d368daff07616002ecf66997758560759d05025e7d46dc1a179fc11720",
+    "stage.mjs": "37aa6a72cea8726c66f5ae37bcb45eab5b84e1e683356ac8a6c9922528d3726f",
+    "logger.mjs": "bb82a426532a67f3cc6744c2d621984036ce1ef35622f30325f21e04f8de92dd",
+    "check-google.mjs": "b49fb6ae067c7243ca9240b4bf9b28599a53052e063e24c37994be11d16dc783",
+    "check-correlation.mjs": "1b8e5b847ef5f57cf9ea62f08343d578f8881490b6bb61004c06ac52a78dccb2",
+    "check-stage.mjs": "ec7f55ebdf11cfe4a90643c545a5669c3726fc507c5417c3aaa525c24e24a895",
+    "check-turns.mjs": "19da01dcf1a5358e71fe93d46cce97c1fd93cf7866af3e5ad7634e9153395f01"
+  },
+  "reusedEvidenceHashes": {
+    "google-offline-6.json": "ef5513a77cc5a8333f97544e85dd9e1529ec0917c5a80c0ab25d74fd5aed08b8",
+    "correlation-offline-6.json": "d3365bd4dbeae718ed9ddbd8e993eda2dbd07cfa3af8b4c5026fd6067e38e8db",
+    "staging-offline-6.json": "0b84d23f997723499fac612efde8f46c11a4496bdc58df41ca6ac4d0a35da498",
+    "turns-offline-6.json": "5aae543140c26ad5b9dace44de688d2bd35fb7ff9219772a762f2181266abb53"
+  },
+  "documentHashes": {
+    "packages/pi-harness/tools/pi-stall-diagnostics/README.md": "d18a46622d78b998c9a44c4782243b654da4422aab3e80076f044edf29b4c2ec",
+    "packages/pi-harness/docs/works/pi-stall-diagnostics/tasks.md": "c902b00a44e05bfeddf2590986cc1f0640a93f76fcfa187d66bb7a6e39dee562",
+    "packages/pi-harness/docs/works/pi-stall-diagnostics/evidence/pair-readiness-offline-6.md": "c823c90af045e8f72efe2d8ab9411ebf08c4e95e81f82e89b7ec20278dfc0038"
+  },
+  "sourceRoot": "D:\\Applications\\Scoop\\apps\\pi-coding-agent-bun\\0.87.1\\node_modules\\@earendil-works\\pi-coding-agent",
+  "finalStates": [
+    {
+      "file": "chunk-OJP47DM6.js",
+      "hash": "81c81a21ec81e84200205f561687408ff5e3738fbbbb3c2a6c186b348d376020",
+      "state": "original"
+    },
+    {
+      "file": "chunk-FUXEF6JQ.js",
+      "hash": "b7d0697d0f4c7d3b54c6aee545d3b27c5981c27d0470e1c79876898f28f2c472",
+      "state": "original"
+    }
+  ],
+  "verification": [
+    "74 recorded disposable pair cases passed",
+    "Current installer/harness source hashes match executed check",
+    "Stage/logger/Google/correlation/staging/benchmark sources and T1-G evidence unchanged",
+    "Both changed modules pass node --check",
+    "Changed source/document trailing-whitespace checks passed",
+    "Changed Markdown local links resolve",
+    "git diff --check passed",
+    "Fresh read-source entry/runtime/main/SDK/adapter guards pass"
+  ],
+  "residualConditions": [
+    "T2 independently selected; no live admission path is enabled",
+    "Fresh real-target source/version/mapping/selector/hash checks and reliable inactivity proof",
+    "Verified live pair backups and supported per-file replacement, consistent-pair provider-free smoke, idempotence and exact rollback drill",
+    "Controlled disposable inactivity and voluntary process exits do not prove real-target inactivity or power-loss durability",
+    "Existing extracted-boundary and synthetic-performance limitations remain in T1-G evidence"
+  ]
+}

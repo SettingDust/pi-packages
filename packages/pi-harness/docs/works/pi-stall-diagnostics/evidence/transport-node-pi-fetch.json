@@ -1,0 +1,2989 @@
+{
+  "runtime": "Node v24.15.0",
+  "platform": "win32",
+  "pi": "0.87.1",
+  "sdk": "6.40.0",
+  "transport": "Pi configureHttpDispatcher / bundled undici 8.10.2",
+  "network": "HTTP/1.1 loopback only",
+  "observationMs": 100,
+  "settlementBoundMs": 1500,
+  "cases": [
+    {
+      "layer": "bare",
+      "mode": "native",
+      "scenario": "completed_open",
+      "before": {
+        "settled": false,
+        "outcome": null,
+        "transportAborted": false
+      },
+      "after": {
+        "settled": true,
+        "outcome": "AbortError",
+        "transportAborted": true,
+        "timedOut": false
+      },
+      "trace": [
+        {
+          "event": "headers",
+          "ms": 32.3
+        },
+        {
+          "event": "next.enter",
+          "ms": 32.6
+        },
+        {
+          "event": "next.settle",
+          "ms": 33.1,
+          "done": false
+        },
+        {
+          "event": "bare.chunk",
+          "ms": 33.1
+        },
+        {
+          "event": "next.enter",
+          "ms": 33.1
+        },
+        {
+          "event": "user.abort",
+          "ms": 137.4
+        },
+        {
+          "event": "fetch.signal.abort",
+          "ms": 137.8
+        },
+        {
+          "event": "next.reject",
+          "ms": 145.2,
+          "name": "AbortError"
+        },
+        {
+          "event": "settled",
+          "ms": 145.2,
+          "outcome": "AbortError"
+        },
+        {
+          "event": "server.response.close",
+          "ms": 147.1
+        }
+      ]
+    },
+    {
+      "layer": "bare",
+      "mode": "native",
+      "scenario": "eof",
+      "before": {
+        "settled": true,
+        "outcome": "end",
+        "transportAborted": false
+      },
+      "after": {
+        "settled": true,
+        "outcome": "end",
+        "transportAborted": false,
+        "timedOut": false
+      },
+      "trace": [
+        {
+          "event": "server.response.close",
+          "ms": 6.8
+        },
+        {
+          "event": "headers",
+          "ms": 7.4
+        },
+        {
+          "event": "next.enter",
+          "ms": 7.4
+        },
+        {
+          "event": "next.settle",
+          "ms": 7.5,
+          "done": false
+        },
+        {
+          "event": "bare.chunk",
+          "ms": 7.5
+        },
+        {
+          "event": "next.enter",
+          "ms": 7.5
+        },
+        {
+          "event": "next.settle",
+          "ms": 7.7,
+          "done": true
+        },
+        {
+          "event": "settled",
+          "ms": 7.7,
+          "outcome": "end"
+        },
+        {
+          "event": "fetch.signal.abort",
+          "ms": 153.1
+        }
+      ]
+    },
+    {
+      "layer": "bare",
+      "mode": "native",
+      "scenario": "abort_before_completion",
+      "before": {
+        "settled": false,
+        "outcome": null,
+        "transportAborted": false
+      },
+      "after": {
+        "settled": true,
+        "outcome": "AbortError",
+        "transportAborted": true,
+        "timedOut": false
+      },
+      "trace": [
+        {
+          "event": "headers",
+          "ms": 3.8
+        },
+        {
+          "event": "next.enter",
+          "ms": 3.8
+        },
+        {
+          "event": "next.settle",
+          "ms": 3.8,
+          "done": false
+        },
+        {
+          "event": "bare.chunk",
+          "ms": 3.8
+        },
+        {
+          "event": "next.enter",
+          "ms": 3.8
+        },
+        {
+          "event": "user.abort",
+          "ms": 105.7
+        },
+        {
+          "event": "fetch.signal.abort",
+          "ms": 105.8
+        },
+        {
+          "event": "next.reject",
+          "ms": 106.4,
+          "name": "AbortError"
+        },
+        {
+          "event": "settled",
+          "ms": 106.5,
+          "outcome": "AbortError"
+        },
+        {
+          "event": "server.response.close",
+          "ms": 106.8
+        }
+      ]
+    },
+    {
+      "layer": "bare",
+      "mode": "native",
+      "scenario": "disconnect",
+      "before": {
+        "settled": false,
+        "outcome": null,
+        "transportAborted": false
+      },
+      "after": {
+        "settled": true,
+        "outcome": "TypeError",
+        "transportAborted": false,
+        "timedOut": false
+      },
+      "trace": [
+        {
+          "event": "headers",
+          "ms": 3.4
+        },
+        {
+          "event": "next.enter",
+          "ms": 3.4
+        },
+        {
+          "event": "next.settle",
+          "ms": 3.5,
+          "done": false
+        },
+        {
+          "event": "bare.chunk",
+          "ms": 3.5
+        },
+        {
+          "event": "next.enter",
+          "ms": 3.5
+        },
+        {
+          "event": "server.destroy",
+          "ms": 107.8
+        },
+        {
+          "event": "next.reject",
+          "ms": 108.7,
+          "name": "TypeError"
+        },
+        {
+          "event": "settled",
+          "ms": 108.7,
+          "outcome": "TypeError"
+        },
+        {
+          "event": "server.response.close",
+          "ms": 108.9
+        },
+        {
+          "event": "fetch.signal.abort",
+          "ms": 140
+        }
+      ]
+    },
+    {
+      "layer": "bare",
+      "mode": "native",
+      "scenario": "failed_open",
+      "before": {
+        "settled": false,
+        "outcome": null,
+        "transportAborted": false
+      },
+      "after": {
+        "settled": true,
+        "outcome": "AbortError",
+        "transportAborted": true,
+        "timedOut": false
+      },
+      "trace": [
+        {
+          "event": "headers",
+          "ms": 3.6
+        },
+        {
+          "event": "next.enter",
+          "ms": 3.6
+        },
+        {
+          "event": "next.settle",
+          "ms": 3.7,
+          "done": false
+        },
+        {
+          "event": "bare.chunk",
+          "ms": 3.7
+        },
+        {
+          "event": "next.enter",
+          "ms": 3.7
+        },
+        {
+          "event": "user.abort",
+          "ms": 120.2
+        },
+        {
+          "event": "fetch.signal.abort",
+          "ms": 120.5
+        },
+        {
+          "event": "next.reject",
+          "ms": 121.2,
+          "name": "AbortError"
+        },
+        {
+          "event": "settled",
+          "ms": 121.2,
+          "outcome": "AbortError"
+        },
+        {
+          "event": "server.response.close",
+          "ms": 121.8
+        }
+      ]
+    },
+    {
+      "layer": "bare",
+      "mode": "native",
+      "scenario": "error_open",
+      "before": {
+        "settled": false,
+        "outcome": null,
+        "transportAborted": false
+      },
+      "after": {
+        "settled": true,
+        "outcome": "AbortError",
+        "transportAborted": true,
+        "timedOut": false
+      },
+      "trace": [
+        {
+          "event": "headers",
+          "ms": 4.4
+        },
+        {
+          "event": "next.enter",
+          "ms": 4.4
+        },
+        {
+          "event": "next.settle",
+          "ms": 4.5,
+          "done": false
+        },
+        {
+          "event": "bare.chunk",
+          "ms": 4.5
+        },
+        {
+          "event": "next.enter",
+          "ms": 4.5
+        },
+        {
+          "event": "user.abort",
+          "ms": 122.5
+        },
+        {
+          "event": "fetch.signal.abort",
+          "ms": 122.6
+        },
+        {
+          "event": "next.reject",
+          "ms": 123,
+          "name": "AbortError"
+        },
+        {
+          "event": "settled",
+          "ms": 123,
+          "outcome": "AbortError"
+        },
+        {
+          "event": "server.response.close",
+          "ms": 123.3
+        }
+      ]
+    },
+    {
+      "layer": "bare",
+      "mode": "native",
+      "scenario": "done_open",
+      "before": {
+        "settled": false,
+        "outcome": null,
+        "transportAborted": false
+      },
+      "after": {
+        "settled": true,
+        "outcome": "AbortError",
+        "transportAborted": true,
+        "timedOut": false
+      },
+      "trace": [
+        {
+          "event": "headers",
+          "ms": 5.1
+        },
+        {
+          "event": "next.enter",
+          "ms": 5.2
+        },
+        {
+          "event": "next.settle",
+          "ms": 5.2,
+          "done": false
+        },
+        {
+          "event": "bare.chunk",
+          "ms": 5.2
+        },
+        {
+          "event": "next.enter",
+          "ms": 5.2
+        },
+        {
+          "event": "user.abort",
+          "ms": 106.9
+        },
+        {
+          "event": "fetch.signal.abort",
+          "ms": 107.1
+        },
+        {
+          "event": "next.reject",
+          "ms": 107.5,
+          "name": "AbortError"
+        },
+        {
+          "event": "settled",
+          "ms": 107.6,
+          "outcome": "AbortError"
+        },
+        {
+          "event": "server.response.close",
+          "ms": 107.9
+        }
+      ]
+    },
+    {
+      "layer": "bare",
+      "mode": "native",
+      "scenario": "break_open",
+      "before": {
+        "settled": true,
+        "outcome": "end",
+        "transportAborted": false
+      },
+      "after": {
+        "settled": true,
+        "outcome": "end",
+        "transportAborted": false,
+        "timedOut": false
+      },
+      "trace": [
+        {
+          "event": "headers",
+          "ms": 3
+        },
+        {
+          "event": "next.enter",
+          "ms": 3
+        },
+        {
+          "event": "next.settle",
+          "ms": 3.1,
+          "done": false
+        },
+        {
+          "event": "bare.chunk",
+          "ms": 3.1
+        },
+        {
+          "event": "return.enter",
+          "ms": 3.1
+        },
+        {
+          "event": "return.settle",
+          "ms": 3.5,
+          "done": true
+        },
+        {
+          "event": "settled",
+          "ms": 3.5,
+          "outcome": "end"
+        },
+        {
+          "event": "server.response.close",
+          "ms": 4.2
+        },
+        {
+          "event": "fetch.signal.abort",
+          "ms": 156.4
+        }
+      ]
+    },
+    {
+      "layer": "sdk",
+      "mode": "native",
+      "scenario": "completed_open",
+      "before": {
+        "settled": false,
+        "outcome": null,
+        "transportAborted": false
+      },
+      "after": {
+        "settled": true,
+        "outcome": "end",
+        "transportAborted": true,
+        "timedOut": false
+      },
+      "trace": [
+        {
+          "event": "headers",
+          "ms": 9.3
+        },
+        {
+          "event": "next.enter",
+          "ms": 10.1
+        },
+        {
+          "event": "next.settle",
+          "ms": 10.2,
+          "done": false
+        },
+        {
+          "event": "sdk.response.completed",
+          "ms": 10.5
+        },
+        {
+          "event": "next.enter",
+          "ms": 10.5
+        },
+        {
+          "event": "user.abort",
+          "ms": 122.7
+        },
+        {
+          "event": "fetch.signal.abort",
+          "ms": 122.9
+        },
+        {
+          "event": "next.reject",
+          "ms": 123.4,
+          "name": "AbortError"
+        },
+        {
+          "event": "settled",
+          "ms": 123.5,
+          "outcome": "end"
+        },
+        {
+          "event": "server.response.close",
+          "ms": 123.8
+        }
+      ]
+    },
+    {
+      "layer": "sdk",
+      "mode": "native",
+      "scenario": "eof",
+      "before": {
+        "settled": true,
+        "outcome": "end",
+        "transportAborted": false
+      },
+      "after": {
+        "settled": true,
+        "outcome": "end",
+        "transportAborted": false,
+        "timedOut": false
+      },
+      "trace": [
+        {
+          "event": "server.response.close",
+          "ms": 3.9
+        },
+        {
+          "event": "headers",
+          "ms": 4.2
+        },
+        {
+          "event": "next.enter",
+          "ms": 4.3
+        },
+        {
+          "event": "next.settle",
+          "ms": 4.4,
+          "done": false
+        },
+        {
+          "event": "sdk.response.completed",
+          "ms": 4.4
+        },
+        {
+          "event": "next.enter",
+          "ms": 4.5
+        },
+        {
+          "event": "next.settle",
+          "ms": 4.5,
+          "done": true
+        },
+        {
+          "event": "settled",
+          "ms": 4.6,
+          "outcome": "end"
+        },
+        {
+          "event": "fetch.signal.abort",
+          "ms": 151.2
+        }
+      ]
+    },
+    {
+      "layer": "sdk",
+      "mode": "native",
+      "scenario": "abort_before_completion",
+      "before": {
+        "settled": false,
+        "outcome": null,
+        "transportAborted": false
+      },
+      "after": {
+        "settled": true,
+        "outcome": "end",
+        "transportAborted": true,
+        "timedOut": false
+      },
+      "trace": [
+        {
+          "event": "headers",
+          "ms": 2.9
+        },
+        {
+          "event": "next.enter",
+          "ms": 3
+        },
+        {
+          "event": "next.settle",
+          "ms": 3.1,
+          "done": false
+        },
+        {
+          "event": "sdk.response.created",
+          "ms": 3.1
+        },
+        {
+          "event": "next.enter",
+          "ms": 3.1
+        },
+        {
+          "event": "user.abort",
+          "ms": 125.1
+        },
+        {
+          "event": "fetch.signal.abort",
+          "ms": 125.3
+        },
+        {
+          "event": "next.reject",
+          "ms": 125.9,
+          "name": "AbortError"
+        },
+        {
+          "event": "settled",
+          "ms": 126,
+          "outcome": "end"
+        },
+        {
+          "event": "server.response.close",
+          "ms": 126.4
+        }
+      ]
+    },
+    {
+      "layer": "sdk",
+      "mode": "native",
+      "scenario": "disconnect",
+      "before": {
+        "settled": false,
+        "outcome": null,
+        "transportAborted": false
+      },
+      "after": {
+        "settled": true,
+        "outcome": "TypeError",
+        "transportAborted": true,
+        "timedOut": false
+      },
+      "trace": [
+        {
+          "event": "headers",
+          "ms": 4.6
+        },
+        {
+          "event": "next.enter",
+          "ms": 4.8
+        },
+        {
+          "event": "next.settle",
+          "ms": 4.9,
+          "done": false
+        },
+        {
+          "event": "sdk.response.completed",
+          "ms": 5
+        },
+        {
+          "event": "next.enter",
+          "ms": 5
+        },
+        {
+          "event": "server.destroy",
+          "ms": 123.2
+        },
+        {
+          "event": "next.reject",
+          "ms": 124.4,
+          "name": "TypeError"
+        },
+        {
+          "event": "fetch.signal.abort",
+          "ms": 124.5
+        },
+        {
+          "event": "settled",
+          "ms": 124.6,
+          "outcome": "TypeError"
+        },
+        {
+          "event": "server.response.close",
+          "ms": 124.7
+        }
+      ]
+    },
+    {
+      "layer": "sdk",
+      "mode": "native",
+      "scenario": "failed_open",
+      "before": {
+        "settled": false,
+        "outcome": null,
+        "transportAborted": false
+      },
+      "after": {
+        "settled": true,
+        "outcome": "end",
+        "transportAborted": true,
+        "timedOut": false
+      },
+      "trace": [
+        {
+          "event": "headers",
+          "ms": 3.3
+        },
+        {
+          "event": "next.enter",
+          "ms": 3.5
+        },
+        {
+          "event": "next.settle",
+          "ms": 3.5,
+          "done": false
+        },
+        {
+          "event": "sdk.response.failed",
+          "ms": 3.6
+        },
+        {
+          "event": "next.enter",
+          "ms": 3.6
+        },
+        {
+          "event": "user.abort",
+          "ms": 107.8
+        },
+        {
+          "event": "fetch.signal.abort",
+          "ms": 107.9
+        },
+        {
+          "event": "next.reject",
+          "ms": 108.5,
+          "name": "AbortError"
+        },
+        {
+          "event": "settled",
+          "ms": 108.5,
+          "outcome": "end"
+        },
+        {
+          "event": "server.response.close",
+          "ms": 108.8
+        }
+      ]
+    },
+    {
+      "layer": "sdk",
+      "mode": "native",
+      "scenario": "error_open",
+      "before": {
+        "settled": false,
+        "outcome": null,
+        "transportAborted": false
+      },
+      "after": {
+        "settled": true,
+        "outcome": "end",
+        "transportAborted": true,
+        "timedOut": false
+      },
+      "trace": [
+        {
+          "event": "headers",
+          "ms": 4.3
+        },
+        {
+          "event": "next.enter",
+          "ms": 4.5
+        },
+        {
+          "event": "next.settle",
+          "ms": 4.5,
+          "done": false
+        },
+        {
+          "event": "sdk.error",
+          "ms": 4.6
+        },
+        {
+          "event": "next.enter",
+          "ms": 4.6
+        },
+        {
+          "event": "user.abort",
+          "ms": 123
+        },
+        {
+          "event": "fetch.signal.abort",
+          "ms": 123.1
+        },
+        {
+          "event": "next.reject",
+          "ms": 123.4,
+          "name": "AbortError"
+        },
+        {
+          "event": "settled",
+          "ms": 123.4,
+          "outcome": "end"
+        },
+        {
+          "event": "server.response.close",
+          "ms": 123.7
+        }
+      ]
+    },
+    {
+      "layer": "sdk",
+      "mode": "native",
+      "scenario": "done_open",
+      "before": {
+        "settled": false,
+        "outcome": null,
+        "transportAborted": false
+      },
+      "after": {
+        "settled": true,
+        "outcome": "end",
+        "transportAborted": true,
+        "timedOut": false
+      },
+      "trace": [
+        {
+          "event": "headers",
+          "ms": 3.2
+        },
+        {
+          "event": "next.enter",
+          "ms": 3.3
+        },
+        {
+          "event": "next.settle",
+          "ms": 3.3,
+          "done": false
+        },
+        {
+          "event": "sdk.response.completed",
+          "ms": 3.4
+        },
+        {
+          "event": "next.enter",
+          "ms": 3.4
+        },
+        {
+          "event": "user.abort",
+          "ms": 124.9
+        },
+        {
+          "event": "fetch.signal.abort",
+          "ms": 125
+        },
+        {
+          "event": "next.reject",
+          "ms": 125.3,
+          "name": "AbortError"
+        },
+        {
+          "event": "settled",
+          "ms": 125.3,
+          "outcome": "end"
+        },
+        {
+          "event": "server.response.close",
+          "ms": 125.6
+        }
+      ]
+    },
+    {
+      "layer": "sdk",
+      "mode": "native",
+      "scenario": "break_open",
+      "before": {
+        "settled": true,
+        "outcome": "end",
+        "transportAborted": true
+      },
+      "after": {
+        "settled": true,
+        "outcome": "end",
+        "transportAborted": true,
+        "timedOut": false
+      },
+      "trace": [
+        {
+          "event": "headers",
+          "ms": 3.2
+        },
+        {
+          "event": "next.enter",
+          "ms": 3.3
+        },
+        {
+          "event": "next.settle",
+          "ms": 3.4,
+          "done": false
+        },
+        {
+          "event": "sdk.response.completed",
+          "ms": 3.4
+        },
+        {
+          "event": "return.enter",
+          "ms": 3.4
+        },
+        {
+          "event": "return.settle",
+          "ms": 3.6,
+          "done": true
+        },
+        {
+          "event": "fetch.signal.abort",
+          "ms": 3.6
+        },
+        {
+          "event": "settled",
+          "ms": 3.6,
+          "outcome": "end"
+        },
+        {
+          "event": "server.response.close",
+          "ms": 4.3
+        }
+      ]
+    },
+    {
+      "layer": "pi",
+      "mode": "native",
+      "scenario": "completed_open",
+      "before": {
+        "settled": false,
+        "outcome": null,
+        "transportAborted": false
+      },
+      "after": {
+        "settled": true,
+        "outcome": "aborted",
+        "transportAborted": true,
+        "timedOut": false
+      },
+      "trace": [
+        {
+          "event": "headers",
+          "ms": 5.2
+        },
+        {
+          "event": "next.enter",
+          "ms": 5.7
+        },
+        {
+          "event": "pi.start",
+          "ms": 5.8
+        },
+        {
+          "event": "next.settle",
+          "ms": 5.8,
+          "done": false
+        },
+        {
+          "event": "next.enter",
+          "ms": 6.1
+        },
+        {
+          "event": "user.abort",
+          "ms": 123.2
+        },
+        {
+          "event": "fetch.signal.abort",
+          "ms": 123.2
+        },
+        {
+          "event": "next.reject",
+          "ms": 123.5,
+          "name": "AbortError"
+        },
+        {
+          "event": "pi.error",
+          "ms": 123.9
+        },
+        {
+          "event": "settled",
+          "ms": 123.9,
+          "outcome": "aborted"
+        },
+        {
+          "event": "server.response.close",
+          "ms": 124.3
+        }
+      ]
+    },
+    {
+      "layer": "pi",
+      "mode": "native",
+      "scenario": "eof",
+      "before": {
+        "settled": true,
+        "outcome": "stop",
+        "transportAborted": false
+      },
+      "after": {
+        "settled": true,
+        "outcome": "stop",
+        "transportAborted": false,
+        "timedOut": false
+      },
+      "trace": [
+        {
+          "event": "server.response.close",
+          "ms": 3
+        },
+        {
+          "event": "headers",
+          "ms": 3.2
+        },
+        {
+          "event": "next.enter",
+          "ms": 3.3
+        },
+        {
+          "event": "pi.start",
+          "ms": 3.3
+        },
+        {
+          "event": "next.settle",
+          "ms": 3.3,
+          "done": false
+        },
+        {
+          "event": "next.enter",
+          "ms": 3.4
+        },
+        {
+          "event": "next.settle",
+          "ms": 3.4,
+          "done": true
+        },
+        {
+          "event": "pi.done",
+          "ms": 3.4
+        },
+        {
+          "event": "settled",
+          "ms": 3.4,
+          "outcome": "stop"
+        },
+        {
+          "event": "fetch.signal.abort",
+          "ms": 154.8
+        }
+      ]
+    },
+    {
+      "layer": "pi",
+      "mode": "native",
+      "scenario": "abort_before_completion",
+      "before": {
+        "settled": false,
+        "outcome": null,
+        "transportAborted": false
+      },
+      "after": {
+        "settled": true,
+        "outcome": "aborted",
+        "transportAborted": true,
+        "timedOut": false
+      },
+      "trace": [
+        {
+          "event": "headers",
+          "ms": 2.9
+        },
+        {
+          "event": "next.enter",
+          "ms": 3
+        },
+        {
+          "event": "pi.start",
+          "ms": 3
+        },
+        {
+          "event": "next.settle",
+          "ms": 3,
+          "done": false
+        },
+        {
+          "event": "next.enter",
+          "ms": 3.1
+        },
+        {
+          "event": "user.abort",
+          "ms": 123.7
+        },
+        {
+          "event": "fetch.signal.abort",
+          "ms": 124
+        },
+        {
+          "event": "next.reject",
+          "ms": 124.6,
+          "name": "AbortError"
+        },
+        {
+          "event": "pi.error",
+          "ms": 124.9
+        },
+        {
+          "event": "settled",
+          "ms": 124.9,
+          "outcome": "aborted"
+        },
+        {
+          "event": "server.response.close",
+          "ms": 125.3
+        }
+      ]
+    },
+    {
+      "layer": "pi",
+      "mode": "native",
+      "scenario": "disconnect",
+      "before": {
+        "settled": false,
+        "outcome": null,
+        "transportAborted": false
+      },
+      "after": {
+        "settled": true,
+        "outcome": "error",
+        "transportAborted": true,
+        "timedOut": false
+      },
+      "trace": [
+        {
+          "event": "headers",
+          "ms": 3.9
+        },
+        {
+          "event": "next.enter",
+          "ms": 4
+        },
+        {
+          "event": "pi.start",
+          "ms": 4.1
+        },
+        {
+          "event": "next.settle",
+          "ms": 4.1,
+          "done": false
+        },
+        {
+          "event": "next.enter",
+          "ms": 4.1
+        },
+        {
+          "event": "server.destroy",
+          "ms": 125.3
+        },
+        {
+          "event": "next.reject",
+          "ms": 126.3,
+          "name": "TypeError"
+        },
+        {
+          "event": "fetch.signal.abort",
+          "ms": 126.5
+        },
+        {
+          "event": "pi.error",
+          "ms": 126.6
+        },
+        {
+          "event": "settled",
+          "ms": 126.6,
+          "outcome": "error"
+        },
+        {
+          "event": "server.response.close",
+          "ms": 126.7
+        }
+      ]
+    },
+    {
+      "layer": "pi",
+      "mode": "native",
+      "scenario": "failed_open",
+      "before": {
+        "settled": true,
+        "outcome": "error",
+        "transportAborted": true
+      },
+      "after": {
+        "settled": true,
+        "outcome": "error",
+        "transportAborted": true,
+        "timedOut": false
+      },
+      "trace": [
+        {
+          "event": "headers",
+          "ms": 3.5
+        },
+        {
+          "event": "next.enter",
+          "ms": 3.6
+        },
+        {
+          "event": "pi.start",
+          "ms": 3.7
+        },
+        {
+          "event": "next.settle",
+          "ms": 3.7,
+          "done": false
+        },
+        {
+          "event": "return.enter",
+          "ms": 3.8
+        },
+        {
+          "event": "return.settle",
+          "ms": 3.9,
+          "done": true
+        },
+        {
+          "event": "fetch.signal.abort",
+          "ms": 3.9
+        },
+        {
+          "event": "pi.error",
+          "ms": 4
+        },
+        {
+          "event": "settled",
+          "ms": 4,
+          "outcome": "error"
+        },
+        {
+          "event": "server.response.close",
+          "ms": 4.7
+        }
+      ]
+    },
+    {
+      "layer": "pi",
+      "mode": "native",
+      "scenario": "error_open",
+      "before": {
+        "settled": true,
+        "outcome": "error",
+        "transportAborted": true
+      },
+      "after": {
+        "settled": true,
+        "outcome": "error",
+        "transportAborted": true,
+        "timedOut": false
+      },
+      "trace": [
+        {
+          "event": "headers",
+          "ms": 3.3
+        },
+        {
+          "event": "next.enter",
+          "ms": 3.4
+        },
+        {
+          "event": "pi.start",
+          "ms": 3.5
+        },
+        {
+          "event": "next.settle",
+          "ms": 3.5,
+          "done": false
+        },
+        {
+          "event": "return.enter",
+          "ms": 3.6
+        },
+        {
+          "event": "return.settle",
+          "ms": 3.7,
+          "done": true
+        },
+        {
+          "event": "fetch.signal.abort",
+          "ms": 3.7
+        },
+        {
+          "event": "pi.error",
+          "ms": 3.8
+        },
+        {
+          "event": "settled",
+          "ms": 3.8,
+          "outcome": "error"
+        },
+        {
+          "event": "server.response.close",
+          "ms": 4.6
+        }
+      ]
+    },
+    {
+      "layer": "pi",
+      "mode": "native",
+      "scenario": "done_open",
+      "before": {
+        "settled": false,
+        "outcome": null,
+        "transportAborted": false
+      },
+      "after": {
+        "settled": true,
+        "outcome": "aborted",
+        "transportAborted": true,
+        "timedOut": false
+      },
+      "trace": [
+        {
+          "event": "headers",
+          "ms": 6.1
+        },
+        {
+          "event": "next.enter",
+          "ms": 6.3
+        },
+        {
+          "event": "pi.start",
+          "ms": 6.4
+        },
+        {
+          "event": "next.settle",
+          "ms": 6.4,
+          "done": false
+        },
+        {
+          "event": "next.enter",
+          "ms": 6.6
+        },
+        {
+          "event": "user.abort",
+          "ms": 122.5
+        },
+        {
+          "event": "fetch.signal.abort",
+          "ms": 122.7
+        },
+        {
+          "event": "next.reject",
+          "ms": 123.1,
+          "name": "AbortError"
+        },
+        {
+          "event": "pi.error",
+          "ms": 123.2
+        },
+        {
+          "event": "settled",
+          "ms": 123.2,
+          "outcome": "aborted"
+        },
+        {
+          "event": "server.response.close",
+          "ms": 123.5
+        }
+      ]
+    },
+    {
+      "layer": "pi_break",
+      "mode": "native",
+      "scenario": "completed_open",
+      "before": {
+        "settled": true,
+        "outcome": "stop",
+        "transportAborted": true
+      },
+      "after": {
+        "settled": true,
+        "outcome": "stop",
+        "transportAborted": true,
+        "timedOut": false
+      },
+      "trace": [
+        {
+          "event": "headers",
+          "ms": 8
+        },
+        {
+          "event": "next.enter",
+          "ms": 9
+        },
+        {
+          "event": "pi.start",
+          "ms": 9.1
+        },
+        {
+          "event": "next.settle",
+          "ms": 9.1,
+          "done": false
+        },
+        {
+          "event": "return.enter",
+          "ms": 9.8
+        },
+        {
+          "event": "return.settle",
+          "ms": 10,
+          "done": true
+        },
+        {
+          "event": "fetch.signal.abort",
+          "ms": 10.1
+        },
+        {
+          "event": "pi.done",
+          "ms": 10.2
+        },
+        {
+          "event": "settled",
+          "ms": 10.2,
+          "outcome": "stop"
+        },
+        {
+          "event": "server.response.close",
+          "ms": 11.3
+        }
+      ]
+    },
+    {
+      "layer": "bare",
+      "mode": "fallback",
+      "scenario": "completed_open",
+      "before": {
+        "settled": false,
+        "outcome": null,
+        "transportAborted": false
+      },
+      "after": {
+        "settled": true,
+        "outcome": "AbortError",
+        "transportAborted": true,
+        "timedOut": false
+      },
+      "trace": [
+        {
+          "event": "headers",
+          "ms": 5
+        },
+        {
+          "event": "read.enter",
+          "ms": 5.4
+        },
+        {
+          "event": "read.settle",
+          "ms": 5.7,
+          "done": false
+        },
+        {
+          "event": "bare.chunk",
+          "ms": 5.7
+        },
+        {
+          "event": "read.enter",
+          "ms": 5.7
+        },
+        {
+          "event": "user.abort",
+          "ms": 107.7
+        },
+        {
+          "event": "fetch.signal.abort",
+          "ms": 107.8
+        },
+        {
+          "event": "read.reject",
+          "ms": 108.3,
+          "name": "AbortError"
+        },
+        {
+          "event": "cancel.enter",
+          "ms": 108.3
+        },
+        {
+          "event": "cancel.reject",
+          "ms": 108.4,
+          "name": "AbortError"
+        },
+        {
+          "event": "settled",
+          "ms": 108.4,
+          "outcome": "AbortError"
+        },
+        {
+          "event": "server.response.close",
+          "ms": 108.7
+        }
+      ]
+    },
+    {
+      "layer": "bare",
+      "mode": "fallback",
+      "scenario": "eof",
+      "before": {
+        "settled": true,
+        "outcome": "end",
+        "transportAborted": false
+      },
+      "after": {
+        "settled": true,
+        "outcome": "end",
+        "transportAborted": false,
+        "timedOut": false
+      },
+      "trace": [
+        {
+          "event": "server.response.close",
+          "ms": 3.2
+        },
+        {
+          "event": "headers",
+          "ms": 3.4
+        },
+        {
+          "event": "read.enter",
+          "ms": 3.4
+        },
+        {
+          "event": "read.settle",
+          "ms": 3.5,
+          "done": false
+        },
+        {
+          "event": "bare.chunk",
+          "ms": 3.5
+        },
+        {
+          "event": "read.enter",
+          "ms": 3.5
+        },
+        {
+          "event": "read.settle",
+          "ms": 3.6,
+          "done": true
+        },
+        {
+          "event": "settled",
+          "ms": 3.8,
+          "outcome": "end"
+        },
+        {
+          "event": "fetch.signal.abort",
+          "ms": 138.1
+        }
+      ]
+    },
+    {
+      "layer": "bare",
+      "mode": "fallback",
+      "scenario": "abort_before_completion",
+      "before": {
+        "settled": false,
+        "outcome": null,
+        "transportAborted": false
+      },
+      "after": {
+        "settled": true,
+        "outcome": "AbortError",
+        "transportAborted": true,
+        "timedOut": false
+      },
+      "trace": [
+        {
+          "event": "headers",
+          "ms": 2.2
+        },
+        {
+          "event": "read.enter",
+          "ms": 2.2
+        },
+        {
+          "event": "read.settle",
+          "ms": 2.3,
+          "done": false
+        },
+        {
+          "event": "bare.chunk",
+          "ms": 2.3
+        },
+        {
+          "event": "read.enter",
+          "ms": 2.3
+        },
+        {
+          "event": "user.abort",
+          "ms": 121.7
+        },
+        {
+          "event": "fetch.signal.abort",
+          "ms": 121.8
+        },
+        {
+          "event": "read.reject",
+          "ms": 122.3,
+          "name": "AbortError"
+        },
+        {
+          "event": "cancel.enter",
+          "ms": 122.4
+        },
+        {
+          "event": "cancel.reject",
+          "ms": 122.4,
+          "name": "AbortError"
+        },
+        {
+          "event": "settled",
+          "ms": 122.4,
+          "outcome": "AbortError"
+        },
+        {
+          "event": "server.response.close",
+          "ms": 122.8
+        }
+      ]
+    },
+    {
+      "layer": "bare",
+      "mode": "fallback",
+      "scenario": "disconnect",
+      "before": {
+        "settled": false,
+        "outcome": null,
+        "transportAborted": false
+      },
+      "after": {
+        "settled": true,
+        "outcome": "TypeError",
+        "transportAborted": false,
+        "timedOut": false
+      },
+      "trace": [
+        {
+          "event": "headers",
+          "ms": 2.3
+        },
+        {
+          "event": "read.enter",
+          "ms": 2.3
+        },
+        {
+          "event": "read.settle",
+          "ms": 2.4,
+          "done": false
+        },
+        {
+          "event": "bare.chunk",
+          "ms": 2.4
+        },
+        {
+          "event": "read.enter",
+          "ms": 2.4
+        },
+        {
+          "event": "server.destroy",
+          "ms": 106.4
+        },
+        {
+          "event": "read.reject",
+          "ms": 107,
+          "name": "TypeError"
+        },
+        {
+          "event": "cancel.enter",
+          "ms": 107
+        },
+        {
+          "event": "cancel.reject",
+          "ms": 107.1,
+          "name": "TypeError"
+        },
+        {
+          "event": "settled",
+          "ms": 107.1,
+          "outcome": "TypeError"
+        },
+        {
+          "event": "server.response.close",
+          "ms": 107.2
+        },
+        {
+          "event": "fetch.signal.abort",
+          "ms": 138.3
+        }
+      ]
+    },
+    {
+      "layer": "bare",
+      "mode": "fallback",
+      "scenario": "failed_open",
+      "before": {
+        "settled": false,
+        "outcome": null,
+        "transportAborted": false
+      },
+      "after": {
+        "settled": true,
+        "outcome": "AbortError",
+        "transportAborted": true,
+        "timedOut": false
+      },
+      "trace": [
+        {
+          "event": "headers",
+          "ms": 2.5
+        },
+        {
+          "event": "read.enter",
+          "ms": 2.5
+        },
+        {
+          "event": "read.settle",
+          "ms": 2.6,
+          "done": false
+        },
+        {
+          "event": "bare.chunk",
+          "ms": 2.6
+        },
+        {
+          "event": "read.enter",
+          "ms": 2.6
+        },
+        {
+          "event": "user.abort",
+          "ms": 107.9
+        },
+        {
+          "event": "fetch.signal.abort",
+          "ms": 108
+        },
+        {
+          "event": "read.reject",
+          "ms": 108.5,
+          "name": "AbortError"
+        },
+        {
+          "event": "cancel.enter",
+          "ms": 108.5
+        },
+        {
+          "event": "cancel.reject",
+          "ms": 108.5,
+          "name": "AbortError"
+        },
+        {
+          "event": "settled",
+          "ms": 108.6,
+          "outcome": "AbortError"
+        },
+        {
+          "event": "server.response.close",
+          "ms": 108.9
+        }
+      ]
+    },
+    {
+      "layer": "bare",
+      "mode": "fallback",
+      "scenario": "error_open",
+      "before": {
+        "settled": false,
+        "outcome": null,
+        "transportAborted": false
+      },
+      "after": {
+        "settled": true,
+        "outcome": "AbortError",
+        "transportAborted": true,
+        "timedOut": false
+      },
+      "trace": [
+        {
+          "event": "headers",
+          "ms": 3.1
+        },
+        {
+          "event": "read.enter",
+          "ms": 3.2
+        },
+        {
+          "event": "read.settle",
+          "ms": 3.3,
+          "done": false
+        },
+        {
+          "event": "bare.chunk",
+          "ms": 3.3
+        },
+        {
+          "event": "read.enter",
+          "ms": 3.3
+        },
+        {
+          "event": "user.abort",
+          "ms": 109
+        },
+        {
+          "event": "fetch.signal.abort",
+          "ms": 109.1
+        },
+        {
+          "event": "read.reject",
+          "ms": 109.6,
+          "name": "AbortError"
+        },
+        {
+          "event": "cancel.enter",
+          "ms": 109.6
+        },
+        {
+          "event": "cancel.reject",
+          "ms": 109.6,
+          "name": "AbortError"
+        },
+        {
+          "event": "settled",
+          "ms": 109.6,
+          "outcome": "AbortError"
+        },
+        {
+          "event": "server.response.close",
+          "ms": 109.9
+        }
+      ]
+    },
+    {
+      "layer": "bare",
+      "mode": "fallback",
+      "scenario": "done_open",
+      "before": {
+        "settled": false,
+        "outcome": null,
+        "transportAborted": false
+      },
+      "after": {
+        "settled": true,
+        "outcome": "AbortError",
+        "transportAborted": true,
+        "timedOut": false
+      },
+      "trace": [
+        {
+          "event": "headers",
+          "ms": 2.8
+        },
+        {
+          "event": "read.enter",
+          "ms": 2.8
+        },
+        {
+          "event": "read.settle",
+          "ms": 2.8,
+          "done": false
+        },
+        {
+          "event": "bare.chunk",
+          "ms": 2.8
+        },
+        {
+          "event": "read.enter",
+          "ms": 2.9
+        },
+        {
+          "event": "user.abort",
+          "ms": 106.7
+        },
+        {
+          "event": "fetch.signal.abort",
+          "ms": 106.7
+        },
+        {
+          "event": "read.reject",
+          "ms": 107.1,
+          "name": "AbortError"
+        },
+        {
+          "event": "cancel.enter",
+          "ms": 107.1
+        },
+        {
+          "event": "cancel.reject",
+          "ms": 107.1,
+          "name": "AbortError"
+        },
+        {
+          "event": "settled",
+          "ms": 107.1,
+          "outcome": "AbortError"
+        },
+        {
+          "event": "server.response.close",
+          "ms": 107.4
+        }
+      ]
+    },
+    {
+      "layer": "bare",
+      "mode": "fallback",
+      "scenario": "break_open",
+      "before": {
+        "settled": true,
+        "outcome": "end",
+        "transportAborted": false
+      },
+      "after": {
+        "settled": true,
+        "outcome": "end",
+        "transportAborted": false,
+        "timedOut": false
+      },
+      "trace": [
+        {
+          "event": "headers",
+          "ms": 3.1
+        },
+        {
+          "event": "read.enter",
+          "ms": 3.1
+        },
+        {
+          "event": "read.settle",
+          "ms": 3.1,
+          "done": false
+        },
+        {
+          "event": "bare.chunk",
+          "ms": 3.1
+        },
+        {
+          "event": "cancel.enter",
+          "ms": 3.1
+        },
+        {
+          "event": "cancel.settle",
+          "ms": 3.3
+        },
+        {
+          "event": "settled",
+          "ms": 3.3,
+          "outcome": "end"
+        },
+        {
+          "event": "server.response.close",
+          "ms": 4.1
+        },
+        {
+          "event": "fetch.signal.abort",
+          "ms": 153.7
+        }
+      ]
+    },
+    {
+      "layer": "sdk",
+      "mode": "fallback",
+      "scenario": "completed_open",
+      "before": {
+        "settled": false,
+        "outcome": null,
+        "transportAborted": false
+      },
+      "after": {
+        "settled": true,
+        "outcome": "end",
+        "transportAborted": true,
+        "timedOut": false
+      },
+      "trace": [
+        {
+          "event": "headers",
+          "ms": 3.5
+        },
+        {
+          "event": "read.enter",
+          "ms": 3.6
+        },
+        {
+          "event": "read.settle",
+          "ms": 3.7,
+          "done": false
+        },
+        {
+          "event": "sdk.response.completed",
+          "ms": 3.8
+        },
+        {
+          "event": "read.enter",
+          "ms": 3.8
+        },
+        {
+          "event": "user.abort",
+          "ms": 123.1
+        },
+        {
+          "event": "fetch.signal.abort",
+          "ms": 123.1
+        },
+        {
+          "event": "read.reject",
+          "ms": 123.5,
+          "name": "AbortError"
+        },
+        {
+          "event": "settled",
+          "ms": 123.5,
+          "outcome": "end"
+        },
+        {
+          "event": "server.response.close",
+          "ms": 123.8
+        }
+      ]
+    },
+    {
+      "layer": "sdk",
+      "mode": "fallback",
+      "scenario": "eof",
+      "before": {
+        "settled": true,
+        "outcome": "end",
+        "transportAborted": false
+      },
+      "after": {
+        "settled": true,
+        "outcome": "end",
+        "transportAborted": false,
+        "timedOut": false
+      },
+      "trace": [
+        {
+          "event": "server.response.close",
+          "ms": 4.7
+        },
+        {
+          "event": "headers",
+          "ms": 4.9
+        },
+        {
+          "event": "read.enter",
+          "ms": 5.1
+        },
+        {
+          "event": "read.settle",
+          "ms": 5.1,
+          "done": false
+        },
+        {
+          "event": "sdk.response.completed",
+          "ms": 5.1
+        },
+        {
+          "event": "read.enter",
+          "ms": 5.1
+        },
+        {
+          "event": "read.settle",
+          "ms": 5.2,
+          "done": true
+        },
+        {
+          "event": "settled",
+          "ms": 5.2,
+          "outcome": "end"
+        },
+        {
+          "event": "fetch.signal.abort",
+          "ms": 154.6
+        }
+      ]
+    },
+    {
+      "layer": "sdk",
+      "mode": "fallback",
+      "scenario": "abort_before_completion",
+      "before": {
+        "settled": false,
+        "outcome": null,
+        "transportAborted": false
+      },
+      "after": {
+        "settled": true,
+        "outcome": "end",
+        "transportAborted": true,
+        "timedOut": false
+      },
+      "trace": [
+        {
+          "event": "headers",
+          "ms": 3.3
+        },
+        {
+          "event": "read.enter",
+          "ms": 3.4
+        },
+        {
+          "event": "read.settle",
+          "ms": 3.5,
+          "done": false
+        },
+        {
+          "event": "sdk.response.created",
+          "ms": 3.5
+        },
+        {
+          "event": "read.enter",
+          "ms": 3.5
+        },
+        {
+          "event": "user.abort",
+          "ms": 123.6
+        },
+        {
+          "event": "fetch.signal.abort",
+          "ms": 123.7
+        },
+        {
+          "event": "read.reject",
+          "ms": 124,
+          "name": "AbortError"
+        },
+        {
+          "event": "settled",
+          "ms": 124.1,
+          "outcome": "end"
+        },
+        {
+          "event": "server.response.close",
+          "ms": 124.4
+        }
+      ]
+    },
+    {
+      "layer": "sdk",
+      "mode": "fallback",
+      "scenario": "disconnect",
+      "before": {
+        "settled": false,
+        "outcome": null,
+        "transportAborted": false
+      },
+      "after": {
+        "settled": true,
+        "outcome": "TypeError",
+        "transportAborted": true,
+        "timedOut": false
+      },
+      "trace": [
+        {
+          "event": "headers",
+          "ms": 5
+        },
+        {
+          "event": "read.enter",
+          "ms": 5.2
+        },
+        {
+          "event": "read.settle",
+          "ms": 5.2,
+          "done": false
+        },
+        {
+          "event": "sdk.response.completed",
+          "ms": 5.3
+        },
+        {
+          "event": "read.enter",
+          "ms": 5.3
+        },
+        {
+          "event": "server.destroy",
+          "ms": 124.3
+        },
+        {
+          "event": "read.reject",
+          "ms": 125.3,
+          "name": "TypeError"
+        },
+        {
+          "event": "fetch.signal.abort",
+          "ms": 125.5
+        },
+        {
+          "event": "settled",
+          "ms": 125.6,
+          "outcome": "TypeError"
+        },
+        {
+          "event": "server.response.close",
+          "ms": 125.8
+        }
+      ]
+    },
+    {
+      "layer": "sdk",
+      "mode": "fallback",
+      "scenario": "failed_open",
+      "before": {
+        "settled": false,
+        "outcome": null,
+        "transportAborted": false
+      },
+      "after": {
+        "settled": true,
+        "outcome": "end",
+        "transportAborted": true,
+        "timedOut": false
+      },
+      "trace": [
+        {
+          "event": "headers",
+          "ms": 5.5
+        },
+        {
+          "event": "read.enter",
+          "ms": 5.7
+        },
+        {
+          "event": "read.settle",
+          "ms": 5.8,
+          "done": false
+        },
+        {
+          "event": "sdk.response.failed",
+          "ms": 5.9
+        },
+        {
+          "event": "read.enter",
+          "ms": 5.9
+        },
+        {
+          "event": "user.abort",
+          "ms": 108.4
+        },
+        {
+          "event": "fetch.signal.abort",
+          "ms": 108.5
+        },
+        {
+          "event": "read.reject",
+          "ms": 109,
+          "name": "AbortError"
+        },
+        {
+          "event": "settled",
+          "ms": 109,
+          "outcome": "end"
+        },
+        {
+          "event": "server.response.close",
+          "ms": 109.3
+        }
+      ]
+    },
+    {
+      "layer": "sdk",
+      "mode": "fallback",
+      "scenario": "error_open",
+      "before": {
+        "settled": false,
+        "outcome": null,
+        "transportAborted": false
+      },
+      "after": {
+        "settled": true,
+        "outcome": "end",
+        "transportAborted": true,
+        "timedOut": false
+      },
+      "trace": [
+        {
+          "event": "headers",
+          "ms": 3.6
+        },
+        {
+          "event": "read.enter",
+          "ms": 3.6
+        },
+        {
+          "event": "read.settle",
+          "ms": 3.7,
+          "done": false
+        },
+        {
+          "event": "sdk.error",
+          "ms": 3.7
+        },
+        {
+          "event": "read.enter",
+          "ms": 3.7
+        },
+        {
+          "event": "user.abort",
+          "ms": 121.4
+        },
+        {
+          "event": "fetch.signal.abort",
+          "ms": 121.5
+        },
+        {
+          "event": "read.reject",
+          "ms": 121.9,
+          "name": "AbortError"
+        },
+        {
+          "event": "settled",
+          "ms": 122,
+          "outcome": "end"
+        },
+        {
+          "event": "server.response.close",
+          "ms": 122.3
+        }
+      ]
+    },
+    {
+      "layer": "sdk",
+      "mode": "fallback",
+      "scenario": "done_open",
+      "before": {
+        "settled": false,
+        "outcome": null,
+        "transportAborted": false
+      },
+      "after": {
+        "settled": true,
+        "outcome": "end",
+        "transportAborted": true,
+        "timedOut": false
+      },
+      "trace": [
+        {
+          "event": "headers",
+          "ms": 3.8
+        },
+        {
+          "event": "read.enter",
+          "ms": 3.9
+        },
+        {
+          "event": "read.settle",
+          "ms": 4,
+          "done": false
+        },
+        {
+          "event": "sdk.response.completed",
+          "ms": 4
+        },
+        {
+          "event": "read.enter",
+          "ms": 4
+        },
+        {
+          "event": "user.abort",
+          "ms": 121.6
+        },
+        {
+          "event": "fetch.signal.abort",
+          "ms": 121.8
+        },
+        {
+          "event": "read.reject",
+          "ms": 122.1,
+          "name": "AbortError"
+        },
+        {
+          "event": "settled",
+          "ms": 122.2,
+          "outcome": "end"
+        },
+        {
+          "event": "server.response.close",
+          "ms": 122.6
+        }
+      ]
+    },
+    {
+      "layer": "sdk",
+      "mode": "fallback",
+      "scenario": "break_open",
+      "before": {
+        "settled": true,
+        "outcome": "end",
+        "transportAborted": true
+      },
+      "after": {
+        "settled": true,
+        "outcome": "end",
+        "transportAborted": true,
+        "timedOut": false
+      },
+      "trace": [
+        {
+          "event": "headers",
+          "ms": 3.2
+        },
+        {
+          "event": "read.enter",
+          "ms": 3.2
+        },
+        {
+          "event": "read.settle",
+          "ms": 3.3,
+          "done": false
+        },
+        {
+          "event": "sdk.response.completed",
+          "ms": 3.3
+        },
+        {
+          "event": "cancel.enter",
+          "ms": 3.4
+        },
+        {
+          "event": "cancel.settle",
+          "ms": 3.6
+        },
+        {
+          "event": "fetch.signal.abort",
+          "ms": 3.6
+        },
+        {
+          "event": "settled",
+          "ms": 3.6,
+          "outcome": "end"
+        },
+        {
+          "event": "server.response.close",
+          "ms": 4.3
+        }
+      ]
+    },
+    {
+      "layer": "pi",
+      "mode": "fallback",
+      "scenario": "completed_open",
+      "before": {
+        "settled": false,
+        "outcome": null,
+        "transportAborted": false
+      },
+      "after": {
+        "settled": true,
+        "outcome": "aborted",
+        "transportAborted": true,
+        "timedOut": false
+      },
+      "trace": [
+        {
+          "event": "headers",
+          "ms": 4.3
+        },
+        {
+          "event": "read.enter",
+          "ms": 4.5
+        },
+        {
+          "event": "pi.start",
+          "ms": 4.5
+        },
+        {
+          "event": "read.settle",
+          "ms": 4.5,
+          "done": false
+        },
+        {
+          "event": "read.enter",
+          "ms": 4.7
+        },
+        {
+          "event": "user.abort",
+          "ms": 122.2
+        },
+        {
+          "event": "fetch.signal.abort",
+          "ms": 122.4
+        },
+        {
+          "event": "read.reject",
+          "ms": 122.9,
+          "name": "AbortError"
+        },
+        {
+          "event": "pi.error",
+          "ms": 123
+        },
+        {
+          "event": "settled",
+          "ms": 123,
+          "outcome": "aborted"
+        },
+        {
+          "event": "server.response.close",
+          "ms": 123.5
+        }
+      ]
+    },
+    {
+      "layer": "pi",
+      "mode": "fallback",
+      "scenario": "eof",
+      "before": {
+        "settled": true,
+        "outcome": "stop",
+        "transportAborted": false
+      },
+      "after": {
+        "settled": true,
+        "outcome": "stop",
+        "transportAborted": false,
+        "timedOut": false
+      },
+      "trace": [
+        {
+          "event": "server.response.close",
+          "ms": 2.7
+        },
+        {
+          "event": "headers",
+          "ms": 2.9
+        },
+        {
+          "event": "read.enter",
+          "ms": 3
+        },
+        {
+          "event": "pi.start",
+          "ms": 3.1
+        },
+        {
+          "event": "read.settle",
+          "ms": 3.1,
+          "done": false
+        },
+        {
+          "event": "read.enter",
+          "ms": 3.1
+        },
+        {
+          "event": "read.settle",
+          "ms": 3.2,
+          "done": true
+        },
+        {
+          "event": "pi.done",
+          "ms": 3.2
+        },
+        {
+          "event": "settled",
+          "ms": 3.2,
+          "outcome": "stop"
+        },
+        {
+          "event": "fetch.signal.abort",
+          "ms": 139.2
+        }
+      ]
+    },
+    {
+      "layer": "pi",
+      "mode": "fallback",
+      "scenario": "abort_before_completion",
+      "before": {
+        "settled": false,
+        "outcome": null,
+        "transportAborted": false
+      },
+      "after": {
+        "settled": true,
+        "outcome": "aborted",
+        "transportAborted": true,
+        "timedOut": false
+      },
+      "trace": [
+        {
+          "event": "headers",
+          "ms": 3.5
+        },
+        {
+          "event": "read.enter",
+          "ms": 3.6
+        },
+        {
+          "event": "pi.start",
+          "ms": 3.7
+        },
+        {
+          "event": "read.settle",
+          "ms": 3.7,
+          "done": false
+        },
+        {
+          "event": "read.enter",
+          "ms": 3.7
+        },
+        {
+          "event": "user.abort",
+          "ms": 122.6
+        },
+        {
+          "event": "fetch.signal.abort",
+          "ms": 122.8
+        },
+        {
+          "event": "read.reject",
+          "ms": 123.1,
+          "name": "AbortError"
+        },
+        {
+          "event": "pi.error",
+          "ms": 123.3
+        },
+        {
+          "event": "settled",
+          "ms": 123.3,
+          "outcome": "aborted"
+        },
+        {
+          "event": "server.response.close",
+          "ms": 123.6
+        }
+      ]
+    },
+    {
+      "layer": "pi",
+      "mode": "fallback",
+      "scenario": "disconnect",
+      "before": {
+        "settled": false,
+        "outcome": null,
+        "transportAborted": false
+      },
+      "after": {
+        "settled": true,
+        "outcome": "error",
+        "transportAborted": true,
+        "timedOut": false
+      },
+      "trace": [
+        {
+          "event": "headers",
+          "ms": 4.8
+        },
+        {
+          "event": "read.enter",
+          "ms": 4.9
+        },
+        {
+          "event": "pi.start",
+          "ms": 4.9
+        },
+        {
+          "event": "read.settle",
+          "ms": 4.9,
+          "done": false
+        },
+        {
+          "event": "read.enter",
+          "ms": 5
+        },
+        {
+          "event": "server.destroy",
+          "ms": 124.9
+        },
+        {
+          "event": "read.reject",
+          "ms": 125.6,
+          "name": "TypeError"
+        },
+        {
+          "event": "fetch.signal.abort",
+          "ms": 125.8
+        },
+        {
+          "event": "pi.error",
+          "ms": 125.9
+        },
+        {
+          "event": "settled",
+          "ms": 125.9,
+          "outcome": "error"
+        },
+        {
+          "event": "server.response.close",
+          "ms": 126
+        }
+      ]
+    },
+    {
+      "layer": "pi",
+      "mode": "fallback",
+      "scenario": "failed_open",
+      "before": {
+        "settled": true,
+        "outcome": "error",
+        "transportAborted": true
+      },
+      "after": {
+        "settled": true,
+        "outcome": "error",
+        "transportAborted": true,
+        "timedOut": false
+      },
+      "trace": [
+        {
+          "event": "headers",
+          "ms": 3.9
+        },
+        {
+          "event": "read.enter",
+          "ms": 4
+        },
+        {
+          "event": "pi.start",
+          "ms": 4.1
+        },
+        {
+          "event": "read.settle",
+          "ms": 4.1,
+          "done": false
+        },
+        {
+          "event": "cancel.enter",
+          "ms": 4.2
+        },
+        {
+          "event": "cancel.settle",
+          "ms": 4.4
+        },
+        {
+          "event": "fetch.signal.abort",
+          "ms": 4.5
+        },
+        {
+          "event": "pi.error",
+          "ms": 4.5
+        },
+        {
+          "event": "settled",
+          "ms": 4.5,
+          "outcome": "error"
+        },
+        {
+          "event": "server.response.close",
+          "ms": 5.4
+        }
+      ]
+    },
+    {
+      "layer": "pi",
+      "mode": "fallback",
+      "scenario": "error_open",
+      "before": {
+        "settled": true,
+        "outcome": "error",
+        "transportAborted": true
+      },
+      "after": {
+        "settled": true,
+        "outcome": "error",
+        "transportAborted": true,
+        "timedOut": false
+      },
+      "trace": [
+        {
+          "event": "headers",
+          "ms": 4.2
+        },
+        {
+          "event": "read.enter",
+          "ms": 4.3
+        },
+        {
+          "event": "pi.start",
+          "ms": 4.4
+        },
+        {
+          "event": "read.settle",
+          "ms": 4.4,
+          "done": false
+        },
+        {
+          "event": "cancel.enter",
+          "ms": 4.4
+        },
+        {
+          "event": "cancel.settle",
+          "ms": 4.6
+        },
+        {
+          "event": "fetch.signal.abort",
+          "ms": 4.6
+        },
+        {
+          "event": "pi.error",
+          "ms": 4.7
+        },
+        {
+          "event": "settled",
+          "ms": 4.7,
+          "outcome": "error"
+        },
+        {
+          "event": "server.response.close",
+          "ms": 5.5
+        }
+      ]
+    },
+    {
+      "layer": "pi",
+      "mode": "fallback",
+      "scenario": "done_open",
+      "before": {
+        "settled": false,
+        "outcome": null,
+        "transportAborted": false
+      },
+      "after": {
+        "settled": true,
+        "outcome": "aborted",
+        "transportAborted": true,
+        "timedOut": false
+      },
+      "trace": [
+        {
+          "event": "headers",
+          "ms": 3.5
+        },
+        {
+          "event": "read.enter",
+          "ms": 3.6
+        },
+        {
+          "event": "pi.start",
+          "ms": 3.7
+        },
+        {
+          "event": "read.settle",
+          "ms": 3.7,
+          "done": false
+        },
+        {
+          "event": "read.enter",
+          "ms": 3.8
+        },
+        {
+          "event": "user.abort",
+          "ms": 122.2
+        },
+        {
+          "event": "fetch.signal.abort",
+          "ms": 122.3
+        },
+        {
+          "event": "read.reject",
+          "ms": 122.8,
+          "name": "AbortError"
+        },
+        {
+          "event": "pi.error",
+          "ms": 122.9
+        },
+        {
+          "event": "settled",
+          "ms": 122.9,
+          "outcome": "aborted"
+        },
+        {
+          "event": "server.response.close",
+          "ms": 123.3
+        }
+      ]
+    },
+    {
+      "layer": "pi_break",
+      "mode": "fallback",
+      "scenario": "completed_open",
+      "before": {
+        "settled": true,
+        "outcome": "stop",
+        "transportAborted": true
+      },
+      "after": {
+        "settled": true,
+        "outcome": "stop",
+        "transportAborted": true,
+        "timedOut": false
+      },
+      "trace": [
+        {
+          "event": "headers",
+          "ms": 3.8
+        },
+        {
+          "event": "read.enter",
+          "ms": 4.1
+        },
+        {
+          "event": "pi.start",
+          "ms": 4.2
+        },
+        {
+          "event": "read.settle",
+          "ms": 4.2,
+          "done": false
+        },
+        {
+          "event": "cancel.enter",
+          "ms": 4.4
+        },
+        {
+          "event": "cancel.settle",
+          "ms": 4.6
+        },
+        {
+          "event": "fetch.signal.abort",
+          "ms": 4.6
+        },
+        {
+          "event": "pi.done",
+          "ms": 4.7
+        },
+        {
+          "event": "settled",
+          "ms": 4.7,
+          "outcome": "stop"
+        },
+        {
+          "event": "server.response.close",
+          "ms": 5.8
+        }
+      ]
+    }
+  ]
+}

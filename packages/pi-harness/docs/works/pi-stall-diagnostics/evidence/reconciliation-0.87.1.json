@@ -1,0 +1,23 @@
+{
+  "status": "passed",
+  "activationAllowed": false,
+  "t1Complete": false,
+  "checks": [
+    "runtime source hashes match",
+    "turns source hashes match",
+    "correlation source hashes match",
+    "check-correlation.mjs syntax passed",
+    "check-stage.mjs syntax passed",
+    "check-turns.mjs syntax passed",
+    "check.mjs syntax passed",
+    "install.mjs syntax passed",
+    "logger.mjs syntax passed",
+    "stage.mjs syntax passed",
+    "Explicit whitespace/conflict-marker check passed for 21 kit and Work files",
+    "git diff --check passed"
+  ],
+  "installedHash": "81c81a21ec81e84200205f561687408ff5e3738fbbbb3c2a6c186b348d376020",
+  "patchedHash": "7db71a2ea905b0fdc495348d0c6cfc3c52e2acfd6d1a7caea78c890bbe65ddfd",
+  "correlationRerun": false,
+  "reason": "Implementation and correlation check hashes unchanged; existing evidence applies."
+}

@@ -1,0 +1,19 @@
+{
+  "runtime": "Bun 1.4.0",
+  "open": {
+    "readable": null,
+    "errored": false,
+    "nodeReadableMarker": null
+  },
+  "locked": {
+    "readable": null,
+    "errored": false,
+    "nodeReadableMarker": null
+  },
+  "errored": {
+    "readable": null,
+    "errored": false,
+    "nodeReadableMarker": null
+  },
+  "manualControllerErrorRejectsRead": true
+}

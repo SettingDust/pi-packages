@@ -1,0 +1,768 @@
+{
+  "status": "passed",
+  "activationAllowed": false,
+  "t1Complete": true,
+  "command": [
+    "node",
+    "packages/pi-harness/tools/pi-stall-diagnostics/check-pair.mjs",
+    "D:/Applications/Scoop/apps/pi-coding-agent-bun/current/node_modules/@earendil-works/pi-coding-agent",
+    "packages/pi-harness/docs/works/pi-stall-diagnostics/evidence/pair-offline-6.json"
+  ],
+  "node": "v24.15.0",
+  "platform": "win32",
+  "checks": [
+    {
+      "name": "Both verified stages parse and match offline-6-google hashes"
+    },
+    {
+      "name": "Real target refused with and without disposable option"
+    },
+    {
+      "name": "Install and repeated install without rewriting; patched isolated CLI smoke",
+      "exitCode": 0,
+      "stdout": "0.87.1",
+      "hashes": [
+        "b1c6995246bb393df5fda23dc3a286f7d8f26814a09fc2aa140760ba78207d3c",
+        "32b6ff866b6a64fc2613fa12474f7ada5ca1483a362d0be7680735bdaedc1200"
+      ],
+      "isolatedHomeEmpty": true,
+      "networkAndProcessesBlocked": true
+    },
+    {
+      "name": "Rollback and repeated rollback without rewriting; restored isolated CLI smoke",
+      "exitCode": 0,
+      "stdout": "0.87.1",
+      "hashes": [
+        "81c81a21ec81e84200205f561687408ff5e3738fbbbb3c2a6c186b348d376020",
+        "b7d0697d0f4c7d3b54c6aee545d3b27c5981c27d0470e1c79876898f28f2c472"
+      ],
+      "isolatedHomeEmpty": true,
+      "networkAndProcessesBlocked": true
+    },
+    {
+      "name": "Mixed state recovery requires separate install: original/patched",
+      "finalHashes": [
+        "81c81a21ec81e84200205f561687408ff5e3738fbbbb3c2a6c186b348d376020",
+        "b7d0697d0f4c7d3b54c6aee545d3b27c5981c27d0470e1c79876898f28f2c472"
+      ]
+    },
+    {
+      "name": "Mixed state recovery requires separate install: patched/original",
+      "finalHashes": [
+        "81c81a21ec81e84200205f561687408ff5e3738fbbbb3c2a6c186b348d376020",
+        "b7d0697d0f4c7d3b54c6aee545d3b27c5981c27d0470e1c79876898f28f2c472"
+      ]
+    },
+    {
+      "name": "Fault install before replacement 0; guarded restoration/repeated rollback",
+      "finalHashes": [
+        "81c81a21ec81e84200205f561687408ff5e3738fbbbb3c2a6c186b348d376020",
+        "b7d0697d0f4c7d3b54c6aee545d3b27c5981c27d0470e1c79876898f28f2c472"
+      ]
+    },
+    {
+      "name": "Fault install before replacement 1; guarded restoration/repeated rollback",
+      "finalHashes": [
+        "81c81a21ec81e84200205f561687408ff5e3738fbbbb3c2a6c186b348d376020",
+        "b7d0697d0f4c7d3b54c6aee545d3b27c5981c27d0470e1c79876898f28f2c472"
+      ]
+    },
+    {
+      "name": "Fault install after replacement 0; guarded restoration/repeated rollback",
+      "finalHashes": [
+        "81c81a21ec81e84200205f561687408ff5e3738fbbbb3c2a6c186b348d376020",
+        "b7d0697d0f4c7d3b54c6aee545d3b27c5981c27d0470e1c79876898f28f2c472"
+      ]
+    },
+    {
+      "name": "Fault install after replacement 1; guarded restoration/repeated rollback",
+      "finalHashes": [
+        "81c81a21ec81e84200205f561687408ff5e3738fbbbb3c2a6c186b348d376020",
+        "b7d0697d0f4c7d3b54c6aee545d3b27c5981c27d0470e1c79876898f28f2c472"
+      ]
+    },
+    {
+      "name": "Fault rollback before replacement 0; guarded restoration/repeated rollback",
+      "finalHashes": [
+        "81c81a21ec81e84200205f561687408ff5e3738fbbbb3c2a6c186b348d376020",
+        "b7d0697d0f4c7d3b54c6aee545d3b27c5981c27d0470e1c79876898f28f2c472"
+      ]
+    },
+    {
+      "name": "Fault rollback before replacement 1; guarded restoration/repeated rollback",
+      "finalHashes": [
+        "81c81a21ec81e84200205f561687408ff5e3738fbbbb3c2a6c186b348d376020",
+        "b7d0697d0f4c7d3b54c6aee545d3b27c5981c27d0470e1c79876898f28f2c472"
+      ]
+    },
+    {
+      "name": "Fault rollback after replacement 0; guarded restoration/repeated rollback",
+      "finalHashes": [
+        "81c81a21ec81e84200205f561687408ff5e3738fbbbb3c2a6c186b348d376020",
+        "b7d0697d0f4c7d3b54c6aee545d3b27c5981c27d0470e1c79876898f28f2c472"
+      ]
+    },
+    {
+      "name": "Fault rollback after replacement 1; guarded restoration/repeated rollback",
+      "finalHashes": [
+        "81c81a21ec81e84200205f561687408ff5e3738fbbbb3c2a6c186b348d376020",
+        "b7d0697d0f4c7d3b54c6aee545d3b27c5981c27d0470e1c79876898f28f2c472"
+      ]
+    },
+    {
+      "name": "Process exit install before replacement 0; stale journal restart",
+      "exitCode": 73,
+      "interruptedHashes": [
+        "81c81a21ec81e84200205f561687408ff5e3738fbbbb3c2a6c186b348d376020",
+        "b7d0697d0f4c7d3b54c6aee545d3b27c5981c27d0470e1c79876898f28f2c472"
+      ],
+      "finalHashes": [
+        "81c81a21ec81e84200205f561687408ff5e3738fbbbb3c2a6c186b348d376020",
+        "b7d0697d0f4c7d3b54c6aee545d3b27c5981c27d0470e1c79876898f28f2c472"
+      ]
+    },
+    {
+      "name": "Process exit install before replacement 1; stale journal restart",
+      "exitCode": 73,
+      "interruptedHashes": [
+        "b1c6995246bb393df5fda23dc3a286f7d8f26814a09fc2aa140760ba78207d3c",
+        "b7d0697d0f4c7d3b54c6aee545d3b27c5981c27d0470e1c79876898f28f2c472"
+      ],
+      "finalHashes": [
+        "81c81a21ec81e84200205f561687408ff5e3738fbbbb3c2a6c186b348d376020",
+        "b7d0697d0f4c7d3b54c6aee545d3b27c5981c27d0470e1c79876898f28f2c472"
+      ]
+    },
+    {
+      "name": "Process exit install after replacement 0; stale journal restart",
+      "exitCode": 73,
+      "interruptedHashes": [
+        "b1c6995246bb393df5fda23dc3a286f7d8f26814a09fc2aa140760ba78207d3c",
+        "b7d0697d0f4c7d3b54c6aee545d3b27c5981c27d0470e1c79876898f28f2c472"
+      ],
+      "finalHashes": [
+        "81c81a21ec81e84200205f561687408ff5e3738fbbbb3c2a6c186b348d376020",
+        "b7d0697d0f4c7d3b54c6aee545d3b27c5981c27d0470e1c79876898f28f2c472"
+      ]
+    },
+    {
+      "name": "Process exit install after replacement 1; stale journal restart",
+      "exitCode": 73,
+      "interruptedHashes": [
+        "b1c6995246bb393df5fda23dc3a286f7d8f26814a09fc2aa140760ba78207d3c",
+        "32b6ff866b6a64fc2613fa12474f7ada5ca1483a362d0be7680735bdaedc1200"
+      ],
+      "finalHashes": [
+        "81c81a21ec81e84200205f561687408ff5e3738fbbbb3c2a6c186b348d376020",
+        "b7d0697d0f4c7d3b54c6aee545d3b27c5981c27d0470e1c79876898f28f2c472"
+      ]
+    },
+    {
+      "name": "Process exit rollback before replacement 0; stale journal restart",
+      "exitCode": 73,
+      "interruptedHashes": [
+        "b1c6995246bb393df5fda23dc3a286f7d8f26814a09fc2aa140760ba78207d3c",
+        "32b6ff866b6a64fc2613fa12474f7ada5ca1483a362d0be7680735bdaedc1200"
+      ],
+      "finalHashes": [
+        "81c81a21ec81e84200205f561687408ff5e3738fbbbb3c2a6c186b348d376020",
+        "b7d0697d0f4c7d3b54c6aee545d3b27c5981c27d0470e1c79876898f28f2c472"
+      ]
+    },
+    {
+      "name": "Process exit rollback before replacement 1; stale journal restart",
+      "exitCode": 73,
+      "interruptedHashes": [
+        "81c81a21ec81e84200205f561687408ff5e3738fbbbb3c2a6c186b348d376020",
+        "32b6ff866b6a64fc2613fa12474f7ada5ca1483a362d0be7680735bdaedc1200"
+      ],
+      "finalHashes": [
+        "81c81a21ec81e84200205f561687408ff5e3738fbbbb3c2a6c186b348d376020",
+        "b7d0697d0f4c7d3b54c6aee545d3b27c5981c27d0470e1c79876898f28f2c472"
+      ]
+    },
+    {
+      "name": "Process exit rollback after replacement 0; stale journal restart",
+      "exitCode": 73,
+      "interruptedHashes": [
+        "81c81a21ec81e84200205f561687408ff5e3738fbbbb3c2a6c186b348d376020",
+        "32b6ff866b6a64fc2613fa12474f7ada5ca1483a362d0be7680735bdaedc1200"
+      ],
+      "finalHashes": [
+        "81c81a21ec81e84200205f561687408ff5e3738fbbbb3c2a6c186b348d376020",
+        "b7d0697d0f4c7d3b54c6aee545d3b27c5981c27d0470e1c79876898f28f2c472"
+      ]
+    },
+    {
+      "name": "Process exit rollback after replacement 1; stale journal restart",
+      "exitCode": 73,
+      "interruptedHashes": [
+        "81c81a21ec81e84200205f561687408ff5e3738fbbbb3c2a6c186b348d376020",
+        "b7d0697d0f4c7d3b54c6aee545d3b27c5981c27d0470e1c79876898f28f2c472"
+      ],
+      "finalHashes": [
+        "81c81a21ec81e84200205f561687408ff5e3738fbbbb3c2a6c186b348d376020",
+        "b7d0697d0f4c7d3b54c6aee545d3b27c5981c27d0470e1c79876898f28f2c472"
+      ]
+    },
+    {
+      "name": "Interrupted mixed recovery repeatable: patched/original",
+      "finalHashes": [
+        "81c81a21ec81e84200205f561687408ff5e3738fbbbb3c2a6c186b348d376020",
+        "b7d0697d0f4c7d3b54c6aee545d3b27c5981c27d0470e1c79876898f28f2c472"
+      ]
+    },
+    {
+      "name": "Interrupted mixed recovery repeatable: original/patched",
+      "finalHashes": [
+        "81c81a21ec81e84200205f561687408ff5e3738fbbbb3c2a6c186b348d376020",
+        "b7d0697d0f4c7d3b54c6aee545d3b27c5981c27d0470e1c79876898f28f2c472"
+      ]
+    },
+    {
+      "name": "Unknown target 0 in original/original preserves pair",
+      "hashes": [
+        "363cffafd0c3c38022477f0ff19963fe764cedd929319d9da04848a388e0e3ec",
+        "b7d0697d0f4c7d3b54c6aee545d3b27c5981c27d0470e1c79876898f28f2c472"
+      ]
+    },
+    {
+      "name": "Unknown target 0 in patched/original preserves pair",
+      "hashes": [
+        "363cffafd0c3c38022477f0ff19963fe764cedd929319d9da04848a388e0e3ec",
+        "b7d0697d0f4c7d3b54c6aee545d3b27c5981c27d0470e1c79876898f28f2c472"
+      ]
+    },
+    {
+      "name": "Unknown target 0 in original/patched preserves pair",
+      "hashes": [
+        "363cffafd0c3c38022477f0ff19963fe764cedd929319d9da04848a388e0e3ec",
+        "32b6ff866b6a64fc2613fa12474f7ada5ca1483a362d0be7680735bdaedc1200"
+      ]
+    },
+    {
+      "name": "missing backup 0 blocks mixed recovery",
+      "hashes": [
+        "b1c6995246bb393df5fda23dc3a286f7d8f26814a09fc2aa140760ba78207d3c",
+        "b7d0697d0f4c7d3b54c6aee545d3b27c5981c27d0470e1c79876898f28f2c472"
+      ]
+    },
+    {
+      "name": "corrupt backup 0 blocks mixed recovery",
+      "hashes": [
+        "b1c6995246bb393df5fda23dc3a286f7d8f26814a09fc2aa140760ba78207d3c",
+        "b7d0697d0f4c7d3b54c6aee545d3b27c5981c27d0470e1c79876898f28f2c472"
+      ]
+    },
+    {
+      "name": "missing staged 0 blocks mixed recovery",
+      "hashes": [
+        "b1c6995246bb393df5fda23dc3a286f7d8f26814a09fc2aa140760ba78207d3c",
+        "b7d0697d0f4c7d3b54c6aee545d3b27c5981c27d0470e1c79876898f28f2c472"
+      ]
+    },
+    {
+      "name": "corrupt staged 0 blocks mixed recovery",
+      "hashes": [
+        "b1c6995246bb393df5fda23dc3a286f7d8f26814a09fc2aa140760ba78207d3c",
+        "b7d0697d0f4c7d3b54c6aee545d3b27c5981c27d0470e1c79876898f28f2c472"
+      ]
+    },
+    {
+      "name": "Unknown target 1 in original/original preserves pair",
+      "hashes": [
+        "81c81a21ec81e84200205f561687408ff5e3738fbbbb3c2a6c186b348d376020",
+        "363cffafd0c3c38022477f0ff19963fe764cedd929319d9da04848a388e0e3ec"
+      ]
+    },
+    {
+      "name": "Unknown target 1 in patched/original preserves pair",
+      "hashes": [
+        "b1c6995246bb393df5fda23dc3a286f7d8f26814a09fc2aa140760ba78207d3c",
+        "363cffafd0c3c38022477f0ff19963fe764cedd929319d9da04848a388e0e3ec"
+      ]
+    },
+    {
+      "name": "Unknown target 1 in original/patched preserves pair",
+      "hashes": [
+        "81c81a21ec81e84200205f561687408ff5e3738fbbbb3c2a6c186b348d376020",
+        "363cffafd0c3c38022477f0ff19963fe764cedd929319d9da04848a388e0e3ec"
+      ]
+    },
+    {
+      "name": "missing backup 1 blocks mixed recovery",
+      "hashes": [
+        "b1c6995246bb393df5fda23dc3a286f7d8f26814a09fc2aa140760ba78207d3c",
+        "b7d0697d0f4c7d3b54c6aee545d3b27c5981c27d0470e1c79876898f28f2c472"
+      ]
+    },
+    {
+      "name": "corrupt backup 1 blocks mixed recovery",
+      "hashes": [
+        "b1c6995246bb393df5fda23dc3a286f7d8f26814a09fc2aa140760ba78207d3c",
+        "b7d0697d0f4c7d3b54c6aee545d3b27c5981c27d0470e1c79876898f28f2c472"
+      ]
+    },
+    {
+      "name": "missing staged 1 blocks mixed recovery",
+      "hashes": [
+        "b1c6995246bb393df5fda23dc3a286f7d8f26814a09fc2aa140760ba78207d3c",
+        "b7d0697d0f4c7d3b54c6aee545d3b27c5981c27d0470e1c79876898f28f2c472"
+      ]
+    },
+    {
+      "name": "corrupt staged 1 blocks mixed recovery",
+      "hashes": [
+        "b1c6995246bb393df5fda23dc3a286f7d8f26814a09fc2aa140760ba78207d3c",
+        "b7d0697d0f4c7d3b54c6aee545d3b27c5981c27d0470e1c79876898f28f2c472"
+      ]
+    },
+    {
+      "name": "Malformed/legacy/duplicate/escaping manifest refusal 38",
+      "hashes": [
+        "81c81a21ec81e84200205f561687408ff5e3738fbbbb3c2a6c186b348d376020",
+        "b7d0697d0f4c7d3b54c6aee545d3b27c5981c27d0470e1c79876898f28f2c472"
+      ]
+    },
+    {
+      "name": "Malformed/legacy/duplicate/escaping manifest refusal 39",
+      "hashes": [
+        "81c81a21ec81e84200205f561687408ff5e3738fbbbb3c2a6c186b348d376020",
+        "b7d0697d0f4c7d3b54c6aee545d3b27c5981c27d0470e1c79876898f28f2c472"
+      ]
+    },
+    {
+      "name": "Malformed/legacy/duplicate/escaping manifest refusal 40",
+      "hashes": [
+        "81c81a21ec81e84200205f561687408ff5e3738fbbbb3c2a6c186b348d376020",
+        "b7d0697d0f4c7d3b54c6aee545d3b27c5981c27d0470e1c79876898f28f2c472"
+      ]
+    },
+    {
+      "name": "Malformed/legacy/duplicate/escaping manifest refusal 41",
+      "hashes": [
+        "81c81a21ec81e84200205f561687408ff5e3738fbbbb3c2a6c186b348d376020",
+        "b7d0697d0f4c7d3b54c6aee545d3b27c5981c27d0470e1c79876898f28f2c472"
+      ]
+    },
+    {
+      "name": "Malformed/legacy/duplicate/escaping manifest refusal 42",
+      "hashes": [
+        "81c81a21ec81e84200205f561687408ff5e3738fbbbb3c2a6c186b348d376020",
+        "b7d0697d0f4c7d3b54c6aee545d3b27c5981c27d0470e1c79876898f28f2c472"
+      ]
+    },
+    {
+      "name": "Malformed/legacy/duplicate/escaping manifest refusal 43",
+      "hashes": [
+        "81c81a21ec81e84200205f561687408ff5e3738fbbbb3c2a6c186b348d376020",
+        "b7d0697d0f4c7d3b54c6aee545d3b27c5981c27d0470e1c79876898f28f2c472"
+      ]
+    },
+    {
+      "name": "Malformed/legacy/duplicate/escaping manifest refusal 44",
+      "hashes": [
+        "81c81a21ec81e84200205f561687408ff5e3738fbbbb3c2a6c186b348d376020",
+        "b7d0697d0f4c7d3b54c6aee545d3b27c5981c27d0470e1c79876898f28f2c472"
+      ]
+    },
+    {
+      "name": "Malformed/legacy/duplicate/escaping manifest refusal 45",
+      "hashes": [
+        "81c81a21ec81e84200205f561687408ff5e3738fbbbb3c2a6c186b348d376020",
+        "b7d0697d0f4c7d3b54c6aee545d3b27c5981c27d0470e1c79876898f28f2c472"
+      ]
+    },
+    {
+      "name": "Malformed/legacy/duplicate/escaping manifest refusal 46",
+      "hashes": [
+        "81c81a21ec81e84200205f561687408ff5e3738fbbbb3c2a6c186b348d376020",
+        "b7d0697d0f4c7d3b54c6aee545d3b27c5981c27d0470e1c79876898f28f2c472"
+      ]
+    },
+    {
+      "name": "Malformed/legacy/duplicate/escaping manifest refusal 47",
+      "hashes": [
+        "81c81a21ec81e84200205f561687408ff5e3738fbbbb3c2a6c186b348d376020",
+        "b7d0697d0f4c7d3b54c6aee545d3b27c5981c27d0470e1c79876898f28f2c472"
+      ]
+    },
+    {
+      "name": "Malformed/legacy/duplicate/escaping manifest refusal 48",
+      "hashes": [
+        "81c81a21ec81e84200205f561687408ff5e3738fbbbb3c2a6c186b348d376020",
+        "b7d0697d0f4c7d3b54c6aee545d3b27c5981c27d0470e1c79876898f28f2c472"
+      ]
+    },
+    {
+      "name": "Malformed/legacy/duplicate/escaping manifest refusal 49",
+      "hashes": [
+        "81c81a21ec81e84200205f561687408ff5e3738fbbbb3c2a6c186b348d376020",
+        "b7d0697d0f4c7d3b54c6aee545d3b27c5981c27d0470e1c79876898f28f2c472"
+      ]
+    },
+    {
+      "name": "Malformed JSON manifest refusal",
+      "hashes": [
+        "81c81a21ec81e84200205f561687408ff5e3738fbbbb3c2a6c186b348d376020",
+        "b7d0697d0f4c7d3b54c6aee545d3b27c5981c27d0470e1c79876898f28f2c472"
+      ]
+    },
+    {
+      "name": "Version/entry/runtime/adapter drift refusal: package.json",
+      "hashes": [
+        "81c81a21ec81e84200205f561687408ff5e3738fbbbb3c2a6c186b348d376020",
+        "b7d0697d0f4c7d3b54c6aee545d3b27c5981c27d0470e1c79876898f28f2c472"
+      ]
+    },
+    {
+      "name": "Version/entry/runtime/adapter drift refusal: dist/bundle/cli.js",
+      "hashes": [
+        "81c81a21ec81e84200205f561687408ff5e3738fbbbb3c2a6c186b348d376020",
+        "b7d0697d0f4c7d3b54c6aee545d3b27c5981c27d0470e1c79876898f28f2c472"
+      ]
+    },
+    {
+      "name": "Version/entry/runtime/adapter drift refusal: dist/bundle/cli-runtime.js",
+      "hashes": [
+        "81c81a21ec81e84200205f561687408ff5e3738fbbbb3c2a6c186b348d376020",
+        "b7d0697d0f4c7d3b54c6aee545d3b27c5981c27d0470e1c79876898f28f2c472"
+      ]
+    },
+    {
+      "name": "Version/entry/runtime/adapter drift refusal: dist/bundle/chunks/google-vertex-O4YJEQUW.js",
+      "hashes": [
+        "81c81a21ec81e84200205f561687408ff5e3738fbbbb3c2a6c186b348d376020",
+        "b7d0697d0f4c7d3b54c6aee545d3b27c5981c27d0470e1c79876898f28f2c472"
+      ]
+    },
+    {
+      "name": "Active fixture refusal",
+      "hashes": [
+        "81c81a21ec81e84200205f561687408ff5e3738fbbbb3c2a6c186b348d376020",
+        "b7d0697d0f4c7d3b54c6aee545d3b27c5981c27d0470e1c79876898f28f2c472"
+      ]
+    },
+    {
+      "name": "Inconclusive fixture refusal",
+      "hashes": [
+        "81c81a21ec81e84200205f561687408ff5e3738fbbbb3c2a6c186b348d376020",
+        "b7d0697d0f4c7d3b54c6aee545d3b27c5981c27d0470e1c79876898f28f2c472"
+      ]
+    },
+    {
+      "name": "Missing positive inactivity proof refusal",
+      "hashes": [
+        "81c81a21ec81e84200205f561687408ff5e3738fbbbb3c2a6c186b348d376020",
+        "b7d0697d0f4c7d3b54c6aee545d3b27c5981c27d0470e1c79876898f28f2c472"
+      ]
+    },
+    {
+      "name": "No smoke callback refusal",
+      "hashes": [
+        "81c81a21ec81e84200205f561687408ff5e3738fbbbb3c2a6c186b348d376020",
+        "b7d0697d0f4c7d3b54c6aee545d3b27c5981c27d0470e1c79876898f28f2c472"
+      ]
+    },
+    {
+      "name": "Hard-linked target refusal",
+      "hashes": [
+        "81c81a21ec81e84200205f561687408ff5e3738fbbbb3c2a6c186b348d376020",
+        "b7d0697d0f4c7d3b54c6aee545d3b27c5981c27d0470e1c79876898f28f2c472"
+      ]
+    },
+    {
+      "name": "Hard-linked backup refusal",
+      "hashes": [
+        "81c81a21ec81e84200205f561687408ff5e3738fbbbb3c2a6c186b348d376020",
+        "b7d0697d0f4c7d3b54c6aee545d3b27c5981c27d0470e1c79876898f28f2c472"
+      ]
+    },
+    {
+      "name": "Hard-linked staged refusal",
+      "hashes": [
+        "81c81a21ec81e84200205f561687408ff5e3738fbbbb3c2a6c186b348d376020",
+        "b7d0697d0f4c7d3b54c6aee545d3b27c5981c27d0470e1c79876898f28f2c472"
+      ]
+    },
+    {
+      "name": "Inactivity lost between writes preserves mixed state and blocks unsafe restoration",
+      "residualHashes": [
+        "b1c6995246bb393df5fda23dc3a286f7d8f26814a09fc2aa140760ba78207d3c",
+        "b7d0697d0f4c7d3b54c6aee545d3b27c5981c27d0470e1c79876898f28f2c472"
+      ],
+      "checks": 5
+    },
+    {
+      "name": "Drift immediately before second replacement blocks write and unsafe recovery",
+      "residualHashes": [
+        "b1c6995246bb393df5fda23dc3a286f7d8f26814a09fc2aa140760ba78207d3c",
+        "d8cc331758cd3571bcc3a8784a8234e6dc6706a1abb9eea907add49882e6fcb7"
+      ]
+    },
+    {
+      "name": "backup drift between writes blocks replacement and restoration",
+      "residualHashes": [
+        "b1c6995246bb393df5fda23dc3a286f7d8f26814a09fc2aa140760ba78207d3c",
+        "b7d0697d0f4c7d3b54c6aee545d3b27c5981c27d0470e1c79876898f28f2c472"
+      ]
+    },
+    {
+      "name": "staged drift between writes blocks replacement and restoration",
+      "residualHashes": [
+        "b1c6995246bb393df5fda23dc3a286f7d8f26814a09fc2aa140760ba78207d3c",
+        "b7d0697d0f4c7d3b54c6aee545d3b27c5981c27d0470e1c79876898f28f2c472"
+      ]
+    },
+    {
+      "name": "Temporary bytes revalidated immediately before rename"
+    },
+    {
+      "name": "Exclusive temporary collision preserves pre-existing bytes"
+    },
+    {
+      "name": "Manifest revalidated between writes; recovery resumes after verified metadata restored"
+    },
+    {
+      "name": "Kernel ownership refuses concurrent operation",
+      "hashes": [
+        "b1c6995246bb393df5fda23dc3a286f7d8f26814a09fc2aa140760ba78207d3c",
+        "32b6ff866b6a64fc2613fa12474f7ada5ca1483a362d0be7680735bdaedc1200"
+      ]
+    },
+    {
+      "name": "Post-install smoke failure restores both originals",
+      "finalHashes": [
+        "81c81a21ec81e84200205f561687408ff5e3738fbbbb3c2a6c186b348d376020",
+        "b7d0697d0f4c7d3b54c6aee545d3b27c5981c27d0470e1c79876898f28f2c472"
+      ]
+    },
+    {
+      "name": "Final restored isolated CLI smoke",
+      "exitCode": 0,
+      "stdout": "0.87.1",
+      "hashes": [
+        "81c81a21ec81e84200205f561687408ff5e3738fbbbb3c2a6c186b348d376020",
+        "b7d0697d0f4c7d3b54c6aee545d3b27c5981c27d0470e1c79876898f28f2c472"
+      ],
+      "isolatedHomeEmpty": true,
+      "networkAndProcessesBlocked": true
+    },
+    {
+      "name": "Read-source main/SDK/adapters/entry remain unchanged"
+    },
+    {
+      "name": "T1-G source/evidence hashes unchanged; paired recovery supersedes legacy installer evidence"
+    }
+  ],
+  "limitations": [
+    "Disposable inactivity is a controlled fixture assertion, not real-target process proof.",
+    "Per-file Windows same-directory rename and process interruption tested; no atomic-pair or power-loss durability claim.",
+    "No providers, existing sessions, installed writes or process termination. T2 remains excluded."
+  ],
+  "manifest": {
+    "revision": "offline-6-google",
+    "activationAllowed": false,
+    "gaps": [
+      "Paired installer/recovery remains T1-P; activation remains disabled."
+    ],
+    "version": "0.87.1",
+    "root": "C:\\Users\\WINDOWS\\AppData\\Local\\Temp\\pi-stall-pair-RyfZP3\\fixture",
+    "entryHash": "e79626f2dd6f94aa45d30f3fa63cd84319a6eefcd150b353cfaf274366926774",
+    "runtimeHash": "9ca136a7caa977d936aa789d7448a3dfb17851677ff5ac8c0dbcf23c31a02142",
+    "targets": [
+      {
+        "target": "C:\\Users\\WINDOWS\\AppData\\Local\\Temp\\pi-stall-pair-RyfZP3\\fixture\\dist\\bundle\\chunks\\chunk-OJP47DM6.js",
+        "originalHash": "81c81a21ec81e84200205f561687408ff5e3738fbbbb3c2a6c186b348d376020",
+        "patchedHash": "b1c6995246bb393df5fda23dc3a286f7d8f26814a09fc2aa140760ba78207d3c",
+        "backup": "C:\\Users\\WINDOWS\\AppData\\Local\\Temp\\pi-stall-pair-RyfZP3\\stage\\original.js",
+        "staged": "C:\\Users\\WINDOWS\\AppData\\Local\\Temp\\pi-stall-pair-RyfZP3\\stage\\patched.mjs",
+        "boundaries": [
+          {
+            "start": "async function runAgentLoop(",
+            "end": "async function runAgentLoopContinue(",
+            "sha256": "cb29a892dc35a50cc9ffd3023f9fa07b3a000f14ede23f18b04a9ba12543b5e1"
+          },
+          {
+            "start": "async function runAgentLoopContinue(",
+            "end": "function createAgentStream(",
+            "sha256": "8f52f97e91bae494cae3080497e650abcb1da91026ccf0cfe633a47c5ce07e74"
+          },
+          {
+            "start": "async function runLoop(initialContext,",
+            "end": "function declareToolChanges(",
+            "sha256": "6c5c345f969b2c4f6d540045b3f14cfeaa110322ba126936cb1c1288b6107dff"
+          },
+          {
+            "start": "async function streamAssistantResponse(",
+            "end": "async function failToolCallsFromTruncatedMessage(",
+            "sha256": "eca7a776e638712886a77cae8e72bc4c8cd3f68e77ba1b18a608a3232a31d2f2"
+          },
+          {
+            "start": "async emitMessageEnd(event){",
+            "end": "async emitToolResult(",
+            "sha256": "ac8d63b8d510b2f91e0628aaa2891ece1da8811c0d346e4698565ea9e3cbaa78"
+          },
+          {
+            "start": "appendMessage(message){",
+            "end": "appendThinkingLevelChange(thinkingLevel){",
+            "sha256": "3ff98ffa61a4036769028c4e0c0dd3bbe81a8da47d7a02128e7293a437814551"
+          },
+          {
+            "start": "async emitToolCall(event){",
+            "end": "async emitUserBash(event){",
+            "sha256": "2de35120f22a21a256f351bbf706afd2fe9df8feccd0079a05cadb535bfdc47c"
+          },
+          {
+            "start": "async function executePreparedToolCall(",
+            "end": "async function finalizeExecutedToolCall(",
+            "sha256": "d0d7117b03a98e66213b4ab74726ec8ea55a407fe0ddcc6943ab4a87c4177835"
+          },
+          {
+            "start": "async abort(){this._isAgentRunActive",
+            "end": "async waitForIdle(){this.isIdle",
+            "sha256": "1ed1e083602bda0076301dba5e6b115ba240d8f9fc15197b435df18851c70e7b"
+          }
+        ]
+      },
+      {
+        "target": "C:\\Users\\WINDOWS\\AppData\\Local\\Temp\\pi-stall-pair-RyfZP3\\fixture\\dist\\bundle\\chunks\\chunk-FUXEF6JQ.js",
+        "originalHash": "b7d0697d0f4c7d3b54c6aee545d3b27c5981c27d0470e1c79876898f28f2c472",
+        "patchedHash": "32b6ff866b6a64fc2613fa12474f7ada5ca1483a362d0be7680735bdaedc1200",
+        "backup": "C:\\Users\\WINDOWS\\AppData\\Local\\Temp\\pi-stall-pair-RyfZP3\\stage\\google-original.js",
+        "staged": "C:\\Users\\WINDOWS\\AppData\\Local\\Temp\\pi-stall-pair-RyfZP3\\stage\\google-patched.mjs",
+        "boundaries": [
+          {
+            "selector": "response=this.apiClient.requestStream({path:path2,queryParams,body:JSON.stringify(body),httpMethod:\"POST\",httpOptions:(_a2=params.config)===null||_a2===void 0?void 0:_a2.httpOptions,abortSignal:(_b=params.config)===null||_b===void 0?void 0:_b.abortSignal})",
+            "sha256": "31eb29154c66d14d0d01c774ee25b31697c5f153b0d814b8a15939212ac791f7"
+          },
+          {
+            "selector": "response=this.apiClient.requestStream({path:path2,queryParams,body:JSON.stringify(body),httpMethod:\"POST\",httpOptions:(_c=params.config)===null||_c===void 0?void 0:_c.httpOptions,abortSignal:(_d=params.config)===null||_d===void 0?void 0:_d.abortSignal})",
+            "sha256": "e152a7e887d336ed56864aa719e2ba239306f1c2539631379250c46736fc4579"
+          },
+          {
+            "selector": "async requestStream(request){",
+            "sha256": "1ed62caf62ae737b63e5cf055e2fd4ba9975f707fad2f913309d35a8f12fd8d8"
+          },
+          {
+            "selector": "this.streamApiCall(url,requestInit,request.httpMethod,patchedHttpOptions.retryOptions,patchedHttpOptions.timeout,request.abortSignal)",
+            "sha256": "138ce916be3d9ae9c4722728ad7ff664f3c79e3483cd82c635e0a6b57a96cef8"
+          },
+          {
+            "selector": "async streamApiCall(url,requestInit,httpMethod,retryOptions,timeout,abortSignal){return this.apiCall(url.toString(),Object.assign(Object.assign({},requestInit),{method:httpMethod}),retryOptions,timeout,abortSignal).then(async response=>(await throwErrorIfNotOK(response),this.processStreamResponse(response))).catch(e=>{throw e instanceof Error?e:new Error(`exception ${e} sending request`,{cause:e})})}",
+            "sha256": "11a6a8c19007831fb54c91ec089642dd64815acf03d4df04c20c47067a722e56"
+          },
+          {
+            "selector": "async apiCall(url,requestInit,retryOptions,timeout,abortSignal){",
+            "sha256": "e92994cb5312874d391ac42e78f4c67f3513d4cc676cf12465f8891fc1495fe6"
+          },
+          {
+            "selector": "runFetch=async()=>{let attempt=createAttemptSignal(timeout,abortSignal),response;try{response=await fetch(url,Object.assign(Object.assign({},requestInit),{signal:attempt.signal}))}catch(e){throw attempt.dispose(),e}",
+            "sha256": "422d27b8fa79bfa947a7b0eb601558008498af468b7a172f9b8b99cf9ffe81fa"
+          }
+        ]
+      }
+    ],
+    "sourceGuards": [
+      {
+        "file": "dist/bundle/chunks/chunk-OJP47DM6.js",
+        "sha256": "81c81a21ec81e84200205f561687408ff5e3738fbbbb3c2a6c186b348d376020"
+      },
+      {
+        "file": "dist/bundle/chunks/google-generative-ai-IMS5EK2Y.js",
+        "sha256": "075e745faaeed61ea2ef0350b0227cc1983232a3289ad8be830350ad85c38cb6"
+      },
+      {
+        "file": "dist/bundle/chunks/google-vertex-O4YJEQUW.js",
+        "sha256": "10c917f7884cb7d97b1e0945f646480bfdc461ca465e6761458cbecead1ffd2e"
+      },
+      {
+        "file": "dist/bundle/chunks/chunk-FUXEF6JQ.js",
+        "sha256": "b7d0697d0f4c7d3b54c6aee545d3b27c5981c27d0470e1c79876898f28f2c472"
+      }
+    ],
+    "target": "C:\\Users\\WINDOWS\\AppData\\Local\\Temp\\pi-stall-pair-RyfZP3\\fixture\\dist\\bundle\\chunks\\chunk-OJP47DM6.js",
+    "originalHash": "81c81a21ec81e84200205f561687408ff5e3738fbbbb3c2a6c186b348d376020",
+    "patchedHash": "b1c6995246bb393df5fda23dc3a286f7d8f26814a09fc2aa140760ba78207d3c",
+    "boundaries": [
+      {
+        "start": "async function runAgentLoop(",
+        "end": "async function runAgentLoopContinue(",
+        "sha256": "cb29a892dc35a50cc9ffd3023f9fa07b3a000f14ede23f18b04a9ba12543b5e1"
+      },
+      {
+        "start": "async function runAgentLoopContinue(",
+        "end": "function createAgentStream(",
+        "sha256": "8f52f97e91bae494cae3080497e650abcb1da91026ccf0cfe633a47c5ce07e74"
+      },
+      {
+        "start": "async function runLoop(initialContext,",
+        "end": "function declareToolChanges(",
+        "sha256": "6c5c345f969b2c4f6d540045b3f14cfeaa110322ba126936cb1c1288b6107dff"
+      },
+      {
+        "start": "async function streamAssistantResponse(",
+        "end": "async function failToolCallsFromTruncatedMessage(",
+        "sha256": "eca7a776e638712886a77cae8e72bc4c8cd3f68e77ba1b18a608a3232a31d2f2"
+      },
+      {
+        "start": "async emitMessageEnd(event){",
+        "end": "async emitToolResult(",
+        "sha256": "ac8d63b8d510b2f91e0628aaa2891ece1da8811c0d346e4698565ea9e3cbaa78"
+      },
+      {
+        "start": "appendMessage(message){",
+        "end": "appendThinkingLevelChange(thinkingLevel){",
+        "sha256": "3ff98ffa61a4036769028c4e0c0dd3bbe81a8da47d7a02128e7293a437814551"
+      },
+      {
+        "start": "async emitToolCall(event){",
+        "end": "async emitUserBash(event){",
+        "sha256": "2de35120f22a21a256f351bbf706afd2fe9df8feccd0079a05cadb535bfdc47c"
+      },
+      {
+        "start": "async function executePreparedToolCall(",
+        "end": "async function finalizeExecutedToolCall(",
+        "sha256": "d0d7117b03a98e66213b4ab74726ec8ea55a407fe0ddcc6943ab4a87c4177835"
+      },
+      {
+        "start": "async abort(){this._isAgentRunActive",
+        "end": "async waitForIdle(){this.isIdle",
+        "sha256": "1ed1e083602bda0076301dba5e6b115ba240d8f9fc15197b435df18851c70e7b"
+      }
+    ]
+  },
+  "disposableDirectory": "C:\\Users\\WINDOWS\\AppData\\Local\\Temp\\pi-stall-pair-RyfZP3",
+  "sourceHashes": {
+    "install.mjs": "bca3490831a03c77b949fad57556d097d1bfc331fe6d5bd59b4c27f8a1ac6326",
+    "check-pair.mjs": "66a822d368daff07616002ecf66997758560759d05025e7d46dc1a179fc11720",
+    "stage.mjs": "37aa6a72cea8726c66f5ae37bcb45eab5b84e1e683356ac8a6c9922528d3726f",
+    "logger.mjs": "bb82a426532a67f3cc6744c2d621984036ce1ef35622f30325f21e04f8de92dd",
+    "check-google.mjs": "b49fb6ae067c7243ca9240b4bf9b28599a53052e063e24c37994be11d16dc783",
+    "check-correlation.mjs": "1b8e5b847ef5f57cf9ea62f08343d578f8881490b6bb61004c06ac52a78dccb2",
+    "check-stage.mjs": "ec7f55ebdf11cfe4a90643c545a5669c3726fc507c5417c3aaa525c24e24a895",
+    "check-turns.mjs": "19da01dcf1a5358e71fe93d46cce97c1fd93cf7866af3e5ad7634e9153395f01"
+  },
+  "reusedEvidenceHashes": {
+    "google-offline-6.json": "ef5513a77cc5a8333f97544e85dd9e1529ec0917c5a80c0ab25d74fd5aed08b8",
+    "correlation-offline-6.json": "d3365bd4dbeae718ed9ddbd8e993eda2dbd07cfa3af8b4c5026fd6067e38e8db",
+    "staging-offline-6.json": "0b84d23f997723499fac612efde8f46c11a4496bdc58df41ca6ac4d0a35da498",
+    "turns-offline-6.json": "5aae543140c26ad5b9dace44de688d2bd35fb7ff9219772a762f2181266abb53"
+  },
+  "changedSources": [
+    "install.mjs replaced; historical installer hash/evidence superseded by this check",
+    "check-pair.mjs added"
+  ],
+  "finalStates": [
+    {
+      "file": "chunk-OJP47DM6.js",
+      "hash": "81c81a21ec81e84200205f561687408ff5e3738fbbbb3c2a6c186b348d376020",
+      "state": "original"
+    },
+    {
+      "file": "chunk-FUXEF6JQ.js",
+      "hash": "b7d0697d0f4c7d3b54c6aee545d3b27c5981c27d0470e1c79876898f28f2c472",
+      "state": "original"
+    }
+  ]
+}

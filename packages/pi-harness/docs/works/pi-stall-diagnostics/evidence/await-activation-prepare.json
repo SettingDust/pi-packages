@@ -1,0 +1,203 @@
+{
+  "revision": "offline-7-awaits",
+  "activationAllowed": false,
+  "root": "D:\\Applications\\Scoop\\apps\\pi-coding-agent-bun\\0.87.1\\node_modules\\@earendil-works\\pi-coding-agent",
+  "version": "0.87.1",
+  "entryHash": "e79626f2dd6f94aa45d30f3fa63cd84319a6eefcd150b353cfaf274366926774",
+  "runtimeHash": "9ca136a7caa977d936aa789d7448a3dfb17851677ff5ac8c0dbcf23c31a02142",
+  "sourceGuards": [
+    {
+      "target": "D:\\Applications\\Scoop\\apps\\pi-coding-agent-bun\\0.87.1\\node_modules\\@earendil-works\\pi-coding-agent\\dist\\bundle\\chunks\\chunk-WIUZI2CJ.js",
+      "sha256": "a85d542043c502be8f1c204929762774b5373fae0f3a21b918bf2df151a1edb8"
+    },
+    {
+      "target": "D:\\Applications\\Scoop\\apps\\pi-coding-agent-bun\\0.87.1\\node_modules\\@earendil-works\\pi-coding-agent\\dist\\bundle\\chunks\\chunk-A3JYRWB6.js",
+      "sha256": "39a18bfbaf6a8edd098844da7988e1ff4a5551520e47c4aacbfc95e7c669a843"
+    }
+  ],
+  "targets": [
+    {
+      "target": "D:\\Applications\\Scoop\\apps\\pi-coding-agent-bun\\0.87.1\\node_modules\\@earendil-works\\pi-coding-agent\\dist\\bundle\\chunks\\chunk-OJP47DM6.js",
+      "originalHash": "81c81a21ec81e84200205f561687408ff5e3738fbbbb3c2a6c186b348d376020",
+      "baseHash": "b1c6995246bb393df5fda23dc3a286f7d8f26814a09fc2aa140760ba78207d3c",
+      "patchedHash": "ded16555bcb4f06e7a5c4feabbfadac044abb89a86ab866a2617d74eaaec54d7",
+      "backup": "C:\\Users\\WINDOWS\\AppData\\Local\\pi-stall-recovery-0.87.1-awaits-20260925T1731Z\\chunk-OJP47DM6.js.original",
+      "staged": "C:\\Users\\WINDOWS\\AppData\\Local\\pi-stall-recovery-0.87.1-awaits-20260925T1731Z\\chunk-OJP47DM6.js.mjs",
+      "selectors": [
+        {
+          "excerpt": "let __sdTerminal=false;const __sdOp=__sd.next();",
+          "sha256": "5f0e60c26de4b4a89393bb4aa4c01b56c502b3be8f314d24007b86e708cff879"
+        },
+        {
+          "excerpt": "__sd.emit(\"assistant.exit\",__sdOp)",
+          "sha256": "7f29887786de1da36335ad39e1659ae9725586cdab1defed2cefa93c5b8e1b84"
+        },
+        {
+          "excerpt": "response=(__sd.emit(\"provider.request\",__sdOp),await",
+          "sha256": "9893859104e2a3530b01889eddf3e9dce250c3c65750ab4a638798c03056f5b4"
+        },
+        {
+          "excerpt": "partialMessage=null,addedPartial=!1;for await(let event of response)switch(event.type)",
+          "sha256": "669353bde66528b154b5780c5e38a09161f195b4bd42cb7ec487d5c3a88260bc"
+        },
+        {
+          "excerpt": "finalMessage2}}let finalMessage=await response.result();",
+          "sha256": "dc89d3b97549db11972fd7cefebcfc64ae58868fa36a8f5d95142dc64aac804d"
+        },
+        {
+          "excerpt": "let finalMessage2=await response.result();",
+          "sha256": "dc8029eb536cc7e9d4f761acc05a4423d9a79320c4eb5cc2ed9cccdc1a7a9b9f"
+        },
+        {
+          "excerpt": "async emit(event){let ctx=this.createContext(),result;for(let{ext:ext2,handlers}of snapshotEventHandlers(this.extensions,event.type))for(let handler of handlers)try{let handlerResult=await handler(event,ctx);if(this.isSessionBeforeEvent(event)&&handlerResult&&(result=handlerResult,result.cancel))return result}catch(err2){let message=err2 instanceof Error?err2.message:String(err2),stack=err2 instanceof Error?err2.stack:void 0;this.emitError({extensionPath:ext2.path,event:event.type,error:message,stack})}return result}",
+          "sha256": "eb511c7667816c104ee836a31cc8b2b137a631050133a326ef7037501023a1ee"
+        },
+        {
+          "excerpt": "abort(){return __sd.scope(__sd.owner(this.sessionManager?.sessionId),async()=>{const __sdOp=__sd.next();__sd.emit(\"abort.enter\",__sdOp);try{this._isAgentRunActive&&(this._agentRunAbortRequested=!0),this.abortRetry(),this.abortCompaction(),this.abortBranchSummary(),this._isBeforeSettle&&(this._abortDuringBeforeSettle=!0),this.agent.abort(),await this.waitForIdle()}catch(__sdError){__sd.emit(\"abort.error\",__sdOp);throw __sdError}finally{__sd.emit(\"abort.exit\",__sdOp)}})}",
+          "sha256": "b7715052f479f370b9d018351c20f2dfcda8dc39f070ed67683fcccf4801b9bc"
+        },
+        {
+          "excerpt": "abort(){this.activeRun?.abortController.abort()}",
+          "sha256": "a65036fe5591836c034589de0407c57d2f20b998efbcef83d7c5d6a8eca7b47b"
+        },
+        {
+          "excerpt": "return {emit(){},id(){}",
+          "sha256": "bbd44d6aef0d719a891e3ff965988c7f67c26c9dbb8ce2e0ef5780d0875c3ae5"
+        }
+      ],
+      "baseline": "C:\\Users\\WINDOWS\\AppData\\Local\\pi-stall-recovery-0.87.1-awaits-20260925T1731Z\\chunk-OJP47DM6.js.baseline"
+    },
+    {
+      "target": "D:\\Applications\\Scoop\\apps\\pi-coding-agent-bun\\0.87.1\\node_modules\\@earendil-works\\pi-coding-agent\\dist\\bundle\\chunks\\openai-responses-HWEUZ6WZ.js",
+      "originalHash": "4ebfa8cec003119c431c92b8306f28f5b9359bde82e213bc8afa6ed764d5bde8",
+      "baseHash": "4ebfa8cec003119c431c92b8306f28f5b9359bde82e213bc8afa6ed764d5bde8",
+      "patchedHash": "464a0fe16527006e378ceaeb19a221bfed39923d457c56e0b8ce8ea26c4ff454",
+      "backup": "C:\\Users\\WINDOWS\\AppData\\Local\\pi-stall-recovery-0.87.1-awaits-20260925T1731Z\\openai-responses-HWEUZ6WZ.js.original",
+      "staged": "C:\\Users\\WINDOWS\\AppData\\Local\\pi-stall-recovery-0.87.1-awaits-20260925T1731Z\\openai-responses-HWEUZ6WZ.js.mjs",
+      "selectors": [
+        {
+          "excerpt": "return(async()=>{let output=",
+          "sha256": "46e60d76bec4ff42d0b9208fa7bc081d639ee8200f60579cf80e4f67f54777bb"
+        },
+        {
+          "excerpt": "if(await options?.onResponse?.(",
+          "sha256": "db4e37e7539b0889a13027d69f536cfa558c8580cdfc1daf60c3748a69406ef3"
+        },
+        {
+          "excerpt": "},model),stream2.push({type:\"start\"",
+          "sha256": "a5f448efd915061c0b77522f68a2fe40a48634b3789dc1caf0b5bce15ea0ee23"
+        },
+        {
+          "excerpt": "await processResponsesStream(",
+          "sha256": "afad7722fbce135202a7fa049cdeaddab2342769493380bc8fcc65aaaa9f1de5"
+        },
+        {
+          "excerpt": "),options?.signal?.aborted)",
+          "sha256": "0237fbd2b5d78db26f4ba843771105ada2b6fed1b85cbc6e8b61ec88b5387ff3"
+        },
+        {
+          "excerpt": "stream2.push({type:\"done\"",
+          "sha256": "c8682710918e551f43edc6dd0647c538d4dfef06e123a431353a60c6083e21cb"
+        },
+        {
+          "excerpt": "catch(error){for(let block",
+          "sha256": "90427c9a866e9a330cee8e84713af4e9dedba2b989e2b428e17ab37ae995b32d"
+        },
+        {
+          "excerpt": "stream2.push({type:\"error\"",
+          "sha256": "b6a7892fbb35492ac4638fa410b9075ef84f02de54ce6b8a06305c88d9439461"
+        }
+      ],
+      "baseline": "C:\\Users\\WINDOWS\\AppData\\Local\\pi-stall-recovery-0.87.1-awaits-20260925T1731Z\\openai-responses-HWEUZ6WZ.js.baseline"
+    },
+    {
+      "target": "D:\\Applications\\Scoop\\apps\\pi-coding-agent-bun\\0.87.1\\node_modules\\@earendil-works\\pi-coding-agent\\dist\\bundle\\chunks\\chunk-NUHFSC37.js",
+      "originalHash": "9b724435ac1da15eaa4465e7eaca0aa9a23617c6f1efa7b6261db6d17dbe755b",
+      "baseHash": "9b724435ac1da15eaa4465e7eaca0aa9a23617c6f1efa7b6261db6d17dbe755b",
+      "patchedHash": "6ff38d5389f66b75728d9bf38e7c0d12e51e9766f056c7e8cca771527562ea4a",
+      "backup": "C:\\Users\\WINDOWS\\AppData\\Local\\pi-stall-recovery-0.87.1-awaits-20260925T1731Z\\chunk-NUHFSC37.js.original",
+      "staged": "C:\\Users\\WINDOWS\\AppData\\Local\\pi-stall-recovery-0.87.1-awaits-20260925T1731Z\\chunk-NUHFSC37.js.mjs",
+      "selectors": [
+        {
+          "excerpt": "static fromSSEResponse(response,controller,client,synthesizeEventData){let consumed=",
+          "sha256": "5965f0c85cbdc6ca531d349a1aa0e5791ffa6fed2124075dbd09e6a607da5cc8"
+        },
+        {
+          "excerpt": "if(sse.data.startsWith(\"[DONE]\")){done=!0;",
+          "sha256": "1c3482b2cbe53a6f27b4bd814e121398330a76b3ddf2cfee8cf12aac0a3e41c4"
+        },
+        {
+          "excerpt": "if(data&&data.error)throw",
+          "sha256": "039a1093262225e52f80ebd3ad9277c837517b7f10ee8b3d58ec151eead3d442"
+        },
+        {
+          "excerpt": "async function*iterSSEChunks(iterator){let data=new Uint8Array;for await(let chunk of iterator){",
+          "sha256": "032f7b0d97369a53a03b049af989e5de3759a3cf53c4043630b5f52632e32795"
+        },
+        {
+          "excerpt": "data.length>0&&(yield data)}var SSEDecoder=",
+          "sha256": "71de7fc1ee097aa60ebe7834266e41ac64d58a5a1e6cbc7a59615ca1263bf7b7"
+        }
+      ],
+      "baseline": "C:\\Users\\WINDOWS\\AppData\\Local\\pi-stall-recovery-0.87.1-awaits-20260925T1731Z\\chunk-NUHFSC37.js.baseline"
+    },
+    {
+      "target": "D:\\Applications\\Scoop\\apps\\pi-coding-agent-bun\\0.87.1\\node_modules\\@earendil-works\\pi-coding-agent\\dist\\bundle\\chunks\\chunk-RCZIEVGO.js",
+      "originalHash": "7b2c0b36b01c1cedb11e7ab525a3fade0967f56b0cbd286fc32ffa25f5965055",
+      "baseHash": "7b2c0b36b01c1cedb11e7ab525a3fade0967f56b0cbd286fc32ffa25f5965055",
+      "patchedHash": "7c0c2febc280d5c0f3e38b2f542d72ed312053825ec66cad6f0ed8cde9c71e18",
+      "backup": "C:\\Users\\WINDOWS\\AppData\\Local\\pi-stall-recovery-0.87.1-awaits-20260925T1731Z\\chunk-RCZIEVGO.js.original",
+      "staged": "C:\\Users\\WINDOWS\\AppData\\Local\\pi-stall-recovery-0.87.1-awaits-20260925T1731Z\\chunk-RCZIEVGO.js.mjs",
+      "selectors": [
+        {
+          "excerpt": "async function forwardStream(target,source){for await(let event of source)target.push(event);target.end(hasResult(source)?await source.result():void 0)}",
+          "sha256": "bc4d564b06a782a853821803e9f699c282d1961bbfa0117eeefe46c3be4c52ca"
+        },
+        {
+          "excerpt": "function lazyStream(model,setup){let outer=new AssistantMessageEventStream;return setup().then(inner=>forwardStream(outer,inner)).catch(error=>{",
+          "sha256": "2c74795cd9a4bfaca3b96a4e7cc82ff9657ca39e86a2242e47642942be211dc0"
+        }
+      ],
+      "baseline": "C:\\Users\\WINDOWS\\AppData\\Local\\pi-stall-recovery-0.87.1-awaits-20260925T1731Z\\chunk-RCZIEVGO.js.baseline"
+    },
+    {
+      "target": "D:\\Applications\\Scoop\\apps\\pi-coding-agent-bun\\0.87.1\\node_modules\\@earendil-works\\pi-coding-agent\\dist\\bundle\\chunks\\chunk-FUXEF6JQ.js",
+      "originalHash": "b7d0697d0f4c7d3b54c6aee545d3b27c5981c27d0470e1c79876898f28f2c472",
+      "baseHash": "32b6ff866b6a64fc2613fa12474f7ada5ca1483a362d0be7680735bdaedc1200",
+      "patchedHash": "32b6ff866b6a64fc2613fa12474f7ada5ca1483a362d0be7680735bdaedc1200",
+      "backup": "C:\\Users\\WINDOWS\\AppData\\Local\\pi-stall-recovery-0.87.1-awaits-20260925T1731Z\\chunk-FUXEF6JQ.js.original",
+      "staged": "C:\\Users\\WINDOWS\\AppData\\Local\\pi-stall-recovery-0.87.1-awaits-20260925T1731Z\\chunk-FUXEF6JQ.js.mjs",
+      "selectors": [
+        {
+          "selector": "response=this.apiClient.requestStream({path:path2,queryParams,body:JSON.stringify(body),httpMethod:\"POST\",httpOptions:(_a2=params.config)===null||_a2===void 0?void 0:_a2.httpOptions,abortSignal:(_b=params.config)===null||_b===void 0?void 0:_b.abortSignal})",
+          "sha256": "31eb29154c66d14d0d01c774ee25b31697c5f153b0d814b8a15939212ac791f7"
+        },
+        {
+          "selector": "response=this.apiClient.requestStream({path:path2,queryParams,body:JSON.stringify(body),httpMethod:\"POST\",httpOptions:(_c=params.config)===null||_c===void 0?void 0:_c.httpOptions,abortSignal:(_d=params.config)===null||_d===void 0?void 0:_d.abortSignal})",
+          "sha256": "e152a7e887d336ed56864aa719e2ba239306f1c2539631379250c46736fc4579"
+        },
+        {
+          "selector": "async requestStream(request){",
+          "sha256": "1ed62caf62ae737b63e5cf055e2fd4ba9975f707fad2f913309d35a8f12fd8d8"
+        },
+        {
+          "selector": "this.streamApiCall(url,requestInit,request.httpMethod,patchedHttpOptions.retryOptions,patchedHttpOptions.timeout,request.abortSignal)",
+          "sha256": "138ce916be3d9ae9c4722728ad7ff664f3c79e3483cd82c635e0a6b57a96cef8"
+        },
+        {
+          "selector": "async streamApiCall(url,requestInit,httpMethod,retryOptions,timeout,abortSignal){return this.apiCall(url.toString(),Object.assign(Object.assign({},requestInit),{method:httpMethod}),retryOptions,timeout,abortSignal).then(async response=>(await throwErrorIfNotOK(response),this.processStreamResponse(response))).catch(e=>{throw e instanceof Error?e:new Error(`exception ${e} sending request`,{cause:e})})}",
+          "sha256": "11a6a8c19007831fb54c91ec089642dd64815acf03d4df04c20c47067a722e56"
+        },
+        {
+          "selector": "async apiCall(url,requestInit,retryOptions,timeout,abortSignal){",
+          "sha256": "e92994cb5312874d391ac42e78f4c67f3513d4cc676cf12465f8891fc1495fe6"
+        },
+        {
+          "selector": "runFetch=async()=>{let attempt=createAttemptSignal(timeout,abortSignal),response;try{response=await fetch(url,Object.assign(Object.assign({},requestInit),{signal:attempt.signal}))}catch(e){throw attempt.dispose(),e}",
+          "sha256": "422d27b8fa79bfa947a7b0eb601558008498af468b7a172f9b8b99cf9ffe81fa"
+        }
+      ],
+      "baseline": "C:\\Users\\WINDOWS\\AppData\\Local\\pi-stall-recovery-0.87.1-awaits-20260925T1731Z\\chunk-FUXEF6JQ.js.baseline"
+    }
+  ]
+}
