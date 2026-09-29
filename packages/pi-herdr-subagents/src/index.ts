@@ -459,6 +459,8 @@ export class SubagentRuntime {
   private manifestUnknown = new Map<string, Json>();
   private launches = new Map<string, Promise<void>>();
   private settlements = new Map<string, Promise<void>>();
+  private pendingSettlements = new Map<string, (effects: boolean) => Promise<void>>();
+  private recovery?: Promise<void>;
   private cleanups = new Map<string, Promise<void>>();
   private taskUpdateListeners = new Set<() => void>();
   private completionNotifier?: CompletionNotifier;
@@ -564,6 +566,7 @@ export class SubagentRuntime {
     thinking?: string;
     parentSessionFile?: string;
   }, registry?: SpawnModelRegistry): Promise<SubagentTask> {
+    while (this.recovery) await this.recovery;
     const model = validateExplicitSpawnModel(input.model, registry);
     const taskSlug = validateTaskSlug(input.taskSlug);
     this.resolveAgent(input.agent);
@@ -574,10 +577,23 @@ export class SubagentRuntime {
     return this.start({ ...input, model, subagentId, taskSlug, generation: 1, artifactDir, launchArgs });
   }
 
-  async recover(cwd: string, parentSessionFile?: string, notifiedKeys: Iterable<string> = []): Promise<void> {
+  recover(cwd: string, parentSessionFile?: string, notifiedKeys: Iterable<string> = []): Promise<void> {
+    const previous = this.recovery;
+    const operation = Promise.resolve().then(async () => {
+      await previous;
+      await this.recoverScope(cwd, parentSessionFile, notifiedKeys);
+    });
+    this.recovery = operation;
+    const release = () => { if (this.recovery === operation) this.recovery = undefined; };
+    void operation.then(release, release);
+    return operation;
+  }
+
+  private async recoverScope(cwd: string, parentSessionFile: string | undefined, notifiedKeys: Iterable<string>): Promise<void> {
     const completionNotifier = this.completionNotifier;
     const tasksDir = this.tasksDir(cwd, parentSessionFile);
-    await this.awaitAllOperations();
+    // Same-scope reconstruction owns cleanup and notification after retrying durable intent.
+    await this.awaitAllOperations(this.activeTasksDir !== resolve(tasksDir));
     this.selectScope(tasksDir);
     this.stop();
     this.tasks.clear();
@@ -606,6 +622,10 @@ export class SubagentRuntime {
       } else if (result && !result.valid) {
         task.status = "failed";
         task.error = result.error;
+        task.updatedAt = new Date().toISOString();
+      } else if (record.version === 2 && record.status === "queued") {
+        task.status = "failed";
+        task.error = "launch_interrupted";
         task.updatedAt = new Date().toISOString();
       } else if (record.version === 1 && record.status === "starting") {
         if (task.paneId) {
@@ -646,19 +666,25 @@ export class SubagentRuntime {
         }
       }
       this.tasks.set(task.subagentId, task);
-      this.prepareRecoveryCleanups(task);
-      await this.persist(task);
-      if (task.status === "running") this.startMonitor(task);
-      await this.runPendingCleanups(task);
-      if (isTerminalStatus(task.status)) await this.notifyTerminal(task, completionNotifier);
+      if (isTerminalStatus(task.status)) {
+        await this.settle(task, task.status, completionNotifier, task.result, task.error, false, false, true);
+      } else {
+        this.prepareRecoveryCleanups(task);
+        await this.persist(task);
+        if (task.status === "running") this.startMonitor(task);
+        await this.runPendingCleanups(task);
+      }
     }
     this.notifyTaskUpdate();
   }
 
   async resume(subagentId: string, prompt: string): Promise<SubagentTask> {
+    while (this.recovery) await this.recovery;
     const old = this.get(subagentId);
-    if (isActiveStatus(old.status)) throw new Error("Cannot resume an active subagent");
     await this.awaitTaskOperations(old);
+    if (this.recovery) { await this.recovery; return this.resume(subagentId, prompt); }
+    if (isActiveStatus(old.status) || this.tasks.get(subagentId) !== old
+      || this.launches.has(`${subagentId}:${old.generation + 1}`)) throw new Error("Cannot resume an active subagent");
     return this.start({
       subagentId: old.subagentId,
       taskSlug: old.taskSlug,
@@ -686,6 +712,9 @@ export class SubagentRuntime {
   private selectScope(tasksDir: string): void {
     const scope = resolve(tasksDir);
     if (scope === this.activeTasksDir) return;
+    if (this.launches.size || this.settlements.size || this.cleanups.size || this.pendingSettlements.size) {
+      throw new Error("Cannot change task scope with unresolved operations");
+    }
     this.stop();
     this.activeTasksDir = scope;
     this.tasks.clear();
@@ -742,30 +771,25 @@ export class SubagentRuntime {
       createdAt: queuedAt, queuedAt, updatedAt: queuedAt,
       ...(input.surfaceCleanups ? { surfaceCleanups: cloneJson(input.surfaceCleanups) } : {}),
     };
-    await this.persist(task);
-    this.tasks.set(task.subagentId, task);
-    this.notifyTaskUpdate();
     const launchKey = this.taskKey(task);
     let finishLaunch!: () => void;
     const launch = new Promise<void>(resolve => { finishLaunch = resolve; });
     this.launches.set(launchKey, launch);
     try {
-      try {
-        const surface = await this.transport.createTab({
-          cwd: input.cwd,
-          label: input.label,
-          env: {
-            PI_HERDR_SUBAGENT_ID: input.subagentId,
-            PI_HERDR_SUBAGENT_GENERATION: String(input.generation),
-            PI_HERDR_SUBAGENT_RESULT_PATH: resultPath,
-          },
-        });
-        task.tabId = surface.tabId;
-        task.paneId = surface.paneId;
-      } catch (error) {
-        await this.settle(task, "failed", completionNotifier, undefined, String(error), true);
-        throw error;
-      }
+      await this.persist(task);
+      this.tasks.set(task.subagentId, task);
+      this.notifyTaskUpdate();
+      const surface = await this.transport.createTab({
+        cwd: input.cwd,
+        label: input.label,
+        env: {
+          PI_HERDR_SUBAGENT_ID: input.subagentId,
+          PI_HERDR_SUBAGENT_GENERATION: String(input.generation),
+          PI_HERDR_SUBAGENT_RESULT_PATH: resultPath,
+        },
+      });
+      task.tabId = surface.tabId;
+      task.paneId = surface.paneId;
       if (this.tasks.get(task.subagentId) !== task) {
         try { await this.transport.closeTab(task.tabId); } catch { /* Removal already owns the visible state. */ }
         throw new Error("Subagent was removed during launch");
@@ -785,16 +809,20 @@ export class SubagentRuntime {
       args.push(`${input.prompt}\n\nWhen subagent_done is available, submit the full YAML Handler Result once as its result argument. Do not output the full Result separately before or after successful submission. If unavailable, return the YAML as your final assistant response. If submission fails, correct and retry or report the failure.`);
       const launchScript = join(artifactDir, `launch-${input.generation}.ps1`);
       const bootstrapScript = join(artifactDir, `launch-${input.generation}.cjs`);
-      try {
-        await writeFile(bootstrapScript, buildNodeLaunchScript(input.cwd, "pi", args));
-        await writeFile(launchScript, `\ufeff$ErrorActionPreference = 'Stop'\r\n${powerShellInvocation(bootstrapRuntime(), [bootstrapScript])}\r\nexit $LASTEXITCODE\r\n`);
-        await this.transport.run(task.paneId, "powershell.exe", ["-NoLogo", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", launchScript]);
-      } catch (error) {
-        await this.settle(task, "failed", completionNotifier, undefined, String(error));
-        throw error;
-      }
+      await writeFile(bootstrapScript, buildNodeLaunchScript(input.cwd, "pi", args));
+      await writeFile(launchScript, `\ufeff$ErrorActionPreference = 'Stop'\r\n${powerShellInvocation(bootstrapRuntime(), [bootstrapScript])}\r\nexit $LASTEXITCODE\r\n`);
+      await this.transport.run(task.paneId, "powershell.exe", ["-NoLogo", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", launchScript]);
       this.startMonitor(task);
       return snapshotTask(task);
+    } catch (error) {
+      // Retain even an unwritten admission so this runtime can retry the same generation.
+      this.tasks.set(task.subagentId, task);
+      try {
+        await this.settle(task, "failed", completionNotifier, undefined, String(error), !task.tabId);
+      } catch (settlementError) {
+        throw new Error(`${String(error)}; terminal persistence failed: ${String(settlementError)}`, { cause: error });
+      }
+      throw error;
     } finally {
       finishLaunch();
       if (this.launches.get(launchKey) === launch) this.launches.delete(launchKey);
@@ -825,15 +853,18 @@ export class SubagentRuntime {
   inspect(id: string): SubagentTask { return snapshotTask(this.get(id)); }
 
   async join(id: string, generation = this.get(id).generation, signal?: AbortSignal): Promise<SubagentTask> {
+    signal?.throwIfAborted();
     const task = this.get(id);
     if (task.generation !== generation) throw new Error("Subagent generation is no longer current");
     await waitForPromise(this.launches.get(this.taskKey(task)), signal);
+    signal?.throwIfAborted();
     const completionNotifier = this.completionNotifier;
     while (isActiveStatus(task.status)) {
+      signal?.throwIfAborted();
       if (existsSync(task.resultPath)) await waitForPromise(this.settleFromResult(task, completionNotifier), signal);
       else await delay(50, undefined, { signal });
     }
-    await waitForPromise(this.operationFor(task), signal);
+    await waitForPromise(this.awaitTaskOperations(task, signal), signal);
     return snapshotTask(task);
   }
 
@@ -858,10 +889,17 @@ export class SubagentRuntime {
   }
 
   async remove(id: string): Promise<void> {
+    while (this.recovery) await this.recovery;
     const task = this.get(id);
+    if (this.launches.has(`${id}:${task.generation + 1}`)) throw new Error("Cannot remove a subagent during generation admission");
     this.stopMonitor(task);
     await this.launches.get(this.taskKey(task));
     await this.awaitTaskOperations(task);
+    if (this.recovery || this.tasks.get(id) !== task) {
+      await this.recovery;
+      return this.remove(id);
+    }
+    if (this.launches.has(`${id}:${task.generation + 1}`)) throw new Error("Cannot remove a subagent during generation admission");
     this.prepareRecoveryCleanups(task);
     await this.persist(task);
     await this.runPendingCleanups(task);
@@ -936,30 +974,68 @@ export class SubagentRuntime {
     error?: string,
     notCreated = false,
     writeCancelledResult = false,
+    recovering = false,
   ): Promise<void> {
     const key = this.taskKey(task);
     const existing = this.settlements.get(key);
     if (existing) return existing;
-    if (!isActiveStatus(task.status)) return Promise.resolve();
-    const operation = (async () => {
+    if (this.pendingSettlements.has(key)) return this.retrySettlement(key);
+    if (!recovering && !isActiveStatus(task.status)) return Promise.resolve();
+    this.pendingSettlements.set(key, async effects => {
       this.stopMonitor(task);
-      if (writeCancelledResult) await writeAtomic(task.resultPath, { subagentId: task.subagentId, generation: task.generation, status: "cancelled" });
+      if (writeCancelledResult && !existsSync(task.resultPath)) {
+        await writeAtomic(task.resultPath, { subagentId: task.subagentId, generation: task.generation, status: "cancelled" });
+      }
       task.status = status;
       task.result = result;
       task.error = error;
       task.updatedAt = new Date().toISOString();
+      this.applyCurrentResult(task);
       this.prepareCleanup(task, notCreated);
+      if (recovering) this.prepareRecoveryCleanups(task);
       await this.persist(task);
-      this.notifyTaskUpdate();
-      await this.runCleanup(task);
+      await this.reconcileCurrentResult(task);
+      if (!effects) return;
+      if (!this.recovery) this.notifyTaskUpdate();
+      await this.runPendingCleanups(task);
+      await this.reconcileCurrentResult(task);
       await this.notifyTerminal(task, completionNotifier);
-    })();
+    });
+    return this.retrySettlement(key);
+  }
+
+  private retrySettlement(key: string, effects = true): Promise<void> {
+    const existing = this.settlements.get(key);
+    if (existing) return existing;
+    const pending = this.pendingSettlements.get(key);
+    if (!pending) return Promise.resolve();
+    const operation = Promise.resolve().then(() => pending(effects));
     this.settlements.set(key, operation);
     void operation.then(
-      () => { if (this.settlements.get(key) === operation) this.settlements.delete(key); },
+      () => {
+        this.pendingSettlements.delete(key);
+        if (this.settlements.get(key) === operation) this.settlements.delete(key);
+      },
       () => { if (this.settlements.get(key) === operation) this.settlements.delete(key); },
     );
     return operation;
+  }
+
+  private applyCurrentResult(task: SubagentTask): boolean {
+    if (!existsSync(task.resultPath)) return false;
+    const result = this.readResult(task);
+    const status = result.valid ? result.status : "failed";
+    const body = result.valid ? result.result : undefined;
+    if (task.status === status && task.result === body && task.error === result.error) return false;
+    task.status = status;
+    task.result = body;
+    task.error = result.error;
+    task.updatedAt = new Date().toISOString();
+    return true;
+  }
+
+  private async reconcileCurrentResult(task: SubagentTask): Promise<void> {
+    if (this.applyCurrentResult(task)) await this.persist(task);
   }
 
   private prepareCleanup(task: SubagentTask, notCreated: boolean, retry = false): void {
@@ -967,11 +1043,13 @@ export class SubagentRuntime {
     if (existing && isFinalCleanupStatus(existing.record.status)) return;
     if (existing && !retry && existing.record.status === "pending") return;
     const attemptedAt = new Date().toISOString();
-    const status: SurfaceCleanupStatus = notCreated ? "not_created" : task.tabId ? "pending" : "identity_missing";
+    const tabId = task.tabId.trim() ? task.tabId : undefined;
+    const paneId = task.paneId.trim() ? task.paneId : undefined;
+    const status: SurfaceCleanupStatus = notCreated ? "not_created" : tabId ? "pending" : "identity_missing";
     const record = cleanupRecord(existing?.record, {
       generation: task.generation,
-      ...(task.tabId ? { tabId: task.tabId } : {}),
-      ...(task.paneId ? { paneId: task.paneId } : {}),
+      ...(tabId ? { tabId } : {}),
+      ...(paneId ? { paneId } : {}),
       status,
       attemptedAt,
     });
@@ -1004,6 +1082,7 @@ export class SubagentRuntime {
     const cleanup = recognizedCleanup(task.surfaceCleanups, generation);
     if (!cleanup || cleanup.record.status !== "pending") return Promise.resolve();
     const operation = (async () => {
+      if (isTerminalStatus(task.status)) await this.reconcileCurrentResult(task);
       try {
         const status = await this.transport.closeTab(cleanup.record.tabId!);
         setCleanup(task, cleanup.index, cleanupRecord(cleanup.record, { ...cleanup.record, status }));
@@ -1029,12 +1108,15 @@ export class SubagentRuntime {
     return this.settlements.get(key) ?? this.cleanups.get(key);
   }
 
-  private async awaitTaskOperations(task: SubagentTask): Promise<void> {
+  private async awaitTaskOperations(task: SubagentTask, signal?: AbortSignal): Promise<void> {
     await this.operationFor(task);
+    signal?.throwIfAborted();
+    await this.retrySettlement(this.taskKey(task));
   }
 
-  private async awaitAllOperations(): Promise<void> {
+  private async awaitAllOperations(effects: boolean): Promise<void> {
     await Promise.all([...this.launches.values(), ...this.settlements.values(), ...this.cleanups.values()]);
+    for (const key of this.pendingSettlements.keys()) await this.retrySettlement(key, effects);
   }
 
 

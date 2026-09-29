@@ -82,10 +82,7 @@ describe("queue admission", () => {
     const pending = runtime.spawn({ agent: "handler", cwd: "/repo", prompt: "work", label: "queued", taskSlug: "queued-task" });
     await queuedObserved;
     expect(persistedStatuses).toEqual(["queued"]);
-    const recovered = new SubagentRuntime(transport(true, []), new AgentRegistry(), root);
-    await recovered.recover("/repo");
-    expect(recovered.listTasks()[0]).toMatchObject({ status: "queued", queuedAt: expect.any(String) });
-    recovered.stop();
+    expect(runtime.listTasks()[0]).toMatchObject({ status: "queued", queuedAt: expect.any(String) });
 
     admit({ tabId: "tab-1", paneId: "pane-1" });
     const task = await pending;

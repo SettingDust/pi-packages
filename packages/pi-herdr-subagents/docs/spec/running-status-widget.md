@@ -10,7 +10,10 @@ or unrelated Work items.
 
 The widget is Dust-inspired, not an exact Pi Dust port. It adopts the useful progress
 surface while deliberately changing activity collection, defaults, icons, and summary
-semantics as stated in section 16.
+semantics as stated in section 16. The interrupted-V2-queued recovery correction below
+is normative but awaiting runtime implementation and verification; the historical
+widget implementation evidence in section 15 does not establish that correction.
+
 ## 1. Scope And Boundary
 
 `@settingdust/pi-herdr-subagents` will provide a parent-session subagent status widget with:
@@ -93,7 +96,10 @@ queue admission -> queued -> running -> completed
 Queue admission is implemented at the start of `SubagentRuntime.start`: the runtime
 persists and publishes `queued` before child-surface creation, then persists and
 publishes `running` after execution admission. The source does not fabricate `queued`
-only in the renderer. At that boundary, it:
+only in the renderer. For the pending interrupted-queued correction, the runtime must
+track launch ownership before the first awaited queued persistence; failed queued
+persistence must not publish a queued observation or create a surface, and failed
+running persistence must not write launch files or submit a command. At that boundary, it:
 
 1. allocates the generation identity;
 2. assigns `queuedAt` from the lifecycle clock as an ISO timestamp;
@@ -109,8 +115,9 @@ Execution admission occurs when the runtime has admitted the generation to its c
 execution surface. It assigns `startedAt` once, preserves it for that generation,
 persists the running state, then emits an invalidation. It must not be inferred from a
 pane poll in the widget path. Terminal settlement persists the terminal state before or
-as part of its existing notification path and emits the terminal invalidation after the
-observation is terminal. Notification remains independent of widget rendering.
+as part of its existing notification path and emits the terminal invalidation only
+after durable terminal intent; a persistence failure must not appear as a successfully
+completed terminal recovery. Notification remains independent of widget rendering.
 
 ### Persisted record versions
 
@@ -139,18 +146,30 @@ V2 `queuedAt` and `updatedAt` are required ISO timestamps. `startedAt` is option
 ### Persistence and recovery
 
 Persisted task records are the recovery source for lifecycle observation. Recovery
-selects the parent task scope, stops old monitors, clears the in-memory current-generation
-map, reads and validates records, and rebuilds queued/running and terminal state before
-its one final invalidation. Recovery may use existing pane verification and Result
-settlement to determine runtime terminal state, but the widget observation receives only
-the permitted lifecycle projection. No Result, prompt, child session, activity, or pane
-content is a widget data source.
+selects the parent task scope, waits for locally owned launches and unresolved terminal
+intent in that scope, stops old monitors, clears the in-memory current-generation
+map, reads and validates records, and rebuilds running and terminal state before
+its one final invalidation. An in-flight local queued launch remains active until it
+finishes and must not be classified as interrupted by overlapping recovery; new
+launches entering during recovery must be serialized or ownership rechecked. Recovery
+may use existing pane verification and Result settlement to determine runtime terminal
+state, but the widget observation receives only the permitted lifecycle projection.
+No Result, prompt, child session, activity, or pane content is a widget data source.
 
-A recovered queued generation renders from its persisted `queuedAt`. A recovered running
-generation renders from persisted `startedAt`. New records must never use `queuedAt` as a
-running start. Only the explicit legacy migration below may use `createdAt` as a
-compatibility fallback for a missing start time. Recovered timestamps remain stable until
-a real lifecycle transition.
+A live queued generation renders from its persisted `queuedAt`. On reopening an owning
+scope, a V2 queued record is incomplete execution admission, not a pending queue that
+can be reconstructed. Subject to the current-generation Result and retained-terminal
+precedence in [Runtime Lifecycle section 3.2](runtime-lifecycle.md#32-recovery-scope-and-adoption),
+recovery must persist `failed/launch_interrupted` for V2 queued, with or without a
+recorded surface, without relaunch or promotion to running. It must retain `queuedAt`,
+not invent `startedAt`, and remove the generation from active progress rows in the
+single final successful-recovery snapshot. A terminal-persistence failure is explicit:
+no completed-recovery invalidation may represent that generation as durably failed;
+it remains retryable under the lifecycle Spec. A recovered running generation renders
+from persisted `startedAt`. New records must never use `queuedAt` as a running start.
+Only the explicit legacy migration below may use `createdAt` as a compatibility
+fallback for a missing start time. Recovered timestamps remain stable until a real
+lifecycle transition.
 
 ### V1 `createdAt` migration and `starting` recovery
 
@@ -455,12 +474,13 @@ spawn request
 ```text
 session_start / before_agent_start
   -> load package settings with warning isolation
-  -> select parent task scope
+  -> select parent task scope and wait for locally owned launch/settlement intent
   -> dispose old component/timer and stop old monitors
   -> validate records
   -> migrate V1 createdAt, including explicit starting recovery mapping
-  -> rebuild queued/running/terminal observations
-  -> persist migrated records atomically
+  -> reconcile V2 queued as terminal after Result precedence, without replay
+  -> rebuild running/terminal observations
+  -> persist recovered terminal and migrated records atomically
   -> emit one final recovery invalidation
   -> mount/reuse one Component with epoch clock and icon capability
   -> render recovered snapshot
@@ -504,6 +524,12 @@ Focused implementation verification must cover:
 - queue admission, running transition, terminal settlement, resume generation
   isolation, persistence, recovery, V1 legacy and V1 canonical identity migration,
   `starting` mapping and every subsequent outcome, and notification independence;
+- overlapping recovery must await local launch ownership from the first queued write;
+  reopened V2 queued records with and without surface identity must resolve through
+  lifecycle Result precedence and `launch_interrupted`, never render as a recovered
+  active queue, never acquire an invented `startedAt`, and disappear from active rows
+  after the single successful recovery invalidation; terminal-persistence failure must
+  remain explicit without a false completed-recovery invalidation;
 - epoch-clock elapsed formatting, recovery continuity, future/invalid timestamp
   clamping, one-second refresh, timer disposal, recovery replacement, and no leaked
   timers;
