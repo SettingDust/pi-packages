@@ -13,7 +13,7 @@ description: Create or update product requirements covering intent, users, outco
 4. Write requirements in observable terms, including critical failure, compatibility, safety, and accessibility outcomes where applicable.
 5. Define measurable or directly verifiable success criteria and acceptance behavior.
 6. Record dependencies, assumptions, unresolved product decisions, and known risks without silently resolving them.
-7. Remove technical design that belongs in ADRs, normative technical detail that belongs in Specs, and decomposition that belongs in Plans or Tasks.
+7. Remove technical design that belongs in ADRs, normative technical detail that belongs in Specs, and decomposition that belongs in the Plan's Waves graph.
 8. Link related authority rather than duplicating it. Check that the revised PRD does not contradict sibling product documents.
 
 ## Output

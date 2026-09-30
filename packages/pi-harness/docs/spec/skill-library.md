@@ -47,11 +47,13 @@ Research modes apply `research-source-grounded` whenever material claims depend 
 ### Delivery
 
 - `spec-driven-development`: coordinate authority-first delivery for durable behavior, interface, architecture, security, migration, or multi-step change.
-- `plan-implementation`: turn accepted authority and context into the smallest executable Plan and Tasks needed for delivery.
-- `implement-plan`: coordinate execution of an accepted Plan and reconcile findings with its authority and task boundaries.
+- `plan-implementation`: turn accepted authority and context into the smallest executable Work/Plan/Waves graph for delivery.
+- `implement-plan`: coordinate execution of an accepted Plan/Waves graph and reconcile findings with its authority and item boundaries.
 - `implement-change`: perform one bounded code, configuration, or ordinary-documentation change and leave focused verification evidence.
 
 `spec-driven-development` may use documentation, planning, implementation, research, clarification, and review Skills as the current work requires. `implement-plan` uses `implement-change` for bounded implementation units.
+
+New planned work uses Work/Context/Plan/Waves: the selected Waves document is the sole executable graph, with one Handler and one Result per item. The [Router Delegation Specification](router-delegation.md#new-planned-work-document-and-release-contract) owns tuple selection, item-ID dependencies, Wave gates, ownership/conflicts, and release semantics. `documentation-plan-writing` drafts the Plan and matched Waves graph; historical Tasks remain compatibility records requiring explicit migration, not a synonym or silent fallback. This discovery guidance does not claim live Resolver or Router conformance.
 
 ### Documentation
 
@@ -61,8 +63,8 @@ Research modes apply `research-source-grounded` whenever material claims depend 
 - `documentation-prd-writing`: create or update product intent, scope, requirements, outcomes, and success criteria.
 - `documentation-adr-writing`: create or update accepted architectural decisions, rationale, consequences, and revisit criteria.
 - `documentation-spec-writing`: create, update, or validate normative behavior, interfaces, constraints, and failure contracts.
-- `documentation-plan-writing`: derive an implementation Plan from accepted authority and Work Context.
-- `documentation-tasks-writing`: derive executable Tasks and dependencies from an accepted Plan.
+- `documentation-plan-writing`: derive an implementation Plan and its matched Waves graph from accepted authority and Work Context.
+- `documentation-tasks-writing`: preserve or analyze historical Tasks records during an explicit migration; it is not the executable path for new planned work.
 - `documentation-proposal-writing`: manage non-authoritative proposal creation and lifecycle transitions.
 - `documentation-domain-driven-design`: document domain language, invariants, bounded contexts, and context relationships.
 

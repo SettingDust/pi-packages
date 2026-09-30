@@ -1,6 +1,6 @@
 ---
 name: documentation-plan-writing
-description: Write or update an implementation Plan derived from accepted authority and Work Context. Use when a durable execution strategy is needed before task decomposition.
+description: Write or update an implementation Plan and its matched Waves graph from accepted authority and Work Context. Use when durable strategy and executable decomposition are needed.
 ---
 
 # Documentation: Plan Writing
@@ -14,10 +14,12 @@ description: Write or update an implementation Plan derived from accepted author
 5. Sequence phases only where dependencies require them. Identify independent work and conditions preventing unsafe parallelism. Define verification for each material behavior and a final integration gate.
 6. Include rollback, transition, security, observability, documentation, or release handling only when required by authority or risk.
 7. Record risks and evidence-backed mitigations. Do not add speculative infrastructure or future flexibility.
-8. When a `@settingdust/pi-harness` executable Plan participates in planned admission, place it as one direct Plan member paired with its Tasks member under the same Work directory. Multiple explicit pairs may share a Work, but a delegation selects one pair only; an overview name, status, or path alone does not authorize execution or infer selection.
-9. The Router Delegation Specification owns tuple grammar and admission validation. This Skill's naming guidance, headings, links, and status text do not prove document kind or acceptance.
-10. Validate that every plan commitment derives from authority and that the Plan does not create new product or architecture decisions.
+8. For new `@settingdust/pi-harness` planned work, place Work, Context, Plan, and Waves in the same Work directory. Select one direct matching `plan.md`/`waves.md` pair or sliced pair under the Router Delegation Specification's grammar. Multiple pairs may share a Work; an overview name, status, or path does not authorize execution or infer selection. Link the Plan to its Work and exactly one Waves document; link Waves back to that same Plan and Work. State which Wave gates establish the selected Plan outcome.
+9. Make the matched Waves document the sole executable graph, not a second decomposition in the Plan or a new `tasks.md`. Give every Wave and item a stable unique ID. Each Wave lists a non-empty set of item IDs, predecessor Wave gates, an incremental outcome, and a verifiable release predicate. Each item states bounded scope and effects, one observable completion predicate, required evidence, prerequisite item IDs, write ownership, and conflicts, with one Handler and one Result. Validate references, uniqueness, and acyclic dependencies; no gate may depend on itself. Serialize conflicting writes, ownership, authority, behavioral contracts, and side effects; shared read-only inputs do not conflict. Display order and Wave numbering create no dependencies or global barrier.
+10. Release only explicit dependents after every required item is `completed` with its evidence and the gate checks pass; `partial`, `failed`, `blocked`, or a missing Result does not release them. The Router retrieves full Results and projects truthful Todo state before release decisions under the effective tool contract. Waves is not an automatic scheduler or an approval gate; confirmation remains Router-owned. Historical Tasks are compatibility records requiring explicit migration, never a Waves synonym or silent fallback.
+11. The Router Delegation Specification owns tuple grammar and admission validation. This Skill's naming guidance, headings, links, and status text do not prove document kind or acceptance, and do not claim current runtime conformance.
+12. Validate that every plan commitment derives from authority and that the Plan does not create new product or architecture decisions.
 
 ## Output
 
-Report the Plan path, strategy, dependencies, verification, risks, and blockers. Keep task-sized execution details for `documentation-tasks-writing`.
+Report the Plan path, matched Waves path, strategy, dependencies, verification, risks, and blockers. Keep item-sized execution details in `waves.md`; use `documentation-tasks-writing` only for explicit historical migration compatibility.

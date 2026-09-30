@@ -17,7 +17,7 @@ description: Classify ownership and coordinate multi-artifact documentation work
    - ordinary documentation: human guidance or reference not owned above.
 3. For each branch choose `create`, `update`, `skip`, or `blocked`, with evidence and target. Update existing ownership instead of duplicating meaning.
 4. Use the corresponding owning Skill for every created or updated specialized artifact. Use `documentation-structure` for placement and relationships.
-5. Keep derived Work, Context, Plan, and Tasks separate from durable authority and create them only when delivery needs them.
+5. Keep derived Work, Context, Plan, and Waves separate from durable authority and create them only when delivery needs them. Historical Tasks artifacts are compatibility records, not a new-plan execution path.
 6. Complete all unblocked branches; one blocked branch must not stop independent documentation work.
 
 ## Output
