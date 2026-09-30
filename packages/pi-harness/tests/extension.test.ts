@@ -37,16 +37,24 @@ function expectClosedResolverSchema(schema: unknown): void {
   const root = expectClosedObject(schema);
   expect(Object.keys(root).sort()).toEqual(["admission", "handoff", "impact", "reasoning"]);
   const handoff = expectClosedObject(root.handoff);
-  for (const key of ["model", "modelRole", "thinking", "reasoning", "impact"]) expect(handoff).not.toHaveProperty(key);
+  expect(Object.keys(handoff).sort()).toEqual(["companionSkills", "constraints", "context", "deliverables", "objective", "primarySkill"]);
+  expect([...root.handoff.required].sort()).toEqual(["context", "objective", "primarySkill"]);
   const contextSchemas = handoff.context.items.anyOf as unknown[];
   expect(contextSchemas).toHaveLength(2);
-  contextSchemas.forEach(expectClosedObject);
+  expect(contextSchemas.map((candidate) => Object.keys(expectClosedObject(candidate)).sort()))
+    .toEqual([["purpose", "ref"], ["inline", "purpose"]]);
   const admissionSchemas = root.admission.anyOf as unknown[];
   expect(admissionSchemas).toHaveLength(2);
-  admissionSchemas.forEach(expectClosedObject);
+  const atomic = admissionSchemas.find((candidate: any) => candidate.properties?.path?.const === "atomic");
+  expect(Object.keys(expectClosedObject(atomic)).sort()).toEqual(["basis", "path", "verification"]);
   const planned = admissionSchemas.find((candidate: any) => candidate.properties?.path?.const === "planned");
   expect(planned).toBeDefined();
-  expectClosedObject(expectClosedObject(planned).authority);
+  const plannedProperties = expectClosedObject(planned);
+  expect(Object.keys(plannedProperties).sort()).toEqual(["authority", "path"]);
+  const authority = expectClosedObject(plannedProperties.authority);
+  expect(Object.keys(authority).sort()).toEqual(["plan", "waves", "work"]);
+  expect([...(planned as any).required].sort()).toEqual(["authority", "path"]);
+  expect([...plannedProperties.authority.required].sort()).toEqual(["plan", "waves", "work"]);
 }
 
 describe("Pi Harness Extension", () => {
@@ -93,8 +101,8 @@ describe("Pi Harness Extension", () => {
     expect(first.systemPrompt).toContain("Common reasoning guidance is 0 for mechanical work with clear boundaries and low ambiguity");
     expect(first.systemPrompt).toContain("not because of a Skill name, document type, or planning/review phase");
     expect(first.systemPrompt).toContain("1 for a small settled implementation or check, simple state reconciliation, or simple documentation reconciliation");
-    expect(first.systemPrompt).toContain("2 for ordinary Plan or Tasks work, independent review, or multi-file impact analysis");
-    expect(first.systemPrompt).toContain("Ordinary Plan, Tasks, and independent review work normally require at least reasoning 2");
+    expect(first.systemPrompt).toContain("2 for ordinary Plan/Waves work, independent review, or multi-file impact analysis");
+    expect(first.systemPrompt).toContain("Ordinary Plan/Waves and independent review work normally require at least reasoning 2");
     expect(first.systemPrompt).toContain("3 for final review involving architecture, security, migration, authority conflict, a complex root cause, or unusually difficult uncertainty");
     expect(first.systemPrompt).toContain("never combine them into a total score, weighted score, priority, or phase level");
     expect(first.systemPrompt).toContain("Common impact guidance is 0 for local, reversible work without external impact");
@@ -140,7 +148,7 @@ describe("Pi Harness Extension", () => {
     expect(first.systemPrompt).not.toContain("use serial fallback");
     // Generated prompt contracts; these checks do not exercise Router decisions or Host parallelism.
     const headings = [
-      "Phase 1 - Identify and present outcomes.",
+      "Phase 1 - Confirm scope, then identify outcomes.",
       "Phase 2 - Select executable work.",
       "Phase 3 - Resolve and delegate the selected outcome.",
       "Phase 4 - Receive and project Results.",
@@ -151,23 +159,45 @@ describe("Pi Harness Extension", () => {
     expect(first.systemPrompt.match(/Phase [1-4] - /g)).toHaveLength(4);
     const phases = positions.map((position, index) => first.systemPrompt.slice(position, positions[index + 1]));
     for (const phrase of [
-      "After loading the strategy, identify each independently observable user-requested result",
+      "After loading the strategy, for a new planned implementation first disclose in an ordinary message",
+      "selected Work/Plan/Waves scope's outcome and important exclusions",
+      "proposed behavior or artifact changes and owners",
+      "steps and material dependencies",
+      "verification and completion criteria",
+      "important tradeoffs, risks, and key decisions",
+      "Obtain explicit current-user confirmation of that disclosed implementation scope before decomposing it into independently observable outcomes or Wave items, selecting domain Skills, constructing a Handoff, or requesting capability",
+      "A path, readiness claim, intent agreement, overview approval, document status, silence, ambiguous or declined response, Handoff, or successful Resolver admission is not confirmation; block the affected implementation",
+      "After that confirmation (or immediately for non-planned work), identify each independently observable user-requested result",
       "complete coordination set immediately for multi-step work",
       "only total absence of a writable and visible coordination mechanism may block coordination",
-      "Internal checks may support it",
+      "Each planned Waves item has exactly one Handler and one independent Result",
+      "keep independently meaningful Results separate even when they are combined in a final report",
+      "Internal checks may support one predicate",
       "A companion Skill must serve the same predicate",
       "independently meaningful completion, failure, dependency, recovery, authorization, durable effect, audit, or terminal state",
     ]) expect(phases[0]).toContain(phrase);
     for (const phrase of [
       "in_progress immediately before its coordination action",
-      "do not overlap dependencies or conflicting writes, ownership, authority, behavioral contracts, or side effects",
+      "A partial, failed, or blocked prerequisite blocks only outcomes that explicitly depend on it; unrelated ready outcomes remain eligible, and Wave grouping is not a global barrier",
+      "Do not overlap dependencies or conflicting writes, ownership, authority, behavioral contracts, or side effects",
       "Shared read-only sources alone do not conflict",
       "Background overlap requires permission from the currently effective delegate tool contract and available resources",
       "unknown, stale, incompatible, or ambiguous overlap capability requires a contract-compliant serial path",
       "Tool-call parallelism is not required for background overlap",
-      "Select the exact same-directory Work/Plan/Tasks tuple for each planned invocation",
+      "Select the exact same-directory Work/Plan/Waves tuple for each planned invocation",
+      "Before resolution, validate reciprocal Work/Plan/Waves links",
+      "the Plan links its Work and exactly one Waves document, and Waves links that same Plan and Work",
+      "missing or inconsistent links block the affected planned execution",
+      "Validate that item and Wave identifiers are unique, references resolve, prerequisite links are acyclic, and no gate depends on its own release",
+      "missing items, contradictory predicates, unresolved dependencies, cycles, or an uncheckable gate block the affected planned execution",
+      "Check both the selected item's prerequisite completion predicates and its containing Wave's prerequisite gates before resolution",
+      "item readiness alone never establishes Wave-gate readiness",
+      "These semantic checks remain Router-owned; Resolver structural validation or successful admission does not establish them",
+      "Use that linked waves.md as the sole executable graph; plan.md explains scope and authority and is not a second decomposition",
+      "Historical tasks.md is a compatibility record only",
+      "If an unfinished historical Tasks-based plan is selected, stop and require explicit migration to a linked Work/Plan/Waves tuple and applicable confirmation before execution; never interpret Tasks as Waves or silently fall back",
     ]) expect(phases[1]).toContain(phrase);
-    // Static contract contrasts for S1-S19; this synthetic event cannot establish live Router decisions.
+    // Static contract contrasts for S1-S23; this synthetic event cannot establish live Router decisions.
     for (const phrase of [
       "settle intended outcomes, boundaries, constraints, and success criteria with the user",
       "surface material alternatives rather than assuming agreement from silence",
@@ -180,18 +210,13 @@ describe("Pi Harness Extension", () => {
       "genuinely complex staged delivery",
       "overview of stages, dependencies, and incremental outcomes",
       "route approval authorizes no stage",
+      "Detail and separately confirm each ready stage's implementation scope",
       "defer future-stage details only when they do not invalidate the route or hide a current-stage decision",
       "Each implementation Plan identifies its Spec-derived scope and relationship to the overview, if any",
-      "outcome and important exclusions",
-      "behavior or artifact changes and owners",
-      "steps and material dependencies",
-      "verification and completion criteria",
-      "important tradeoffs, risks, and key decisions",
-      "Obtain explicit current-user confirmation of this disclosed implementation scope before its first delegation",
-      "A path, readiness claim, intent agreement, overview approval, document status, silence, ambiguous or declined response, Handoff, or successful Resolver admission is not confirmation",
+      "do not execute an implementation Plan without the Phase 1 disclosure and explicit current-user confirmation",
     ]) expect(phases[1]).toContain(phrase); // S3-S8/S13: route-only versus each ready scope.
     for (const phrase of [
-      "refine Tasks, implement, repair defects, and verify across bounded Handler outcomes without per-task approval",
+      "refine Waves items, implement, repair defects, and verify across bounded Handler outcomes without per-item approval",
       "confirm the affected portion before executing it",
       "After byte-only drift, compare the current Plan with the confirmed scope and retry current-call validation against the current tuple without renewed confirmation",
       "report failed or partial verification truthfully, and repair and recheck within scope",
@@ -209,8 +234,15 @@ describe("Pi Harness Extension", () => {
     expect(phases[1]).not.toContain("reconfirm on substantive authority or Plan drift");
     expect(phases[1]).not.toContain("Complete applicable planned Work/Plan/Tasks, disclose the exact selected Plan");
     expect(phases[0].indexOf("settle intended outcomes")).toBeLessThan(phases[0].indexOf("express new behavior verifiably"));
-    expect(phases[1].indexOf("route approval authorizes no stage")).toBeLessThan(phases[1].indexOf("explicit current-user confirmation of this disclosed implementation scope"));
+    expect(phases[0].indexOf("first disclose in an ordinary message")).toBeLessThan(phases[0].indexOf("Obtain explicit current-user confirmation"));
+    expect(phases[0].indexOf("Obtain explicit current-user confirmation")).toBeLessThan(phases[0].indexOf("identify each independently observable user-requested result"));
+    expect(phases[0].indexOf("identify each independently observable user-requested result")).toBeLessThan(phases[0].indexOf("Each planned Waves item has exactly one Handler"));
+    expect(phases[1].indexOf("route approval authorizes no stage")).toBeLessThan(phases[1].indexOf("separately confirm each ready stage's implementation scope"));
     for (const phrase of [
+      "select one domain primary Skill and optional companion Skills for this Handoff only",
+      "then assign the least sufficient finite non-negative reasoning and impact requirements from the concrete work before calling resolve_delegation",
+      "For bounded behavior-neutral work supply atomic basis and focused verification",
+      "supply only the exact planned Work/Plan/Waves selectors",
       "Keep Handoff fields limited to objective, primarySkill, optional companionSkills, context, constraints, and deliverables; keep Handoff and admission shapes closed",
       "After a resolved response and compatible delegate capability, immediately launch this outcome's Handler as the next environment action",
       "Complete all reads, compatibility checks, and pre-action Todo projection before resolve",
@@ -221,22 +253,40 @@ describe("Pi Harness Extension", () => {
       "agent: \"handler\" with that resolved prompt, model, thinking, taskSlug",
       "If resolution or delegate capability fails, report the block without spawning",
     ]) expect(phases[2]).toContain(phrase);
+    expect(phases[2].indexOf("select one domain primary Skill")).toBeLessThan(phases[2].indexOf("before calling resolve_delegation"));
+    expect(phases[2].indexOf("Pass the returned prompt, model, and thinking exactly")).toBeLessThan(phases[2].indexOf("When calling subagent_spawn"));
     for (const phrase of [
-      "A summary notification is not a full Result: retrieve it via the effective backend's supported path",
+      "A summary notification is not a full Result: retrieve it via the effective backend's supported path before correlating or projecting it",
+      "wait for notifications rather than routine polling",
       "read the complete Result, including its status, summary, report, and artifacts",
+      "Immediately project completed, partial, blocked, or failed truthfully in the existing Todo",
+      "closest truthful native status plus existing descriptive or message surfaces where needed",
       "not fixed workflow-control instructions",
       "Never mark partial, blocked, or failed as completed",
+      "If Result context is missing, incomplete, malformed, or structurally ambiguous, fail closed",
+      "do not dispatch or claim completion based on it",
       "duplicate notification is idempotent",
       "preserve the first semantic state, leave status and dependencies unchanged",
       "On restart or replay, reapply only when available identity and visible state make that safe",
       "prefer resuming that same execution",
       "After projecting each Result, make a fresh Router-owned decision before releasing dependents",
       "release only satisfied dependencies",
+      "Only completed plus required evidence satisfies an item predicate by default",
+      "partial, failed, blocked, or insufficient evidence leaves it unsatisfied",
+      "Verify a Wave gate separately from item completion",
+      "every item listed in that Wave must satisfy its completion predicate and the gate's stated verification must pass before releasing only its explicitly dependent work",
+      "An adoptable Result and sufficient evidence are required",
+      "do not infer gate release from terminal status, Wave numbering, document order, or Todo completion alone",
       "A combined final report does not merge independent execution or completion states",
       "terminal Result was applied, identity and required fields are known and non-contradictory",
       "record is neither current nor needed by unresolved dependents",
       "Never use subagent_remove for cleanup or delete Results, sessions, manifests, or artifacts",
     ]) expect(phases[3]).toContain(phrase);
+    expect(phases[3].indexOf("retrieve it via the effective backend's supported path")).toBeLessThan(phases[3].indexOf("Immediately project"));
+    expect(phases[3].indexOf("read the complete Result")).toBeLessThan(phases[3].indexOf("Immediately project"));
+    expect(phases[3].indexOf("Immediately project")).toBeLessThan(phases[3].indexOf("After projecting each Result, make a fresh Router-owned decision"));
+    expect(phases[3].indexOf("Immediately project")).toBeLessThan(phases[3].indexOf("Verify a Wave gate separately from item completion"));
+    expect(phases[3].indexOf("Verify a Wave gate separately from item completion")).toBeLessThan(phases[3].indexOf("before releasing only its explicitly dependent work"));
     expect(active).toEqual(["read", "resolve_delegation"]);
     expect(registryReads).toBe(0);
 
@@ -257,6 +307,24 @@ describe("Pi Harness Extension", () => {
     expect(registryReads).toBe(1);
     const handlerPrompt = Bun.YAML.parse(invocation.details.prompt) as Record<string, unknown>;
     for (const key of ["model", "modelRole", "thinking", "candidate", "reasoning", "impact"]) expect(handlerPrompt).not.toHaveProperty(key);
+
+    const root = mkdtempSync(join(tmpdir(), "pi-harness-planned-"));
+    try {
+      const directory = join(root, "docs", "works", "exact");
+      mkdirSync(directory, { recursive: true });
+      const authority = { work: join(directory, "work.md"), plan: join(directory, "plan.md"), waves: join(directory, "waves.md") };
+      for (const path of Object.values(authority)) writeFileSync(path, "fixture\n");
+      // The existing API/context doubles expose no Handler launch capability.
+      const plannedContext = { ...context(modelRegistry), cwd: root };
+      const plannedInvocation = await resolver.execute("planned", {
+        handoff: { objective: "Resolve only.", primarySkill: "implement", context: Object.values(authority).map((ref) => ({ ref, purpose: "Selected." })) },
+        admission: { path: "planned", authority }, reasoning: 1, impact: 2,
+      }, undefined, undefined, plannedContext);
+      expect(plannedInvocation.details).toMatchObject({ status: "resolved", model: "test/reasoning/model", thinking: "medium" });
+      expect([...tools.keys()]).toEqual(["resolve_delegation"]);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
 
     expect(JSON.stringify(tools.get("resolve_delegation")!.parameters)).toContain("implement");
     expect(JSON.stringify(tools.get("resolve_delegation")!.parameters)).not.toContain("research");
@@ -315,7 +383,7 @@ describe("Pi Harness Extension", () => {
 
     const result = await tools.get("resolve_delegation")!.execute("drift", {
       handoff: { objective: "Must not launch.", primarySkill: "implement", context: [{ ref: "missing-authority.md", purpose: "Must not be read." }] },
-      admission: { path: "planned", authority: { work: "missing-work.md", plan: "missing-plan.md", tasks: "missing-tasks.md" } },
+      admission: { path: "planned", authority: { work: "missing-work.md", plan: "missing-plan.md", waves: "missing-waves.md" } },
       reasoning: 1,
       impact: 1,
     }, undefined, undefined, ctx);

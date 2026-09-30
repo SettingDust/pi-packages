@@ -161,6 +161,7 @@ export interface ResolveOptions {
 }
 
 
+// Legality only: confirmation, explicit migration, semantic readiness, and launch stay Router-owned.
 export async function resolveDelegation(input: unknown, options: ResolveOptions): Promise<Resolution> {
   const parsed = validateInput(input);
   if (!parsed.ok) return blocked(parsed.code, parsed.message);
@@ -194,9 +195,9 @@ export async function resolveDelegation(input: unknown, options: ResolveOptions)
   const subjectBuilder = options.subjectBuilder ?? buildPlannedSubject;
   let authorityPaths: AuthoritySelectors;
   try {
-    authorityPaths = { work: await canonicalPath(options.cwd, admissionResult.value.authority.work), plan: await canonicalPath(options.cwd, admissionResult.value.authority.plan), tasks: await canonicalPath(options.cwd, admissionResult.value.authority.tasks) };
+    authorityPaths = { work: await canonicalPath(options.cwd, admissionResult.value.authority.work), plan: await canonicalPath(options.cwd, admissionResult.value.authority.plan), waves: await canonicalPath(options.cwd, admissionResult.value.authority.waves) };
   } catch { return blocked("missing_authority", "Planned authority selectors must resolve to readable Handoff context references"); }
-  const selected = [authorityPaths.work, authorityPaths.plan, authorityPaths.tasks];
+  const selected = [authorityPaths.work, authorityPaths.plan, authorityPaths.waves];
   const counts = selected.map((path) => normalizedContext.filter((item) => "ref" in item && item.ref === path).length);
   if (new Set(selected).size !== 3 || counts.some((count) => count !== 1)) return blocked("missing_authority", "Planned authority must select three distinct paths occurring exactly once in Handoff context");
   const subjectInput = { objective: normalizedHandoff.objective, primarySkill: normalizedHandoff.primarySkill, companionSkills: normalizedHandoff.companionSkills, context: normalizedHandoff.context as Array<{ ref: string; purpose: string } | { inline: string; purpose: string }>, constraints: normalizedHandoff.constraints, deliverables: normalizedHandoff.deliverables };
@@ -275,10 +276,10 @@ function validateAdmission(value: unknown):
     return { ok: true, value: { path: "atomic", basis: [...value.basis], verification: [...value.verification] } };
   }
   if (value.path === "planned") {
-    if (!exactKeys(value, ["path", "authority"]) || !isRecord(value.authority) || hasForbiddenAdmissionField(value.authority) || !exactKeys(value.authority, ["work", "plan", "tasks"]) || ![value.authority.work, value.authority.plan, value.authority.tasks].every(nonEmptyString)) {
-      return { ok: false, code: "invalid_admission", message: "Planned admission must contain only work, plan, and tasks path selectors" };
+    if (!exactKeys(value, ["path", "authority"]) || !isRecord(value.authority) || hasForbiddenAdmissionField(value.authority) || !exactKeys(value.authority, ["work", "plan", "waves"]) || ![value.authority.work, value.authority.plan, value.authority.waves].every(nonEmptyString)) {
+      return { ok: false, code: "invalid_admission", message: "Planned admission must contain only work, plan, and waves path selectors" };
     }
-    return { ok: true, value: { path: "planned", authority: { work: value.authority.work, plan: value.authority.plan, tasks: value.authority.tasks } } };
+    return { ok: true, value: { path: "planned", authority: { work: value.authority.work, plan: value.authority.plan, waves: value.authority.waves } } };
   }
   return { ok: false, code: "invalid_admission", message: "Admission path must be atomic or planned" };
 }

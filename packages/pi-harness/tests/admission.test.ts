@@ -5,6 +5,7 @@ import {
   buildPlannedSubject,
   canonicalDocumentSnapshot,
   canonicalJson,
+  canonicalPath,
   validateTuple,
   type PlannedSubject,
 } from "../src/admission.js";
@@ -28,6 +29,31 @@ test("planned subject preserves canonical set and Handoff identity", async () =>
     expect(changed).not.toHaveProperty("planAuthorizationSha256");
     expect(changed).not.toHaveProperty("a3AuthoritySha256");
     expect(changed).not.toHaveProperty("a3DecisionSha256");
+  } finally {
+    await fixture.dispose();
+  }
+});
+
+test("planned Handoff identity covers Skills, ordered context, constraints, and deliverables", async () => {
+  const fixture = await subjectFixture();
+  try {
+    const baseline = fixture.subject;
+    for (const handoff of [
+      { ...fixture.handoff, primarySkill: "implement-plan" },
+      { ...fixture.handoff, companionSkills: ["research-quick"] },
+      { ...fixture.handoff, context: [...fixture.handoff.context].reverse() },
+      { ...fixture.handoff, context: fixture.handoff.context.map((item) => ({ ...item, purpose: "Changed purpose." })) },
+      { ...fixture.handoff, context: [...fixture.handoff.context, { inline: "Additional scope.", purpose: "Scope." }] },
+      { ...fixture.handoff, constraints: ["Changed constraint."] },
+      { ...fixture.handoff, deliverables: ["Changed deliverable."] },
+    ]) {
+      const changed = await buildPlannedSubject(fixture.cwd, fixture.authority, handoff);
+      expect(changed.setSha256).toBe(baseline.setSha256);
+      expect(changed.handoffSha256).not.toBe(baseline.handoffSha256);
+      expect(changed.subjectSha256).not.toBe(baseline.subjectSha256);
+    }
+    expect(baseline).toHaveProperty("waves", { path: await canonicalPath(fixture.cwd, fixture.authority.waves), sha256: baseline.waves.sha256 });
+    expect(baseline).not.toHaveProperty("tasks");
   } finally {
     await fixture.dispose();
   }
@@ -60,23 +86,28 @@ test("canonical JSON preserves key order and rejects unpaired surrogates", () =>
   expect(() => canonicalJson("\ud800")).toThrow("unpaired surrogate");
 });
 
-test("planned tuple keeps Plan and Tasks as direct matched members", () => {
+test("planned tuple keeps Plan and Waves as direct matched members", () => {
   expect(() => validateTuple({
     work: "/workspace/docs/works/demo/work.md",
     plan: "/workspace/docs/works/demo/nested/plan-slice.md",
-    tasks: "/workspace/docs/works/demo/nested/tasks-slice.md",
+    waves: "/workspace/docs/works/demo/nested/waves-slice.md",
   })).toThrow("authority members must share one directory");
   expect(() => validateTuple({
     work: "/workspace/docs/works/demo/work.md",
     plan: "/workspace/docs/works/demo/plan-one.md",
-    tasks: "/workspace/docs/works/demo/tasks-two.md",
-  })).toThrow("plan/tasks slices must match");
+    waves: "/workspace/docs/works/demo/waves-two.md",
+  })).toThrow("plan/waves slices must match");
+  expect(() => validateTuple({
+    work: "/workspace/docs/works/demo/work.md",
+    plan: "/workspace/docs/works/demo/a--plan-slice.md",
+    waves: "/workspace/docs/works/demo/b--waves-slice.md",
+  })).toThrow("plan/waves prefixes must match");
 });
 
 async function subjectFixture(work: string | Uint8Array = "work\n"): Promise<{
   subject: PlannedSubject;
   cwd: string;
-  authority: { work: string; plan: string; tasks: string };
+  authority: { work: string; plan: string; waves: string };
   handoff: {
     objective: string;
     primarySkill: string;
@@ -93,11 +124,11 @@ async function subjectFixture(work: string | Uint8Array = "work\n"): Promise<{
   const authority = {
     work: join(directory, "work.md"),
     plan: join(directory, "plan.md"),
-    tasks: join(directory, "tasks.md"),
+    waves: join(directory, "waves.md"),
   };
   await writeFile(authority.work, work);
   await writeFile(authority.plan, "plan\n");
-  await writeFile(authority.tasks, "tasks\n");
+  await writeFile(authority.waves, "waves\n");
   const handoff = {
     objective: "test",
     primarySkill: "implement-change",

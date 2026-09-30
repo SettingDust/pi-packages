@@ -73,14 +73,39 @@ describe("built-in Skill library", () => {
     (name) => expect(readSkill(name).body).toContain("research-source-grounded"),
   );
 
-  test.each(["plan-implementation", "documentation-tasks-writing"])(
+  test.each(["plan-implementation"])(
     "%s separates independent outcomes despite execution conflicts",
     (name) => {
       const { body } = readSkill(name);
       expect(body).toContain("Keep independently valuable outcomes separate even when their writes or other effects conflict");
-      expect(body).toContain("serialize conflicting tasks and dependencies");
+      expect(body).toContain("serialize conflicting items and dependencies");
     },
   );
+
+  test("historical Tasks Skill cannot become the new executable path", () => {
+    const { metadata, body } = readSkill("documentation-tasks-writing");
+    expect(metadata.description).toContain("Do not use for new planned work");
+    expect(body).toContain("do not silently reinterpret Tasks as Waves");
+    expect(body).toContain("replacement Work/Plan/Waves tuple");
+  });
+
+  test("new-plan Skills and discovery select Waves as the only executable graph", () => {
+    for (const name of ["documentation", "documentation-structure", "documentation-work", "documentation-plan-writing", "plan-implementation", "implement-plan", "spec-driven-development"]) {
+      const { body } = readSkill(name);
+      expect(body).toContain("Waves");
+      expect(body).not.toMatch(/Plan\/Tasks|Plan\+Tasks|Plan and Tasks/);
+    }
+    const { body } = readSkill("documentation-plan-writing");
+    for (const rule of ["sole executable graph", "one Handler and one Result", "prerequisite item IDs", "write ownership", "acyclic dependencies", "no dependencies or global barrier", "`partial`, `failed`, `blocked`", "explicit migration", "silent fallback"]) {
+      expect(body).toContain(rule);
+    }
+    const library = readFileSync(join(root, "docs/spec/skill-library.md"), "utf8");
+    expect(library).toContain("Work/Context/Plan/Waves");
+    expect(library).toContain("sole executable graph");
+    expect(library).toContain("historical Tasks remain compatibility records requiring explicit migration");
+    expect(library).not.toMatch(/Plan\/Tasks|Plan and Tasks|derive executable Tasks/);
+    expect(readFileSync(join(root, "docs/README.md"), "utf8")).toContain("Work/Context/Plan/Waves");
+  });
 
   test("spec-driven preparation completes without implementation checks", () => {
     const { body } = readSkill("spec-driven-development");

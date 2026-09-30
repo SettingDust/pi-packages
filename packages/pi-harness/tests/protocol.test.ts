@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
-import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { buildPlannedSubject } from "../src/admission.js";
@@ -29,7 +29,7 @@ const atomic = { path: "atomic", basis: ["Bounded."], verification: ["Focused te
 const authority = {
   work: "docs/works/admission/work.md",
   plan: "docs/works/admission/plan-slice.md",
-  tasks: "docs/works/admission/tasks-slice.md",
+  waves: "docs/works/admission/waves-slice.md",
 };
 let cwd: string;
 let authorityDir: string;
@@ -43,7 +43,7 @@ beforeAll(async () => {
   await writeFile(join(cwd, "context.md"), "context", "utf8");
   await writeFile(join(authorityDir, "work.md"), "work\n", "utf8");
   await writeFile(join(authorityDir, "plan-slice.md"), "plan\n", "utf8");
-  await writeFile(join(authorityDir, "tasks-slice.md"), "tasks\n", "utf8");
+  await writeFile(join(authorityDir, "waves-slice.md"), "waves\n", "utf8");
   options = { skills, candidates, cwd, modelRegistry: registry() };
 });
 
@@ -82,7 +82,7 @@ function planned(): Handoff {
     context: [
       { ref: authority.work, purpose: "Work." },
       { ref: authority.plan, purpose: "Plan." },
-      { ref: authority.tasks, purpose: "Tasks." },
+      { ref: authority.waves, purpose: "Waves." },
     ],
   });
 }
@@ -285,22 +285,185 @@ describe("admission preservation", () => {
     expect(observations).toBe(0);
   });
 
-  test("preserves planned admission and final-JIT validation", async () => {
+  test("rejects tasks as a planned waves alias and requires exact authority fields before Registry access", async () => {
     registryReads = 0;
+    expect(await resolveDelegation({ ...request(planned()), admission: { path: "planned", authority: { ...authority, tasks: authority.waves } } }, options))
+      .toMatchObject({ status: "blocked", code: "invalid_admission" });
+    expect(await resolveDelegation({ ...request(planned()), admission: { path: "planned", authority: { work: authority.work, plan: authority.plan, tasks: authority.waves } } }, options))
+      .toMatchObject({ status: "blocked", code: "invalid_admission" });
+    expect(registryReads).toBe(0);
+  });
+
+  test("unfinished historical Tasks require a new Waves tuple, never an alias or fallback", async () => {
+    const directory = join(cwd, "docs", "works", "historical");
+    const selected = { work: join(directory, "work.md"), plan: join(directory, "plan.md"), waves: join(directory, "waves.md") };
+    const tasks = join(directory, "tasks.md");
+    const historical = "# Tasks\n\n- [ ] Unfinished implementation.\n";
+    await mkdir(directory, { recursive: true });
+    await writeFile(selected.work, "# Work\n\n[Plan](plan.md) | [Historical Tasks](tasks.md)\n");
+    await writeFile(selected.plan, "# Plan\n\n[Work](work.md) | [Tasks](tasks.md)\n");
+    await writeFile(tasks, historical);
+    const oldAuthority = { work: selected.work, plan: selected.plan, tasks };
+    const legacyHandoff = handoff({ context: Object.values(oldAuthority).map((ref) => ({ ref, purpose: "Historical input." })) });
+    registryReads = 0;
+    for (const invalidAuthority of [oldAuthority, { ...oldAuthority, waves: tasks }, { ...selected, migrated: true }]) {
+      expect(await resolveDelegation(request(legacyHandoff, { admission: { path: "planned", authority: invalidAuthority } }), options))
+        .toMatchObject({ status: "blocked", code: "invalid_admission" });
+    }
+    expect(await resolveDelegation(request(legacyHandoff, { admission: { path: "planned", authority: { ...selected, waves: tasks } } }), options))
+      .toMatchObject({ status: "blocked", code: "invalid_admission", message: expect.stringContaining("direct-member grammar") });
+    expect(await resolveDelegation(request(legacyHandoff, { admission: { path: "planned", authority: selected } }), options))
+      .toMatchObject({ status: "blocked", code: "missing_authority" });
+    expect(registryReads).toBe(0);
+    expect(await Bun.file(selected.waves).exists()).toBeFalse();
+    expect(await readFile(selected.plan, "utf8")).toContain("[Tasks](tasks.md)");
+    expect(await readFile(tasks, "utf8")).toBe(historical);
+
+    // This fixture models an explicit migration; Resolver does not attest the Router's decision.
+    await writeFile(selected.work, "# Work\n\n[Plan](plan.md) | [Waves](waves.md) | [Historical Tasks](tasks.md)\n");
+    await writeFile(selected.plan, "# Plan\n\n[Work](work.md) | [Waves](waves.md)\n");
+    await writeFile(selected.waves, "# Waves\n\n[Work](work.md) | [Plan](plan.md)\n\n## W0\n- ITEM: Unfinished implementation.\n");
+    const migrated = handoff({ context: [...Object.values(selected), tasks].map((ref) => ({ ref, purpose: "Explicit migrated input." })) });
+    expect(await resolveDelegation(request(migrated, { admission: { path: "planned", authority: selected } }), options))
+      .toMatchObject({ status: "resolved" });
+    expect(registryReads).toBe(1);
+    expect(await readFile(tasks, "utf8")).toBe(historical);
+  });
+
+  test.each(["confirmed", "confirmation", "migration"])("rejects model-supplied %s instead of treating it as authorization", async (field) => {
+    registryReads = 0;
+    const input = request(planned(), { admission: { path: "planned", authority } });
+    for (const [invalid, code] of [
+      [{ ...input, [field]: true }, "invalid_configuration"],
+      [{ ...input, handoff: { ...input.handoff, [field]: true } }, "invalid_configuration"],
+      [{ ...input, admission: { path: "planned", authority, [field]: true } }, "invalid_admission"],
+      [{ ...input, admission: { path: "planned", authority: { ...authority, [field]: true } } }, "invalid_admission"],
+    ] as const) {
+      expect(await resolveDelegation(invalid, options)).toMatchObject({ status: "blocked", code });
+    }
+    expect(registryReads).toBe(0);
+  });
+
+  test("unconfirmed document status cannot become confirmation or block structural resolution", async () => {
+    const directory = join(cwd, "docs", "works", "unconfirmed");
+    const selected = { work: join(directory, "work.md"), plan: join(directory, "plan.md"), waves: join(directory, "waves.md") };
+    await mkdir(directory, { recursive: true });
+    await writeFile(selected.work, "# Work\n\nStatus: unconfirmed; no user approval.\n");
+    await writeFile(selected.plan, "# Plan\n\nStatus: ready.\n[Work](work.md) | [Waves](waves.md)\n");
+    await writeFile(selected.waves, "# Waves\n\n[Work](work.md) | [Plan](plan.md)\n");
+    const input = request(handoff({ context: Object.values(selected).map((ref) => ({ ref, purpose: "Unconfirmed fixture." })) }), { admission: { path: "planned", authority: selected } });
+    // A direct Resolver call checks legality only; Router must block unconfirmed implementation before it.
+    const result = await resolveDelegation(input, options);
+    expect(result.status).toBe("resolved");
+    expect(Object.keys(result).sort()).toEqual(["model", "prompt", "status", "thinking"]);
+    expect(await readFile(selected.work, "utf8")).toContain("Status: unconfirmed; no user approval.");
+  });
+
+  test.each(["work", "plan", "waves"] as const)("rejects invalid UTF-8 in %s before candidate selection", async (member) => {
+    const path = join(cwd, authority[member]);
+    const original = await readFile(path);
+    registryReads = 0;
+    try {
+      await writeFile(path, Uint8Array.from([0xff]));
+      expect(await resolveDelegation(request(planned(), { admission: { path: "planned", authority } }), options))
+        .toMatchObject({ status: "blocked", code: "invalid_admission" });
+      expect(registryReads).toBe(0);
+    } finally {
+      await writeFile(path, original);
+    }
+  });
+
+  test("fails closed when Waves disappears at the final JIT observation", async () => {
+    const path = join(cwd, authority.waves);
+    const original = await readFile(path);
     let observations = 0;
+    registryReads = 0;
+    try {
+      expect(await resolveDelegation(request(planned(), { admission: { path: "planned", authority } }), {
+        ...options,
+        subjectBuilder: async (...args) => {
+          observations++;
+          const subject = await buildPlannedSubject(...args);
+          if (observations === 1) await rm(path);
+          return subject;
+        },
+      })).toMatchObject({ status: "blocked", code: "authority_drift" });
+      expect(observations).toBe(2);
+      expect(registryReads).toBe(0);
+    } finally {
+      await writeFile(path, original);
+    }
+  });
+
+  test.each(["work", "plan", "waves"] as const)("rejects missing and duplicate %s context references", async (member) => {
+    const missing = planned();
+    missing.context = missing.context.filter((item) => !("ref" in item) || item.ref !== authority[member]);
+    expect(await resolveDelegation({ ...request(missing), admission: { path: "planned", authority } }, options))
+      .toMatchObject({ status: "blocked", code: "missing_authority" });
+    const duplicate = planned();
+    duplicate.context = [...duplicate.context, { ref: `./${authority[member]}`, purpose: "Duplicate." }];
+    expect(await resolveDelegation({ ...request(duplicate), admission: { path: "planned", authority } }, options))
+      .toMatchObject({ status: "blocked", code: "missing_authority" });
+  });
+  test.each([undefined, null, [], "", 42].map((waves) => [waves]))("rejects malformed waves selector %p", async (waves) => {
+    expect(await resolveDelegation({ ...request(planned()), admission: { path: "planned", authority: { ...authority, waves } } }, options))
+      .toMatchObject({ status: "blocked", code: "invalid_admission" });
+  });
+
+  test.each([["plan.md", "waves.md"], ["stage--plan.md", "stage--waves.md"], ["stage--plan-one.md", "stage--waves-one.md"]])("accepts exact matched %s / %s with normalized paths", async (plan, waves) => {
+    const selected = { work: authority.work, plan: `docs/works/admission/${plan}`, waves: `docs/works/admission/${waves}` };
+    for (const ref of Object.values(selected)) await writeFile(join(cwd, ref), "fixture\n");
+    const context = Object.values(selected).map((ref) => ({ ref: `./${ref}`, purpose: "Selected." }));
+    const result = await resolveDelegation({ ...request(handoff({ context })), admission: { path: "planned", authority: selected } }, options);
+    expect(result.status).toBe("resolved");
+    if (result.status === "resolved") {
+      const normalized = Bun.YAML.parse(result.prompt) as Handoff;
+      expect(normalized.context).toHaveLength(3);
+      for (const item of normalized.context) expect("ref" in item && item.ref).toMatch(/\/docs\/works\/admission\//);
+    }
+  });
+
+  test("preserves planned admission and orders final JIT before resolution metadata", async () => {
+    registryReads = 0;
+    const events: string[] = [];
     const result = await resolveDelegation({
       ...request(planned()),
       admission: { path: "planned", authority },
     }, {
       ...options,
-      subjectBuilder: async (...args) => { observations++; return buildPlannedSubject(...args); },
+      subjectBuilder: async (...args) => { events.push("subject"); return buildPlannedSubject(...args); },
+      modelRegistry: { getAvailable: () => { events.push("registry"); return options.modelRegistry.getAvailable(); } },
     });
+    events.push("returned");
     expect(result.status).toBe("resolved");
-    expect(observations).toBe(2);
+    expect(events).toEqual(["subject", "subject", "registry", "returned"]);
+    expect(Object.keys(result).sort()).toEqual(["model", "prompt", "status", "thinking"]);
     expect(registryReads).toBe(1);
   });
 
-  test("blocks authority drift before Registry observation", async () => {
+  test("rejects directory, member, prefix, and slice mismatches", async () => {
+    const mismatches = [
+      { work: authority.work, plan: "docs/works/admission/nested/plan-slice.md", waves: "docs/works/admission/nested/waves-slice.md" },
+      { work: authority.work, plan: "docs/works/admission/plan-one.md", waves: "docs/works/admission/waves-two.md" },
+      { work: authority.work, plan: "docs/works/admission/a--plan-slice.md", waves: "docs/works/admission/b--waves-slice.md" },
+      { work: authority.work, plan: authority.waves, waves: authority.plan },
+      { work: authority.work, plan: authority.plan, waves: "docs/works/admission/plan-other.md" },
+      { work: authority.work, plan: "docs/works/admission/a--plan-slice.md", waves: authority.waves },
+      { work: "docs/works/admission/not-work.md", plan: authority.plan, waves: authority.waves },
+      { work: authority.work, plan: authority.plan, waves: "docs/works/admission/waves.md" },
+    ];
+    for (const invalidAuthority of mismatches) {
+      for (const ref of Object.values(invalidAuthority)) {
+        await mkdir(join(cwd, ref, ".."), { recursive: true });
+        await writeFile(join(cwd, ref), "fixture\n");
+      }
+      const context = Object.values(invalidAuthority).map((ref) => ({ ref, purpose: "Selected." }));
+      expect(await resolveDelegation({ ...request(handoff({ context })), admission: { path: "planned", authority: invalidAuthority } }, options))
+        .toMatchObject({ status: "blocked", code: "invalid_admission" });
+    }
+  });
+
+  test.each(["work", "plan", "waves"] as const)("blocks %s byte drift before Registry observation", async (member) => {
     registryReads = 0;
     let observations = 0;
     const result = await resolveDelegation({ ...request(planned()), admission: { path: "planned", authority } }, {
@@ -308,20 +471,45 @@ describe("admission preservation", () => {
       subjectBuilder: async (...args) => {
         const subject = await buildPlannedSubject(...args);
         observations++;
-        if (observations === 1) await writeFile(join(authorityDir, "work.md"), "changed\n", "utf8");
+        if (observations === 1) await writeFile(join(cwd, authority[member]), "changed\n", "utf8");
         return subject;
       },
     });
     expect(result).toMatchObject({ status: "blocked", code: "authority_drift" });
     expect(registryReads).toBe(0);
-    await writeFile(join(authorityDir, "work.md"), "work\n", "utf8");
+    expect(observations).toBe(2);
+    await writeFile(join(cwd, authority[member]), `${member}\n`, "utf8");
   });
 });
 
 describe("Handler Result parsing", () => {
-  test.each(["completed", "partial", "blocked", "failed"] as const)("accepts %s", (status) => {
-    expect(parseHandlerResult({ status, summary: "Done.", report: "Evidence." }))
-      .toMatchObject({ valid: true, result: { status } });
+  test.each(["completed", "partial", "blocked", "failed"] as const)("preserves the full %s Result and artifacts without conflating terminal statuses", (status) => {
+    const result = {
+      status,
+      summary: "Selected Waves item only.",
+      report: "## Evidence\nFocused checks ran.\n\n## Limitations\nNo live bootstrap acceptance.\n",
+      artifacts: [{ ref: "checks/result.md", purpose: "Focused evidence." }],
+    };
+    expect(parseHandlerResult(result)).toEqual({ valid: true, result });
+    expect(parseHandlerResult(Bun.YAML.stringify(result))).toEqual({ valid: true, result });
+    expect(parseHandlerResult({ status, summary: result.summary, report: result.report }))
+      .toEqual({ valid: true, result: { status, summary: result.summary, report: result.report } });
+  });
+
+  test.each([
+    ["summary-only notification", { status: "completed", summary: "Done." }],
+    ["missing status", { summary: "Done.", report: "Evidence." }],
+    ["missing summary", { status: "completed", report: "Evidence." }],
+    ["empty report", { status: "completed", summary: "Done.", report: " " }],
+    ["non-string report", { status: "completed", summary: "Done.", report: { evidence: "Checks." } }],
+    ["multiple Results", [{ status: "completed", summary: "One.", report: "Evidence." }, { status: "blocked", summary: "Two.", report: "Missing prerequisite." }]],
+    ["bundled Results", { results: [{ status: "completed", summary: "Done.", report: "Evidence." }] }],
+    ["malformed artifact", { status: "completed", summary: "Done.", report: "Evidence.", artifacts: [{ ref: "checks/result.md" }] }],
+    ["invalid YAML", "status: ["],
+  ])("rejects %s without inventing a full Result", (_label, input) => {
+    const parsed = parseHandlerResult(input);
+    expect(parsed.valid).toBeFalse();
+    expect(parsed).not.toHaveProperty("result");
   });
   test.each(["suggestedNext", "nextAction", "nextSkill"])("rejects workflow field %s", (field) => {
     expect(parseHandlerResult({ status: "completed", summary: "Done.", report: "Evidence.", [field]: "implement" }).valid)

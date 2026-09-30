@@ -5,7 +5,7 @@ import { resolve, win32 } from "node:path";
 export interface AuthoritySelectors {
   work: string;
   plan: string;
-  tasks: string;
+  waves: string;
 }
 
 export interface DocumentIdentity {
@@ -17,7 +17,7 @@ export interface PlannedSubject {
   authorityPathTuple: string;
   work: DocumentIdentity;
   plan: DocumentIdentity;
-  tasks: DocumentIdentity;
+  waves: DocumentIdentity;
   setSha256: string;
   handoffSha256: string;
   subjectSha256: string;
@@ -25,7 +25,7 @@ export interface PlannedSubject {
 
 const token = "[a-z0-9]+(?:-[a-z0-9]+)*";
 const workNamePattern = new RegExp(`^${token}$`);
-const memberPattern = new RegExp(`^(?:(?:${token})--)?(plan|tasks)(?:-(${token}))?\\.md$`);
+const memberPattern = new RegExp(`^(?:(${token})--)?(plan|waves)(?:-(${token}))?\\.md$`);
 
 export async function canonicalPath(cwd: string, ref: string): Promise<string> {
   if (typeof ref !== "string" || ref.trim().length === 0) throw new Error("empty reference");
@@ -53,19 +53,19 @@ export async function buildPlannedSubject(
   const paths = {
     work: await canonicalPath(cwd, authority.work),
     plan: await canonicalPath(cwd, authority.plan),
-    tasks: await canonicalPath(cwd, authority.tasks),
+    waves: await canonicalPath(cwd, authority.waves),
   };
   validateTuple(paths);
 
   const identities = {
     work: { path: paths.work, sha256: await documentSha256(paths.work) },
     plan: { path: paths.plan, sha256: await documentSha256(paths.plan) },
-    tasks: { path: paths.tasks, sha256: await documentSha256(paths.tasks) },
+    waves: { path: paths.waves, sha256: await documentSha256(paths.waves) },
   } satisfies Record<keyof AuthoritySelectors, DocumentIdentity>;
   const setSha256 = sha256(canonicalJson([
     { kind: "work", ...identities.work },
     { kind: "plan", ...identities.plan },
-    { kind: "tasks", ...identities.tasks },
+    { kind: "waves", ...identities.waves },
   ]));
   const normalizedContext: Array<Record<string, string>> = [];
   for (const item of handoff.context) {
@@ -91,19 +91,20 @@ export async function buildPlannedSubject(
 }
 
 export function validateTuple(paths: AuthoritySelectors): void {
-  if (new Set([paths.work, paths.plan, paths.tasks]).size !== 3) throw new Error("authority paths must be distinct");
+  if (new Set([paths.work, paths.plan, paths.waves]).size !== 3) throw new Error("authority paths must be distinct");
   const workMatch = paths.work.match(new RegExp(`^(.+)/docs/works/(${token})/work\\.md$`));
   if (!workMatch || !workNamePattern.test(workMatch[2]!)) throw new Error("work must be a direct docs/works member");
   const directory = paths.work.slice(0, paths.work.lastIndexOf("/"));
   const plan = memberPattern.exec(paths.plan.slice(paths.plan.lastIndexOf("/") + 1));
-  const tasks = memberPattern.exec(paths.tasks.slice(paths.tasks.lastIndexOf("/") + 1));
-  if (!plan || !tasks || plan[1] !== "plan" || tasks[1] !== "tasks") throw new Error("plan/tasks must match the direct-member grammar");
-  if (paths.plan.slice(0, paths.plan.lastIndexOf("/")) !== directory || paths.tasks.slice(0, paths.tasks.lastIndexOf("/")) !== directory) throw new Error("authority members must share one directory");
-  if (plan[2] !== tasks[2]) throw new Error("plan/tasks slices must match");
+  const waves = memberPattern.exec(paths.waves.slice(paths.waves.lastIndexOf("/") + 1));
+  if (!plan || !waves || plan[2] !== "plan" || waves[2] !== "waves") throw new Error("plan/waves must match the direct-member grammar");
+  if (paths.plan.slice(0, paths.plan.lastIndexOf("/")) !== directory || paths.waves.slice(0, paths.waves.lastIndexOf("/")) !== directory) throw new Error("authority members must share one directory");
+  if (plan[1] !== waves[1]) throw new Error("plan/waves prefixes must match");
+  if (plan[3] !== waves[3]) throw new Error("plan/waves slices must match");
 }
 
 export function tupleKey(paths: AuthoritySelectors): string {
-  return `${paths.work}\u0000${paths.plan}\u0000${paths.tasks}`;
+  return `${paths.work}\u0000${paths.plan}\u0000${paths.waves}`;
 }
 
 export function canonicalJson(value: unknown): string {
