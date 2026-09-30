@@ -854,18 +854,42 @@ export class SubagentRuntime {
 
   async join(id: string, generation = this.get(id).generation, signal?: AbortSignal): Promise<SubagentTask> {
     signal?.throwIfAborted();
-    const task = this.get(id);
+    let task = this.get(id);
     if (task.generation !== generation) throw new Error("Subagent generation is no longer current");
-    await waitForPromise(this.launches.get(this.taskKey(task)), signal);
-    signal?.throwIfAborted();
     const completionNotifier = this.completionNotifier;
-    while (isActiveStatus(task.status)) {
+    while (true) {
       signal?.throwIfAborted();
-      if (existsSync(task.resultPath)) await waitForPromise(this.settleFromResult(task, completionNotifier), signal);
-      else await delay(50, undefined, { signal });
+      const recovery = this.recovery;
+      if (recovery) {
+        await waitForPromise(recovery, signal);
+        const recovered = this.tasks.get(id);
+        if (recovered) {
+          task = recovered;
+          if (task.generation !== generation) throw new Error("Subagent generation is no longer current");
+        }
+        continue;
+      }
+      const current = this.tasks.get(id);
+      if (current && current !== task) {
+        task = current;
+        if (task.generation !== generation) throw new Error("Subagent generation is no longer current");
+        continue;
+      }
+      const key = this.taskKey(task);
+      await waitForPromise(this.launches.get(key), signal);
+      signal?.throwIfAborted();
+      if (this.recovery || (this.tasks.has(id) && this.tasks.get(id) !== task)) continue;
+      while (isActiveStatus(task.status)) {
+        signal?.throwIfAborted();
+        if (this.recovery || (this.tasks.has(id) && this.tasks.get(id) !== task)) break;
+        if (existsSync(task.resultPath)) await waitForPromise(this.settleFromResult(task, completionNotifier), signal);
+        else await delay(50, undefined, { signal });
+      }
+      if (this.recovery || (this.tasks.has(id) && this.tasks.get(id) !== task)) continue;
+      await waitForPromise(this.awaitTaskOperations(task, signal), signal);
+      if (this.recovery || (this.tasks.has(id) && this.tasks.get(id) !== task)) continue;
+      return snapshotTask(task);
     }
-    await waitForPromise(this.awaitTaskOperations(task, signal), signal);
-    return snapshotTask(task);
   }
 
   async steer(id: string, message: string): Promise<SubagentTask> {

@@ -443,6 +443,27 @@ describe("pi-herdr-subagents runtime", () => {
     expect(existsSync(dirname(first.resultPath))).toBeFalse();
   });
 
+  test("rebinds a join that overlaps recovery and observes a recovered terminal state", async () => {
+    const parentDir = mkdtempSync(join(tmpdir(), "subagents-join-recovery-race-"));
+    const parentSessionFile = join(parentDir, "parent.jsonl");
+    const runtime = new SubagentRuntime(fakeTransport(true).transport, handlerRegistry());
+    const task = await runtime.spawn({
+      agent: "handler", cwd: "/repo", prompt: "work", label: "join recovery", taskSlug: "task", parentSessionFile,
+    });
+    const manifestPath = join(dirname(task.resultPath), "task.json");
+    const manifest = JSON.parse(readFileSync(manifestPath, "utf8")) as Record<string, unknown>;
+    manifest.status = "queued";
+    delete manifest.startedAt;
+    writeFileSync(manifestPath, JSON.stringify(manifest));
+
+    const joining = runtime.join(task.subagentId);
+    const recovering = runtime.recover("/repo", parentSessionFile);
+    await recovering;
+
+    await expect(joining).resolves.toMatchObject({ status: "failed", error: "launch_interrupted", generation: 1 });
+    runtime.stop();
+  });
+
   test("recovers only the current generation and rejects a mismatched Result", async () => {
     const parentDir = mkdtempSync(join(tmpdir(), "subagents-recover-generation-"));
     const parentSessionFile = join(parentDir, "parent.jsonl");
