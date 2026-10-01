@@ -11,9 +11,10 @@ import type { RegistryModel } from "../src/protocol.js";
 type BeforeHandler = (event: BeforeAgentStartEvent, ctx: ExtensionContext) => unknown | Promise<unknown>;
 type RegisteredTool = {
   name: string;
+  description?: string;
   parameters: any;
   renderCall?: (args: any, theme: any, context: any) => { render(width: number): string[] };
-  execute(toolCallId: string, params: unknown, signal: AbortSignal | undefined, onUpdate: undefined, ctx: ExtensionContext): Promise<{ details?: any }>;
+  execute(toolCallId: string, params: unknown, signal: AbortSignal | undefined, onUpdate: undefined, ctx: ExtensionContext): Promise<{ content?: Array<{ type: string; text: string }>; details?: any }>;
 };
 
 function skill(name: string, disableModelInvocation = false): Skill {
@@ -21,11 +22,25 @@ function skill(name: string, disableModelInvocation = false): Skill {
 }
 
 function event(skills: Skill[], customPrompt?: string): BeforeAgentStartEvent {
-  return { type: "before_agent_start", prompt: "Implement the change", systemPrompt: customPrompt === undefined ? "default Pi prompt" : `${customPrompt}\nCurrent working directory: /workspace`, systemPromptOptions: { cwd: "/workspace", skills, ...(customPrompt === undefined ? {} : { customPrompt }) } };
+  return { type: "before_agent_start", prompt: "Implement the change", systemPrompt: customPrompt === undefined ? "default Pi prompt" : `${customPrompt}\nCurrent working directory: /workspace`, systemPromptOptions: { cwd: "/workspace", selectedTools: [], toolSnippets: {}, toolGuidelines: {}, promptGuidelines: [], appendSystemPrompt: "", sections: {}, contextFiles: [], skills, ...(customPrompt === undefined ? {} : { customPrompt }) } };
 }
 
 function context(modelRegistry: { getAvailable: () => RegistryModel[] }): ExtensionContext {
   return { cwd: process.cwd(), isProjectTrusted: () => false, modelRegistry } as unknown as ExtensionContext;
+}
+
+function expectSingleCallPrompt(prompt: string): void {
+  for (const phrase of [
+    "Resolver binds the invocation and calls it within resolve_delegation once",
+    "Do not issue a second launch after its response for the same outcome, reconstruct the prompt, or replace the resolved model/thinking",
+    "Any later independent outcome requires its own permitted resolve_delegation call",
+    "include resource and authorization checks",
+  ]) expect(prompt).toContain(phrase);
+  for (const phrase of [
+    "it does not launch a Handler",
+    "immediately launch this outcome's Handler as the next environment action",
+    "do not interpose any action between a resolved response and its exact launch",
+  ]) expect(prompt).not.toContain(phrase);
 }
 
 function expectClosedObject(schema: unknown): Record<string, any> {
@@ -35,7 +50,11 @@ function expectClosedObject(schema: unknown): Record<string, any> {
 
 function expectClosedResolverSchema(schema: unknown): void {
   const root = expectClosedObject(schema);
-  expect(Object.keys(root).sort()).toEqual(["admission", "handoff", "impact", "reasoning"]);
+  expect(Object.keys(root).sort()).toEqual(["admission", "delegate", "handoff", "impact", "reasoning"]);
+  expect(Object.keys(expectClosedObject(root.delegate)).sort()).toEqual(["name", "params"]);
+  expect(root.delegate.properties.params).toMatchObject({ type: "object", additionalProperties: true });
+  expect((schema as { required: string[] }).required).toContain("delegate");
+  expect([...root.delegate.required].sort()).toEqual(["name", "params"]);
   const handoff = expectClosedObject(root.handoff);
   expect(Object.keys(handoff).sort()).toEqual(["companionSkills", "constraints", "context", "deliverables", "objective", "primarySkill"]);
   expect([...root.handoff.required].sort()).toEqual(["context", "objective", "primarySkill"]);
@@ -87,6 +106,7 @@ describe("Pi Harness Extension", () => {
     expect(strategy).toBeDefined();
     expect(strategy.disableModelInvocation).toBeFalse();
     const first = await before!(event([skill("implement"), strategy, skill("hidden", true)]), context(modelRegistry)) as { systemPrompt: string };
+    expectSingleCallPrompt(first.systemPrompt);
     expect(first.systemPrompt).toStartWith("You are the Pi Harness Router.");
     expect(first.systemPrompt).toContain("<name>delegation-strategy</name>");
     expect(first.systemPrompt).toContain(`<location>${strategy.filePath}</location>`);
@@ -119,9 +139,12 @@ describe("Pi Harness Extension", () => {
     expect(first.systemPrompt).not.toContain("Model Role");
     expect(first.systemPrompt).not.toContain("harness.roles");
     expect(first.systemPrompt).not.toContain("modelRole");
-    expect(first.systemPrompt).toContain("When calling subagent_spawn, always pass agent: \"handler\"");
-    expect(first.systemPrompt).toContain("with that resolved prompt, model, thinking, taskSlug");
-    expect(first.systemPrompt).toContain("Pass the returned prompt, model, and thinking exactly");
+    expect(first.systemPrompt).toContain("Resolver binds agent: \"handler\"");
+    expect(first.systemPrompt).toContain("and the exact resolved prompt, model, and thinking");
+    expect(first.systemPrompt).toContain("Do not supply agent, prompt, model, or thinking in delegate.params");
+    expect(first.systemPrompt).toContain("In that single call, the Resolver validates the Handoff, binds the exact invocation, and calls the selected registered delegate once");
+    expect(first.systemPrompt).toContain("Do not launch the same outcome separately after the response");
+    expect(first.systemPrompt).not.toContain("The Resolver validates the Handoff and selects a candidate; it does not launch a Handler.");
     expect(first.systemPrompt).toContain("without local selection, fallback, substitution, rewrite, or another Registry read");
     for (const phrase of [
       "First decide only whether new project-domain delegation is needed",
@@ -244,17 +267,17 @@ describe("Pi Harness Extension", () => {
       "For bounded behavior-neutral work supply atomic basis and focused verification",
       "supply only the exact planned Work/Plan/Waves selectors",
       "Keep Handoff fields limited to objective, primarySkill, optional companionSkills, context, constraints, and deliverables; keep Handoff and admission shapes closed",
-      "After a resolved response and compatible delegate capability, immediately launch this outcome's Handler as the next environment action",
+      "Do not issue a second launch after its response",
       "Complete all reads, compatibility checks, and pre-action Todo projection before resolve",
-      "do not interpose any action between a resolved response and its exact launch",
+      "Resolver binds the invocation and calls it within resolve_delegation",
       "Only after an active launch, and only when the effective registered delegate tool contract and resources permit another same-turn launch",
       "An effective end-turn requirement wins over the Skill",
-      "Pass the returned prompt, model, and thinking exactly",
-      "agent: \"handler\" with that resolved prompt, model, thinking, taskSlug",
+      "Do not supply agent, prompt, model, or thinking in delegate.params",
+      "agent: \"handler\" and the exact resolved prompt, model, and thinking",
       "If resolution or delegate capability fails, report the block without spawning",
     ]) expect(phases[2]).toContain(phrase);
     expect(phases[2].indexOf("select one domain primary Skill")).toBeLessThan(phases[2].indexOf("before calling resolve_delegation"));
-    expect(phases[2].indexOf("Pass the returned prompt, model, and thinking exactly")).toBeLessThan(phases[2].indexOf("When calling subagent_spawn"));
+    expect(phases[2].indexOf("Do not supply agent, prompt, model, or thinking in delegate.params")).toBeLessThan(phases[2].indexOf("Resolver binds agent:"));
     for (const phrase of [
       "A summary notification is not a full Result: retrieve it via the effective backend's supported path before correlating or projecting it",
       "wait for notifications rather than routine polling",
@@ -295,18 +318,63 @@ describe("Pi Harness Extension", () => {
     const schema = JSON.stringify(resolver.parameters);
     expect(schema).toContain("implement");
     expect(schema).toContain("delegation-strategy");
+    expect(schema).toContain("Exactly one Router-selected registered delegate invocation");
+    expect(schema).toContain("do not launch the same outcome separately after this call returns");
+    expect(schema).toContain("Router-selected startup fields for this single invocation");
+    expect(schema).toContain("omit protected agent, prompt, model, and thinking, which Resolver binds");
     expect(schema).not.toContain("hidden");
     expect(schema).not.toContain("modelRole");
+    expect(resolver.description).toContain("call the Router-selected registered delegate once within this resolve_delegation call");
+    expect(resolver.description).toContain("any later independent outcome requires its own permitted resolve_delegation call");
+    expect(resolver.description).not.toContain("does not launch a Handler");
     const rendered = resolver.renderCall!({ handoff: { objective: "Inspect implementation.", primarySkill: "implement", context: [] }, reasoning: 2, impact: 3 }, { fg: (_color: string, text: string) => text, bold: (text: string) => text }, {}).render(120).join("\n");
     expect(rendered).toContain("resolve_delegation  reasoning 2, impact 3");
     expect(rendered).not.toContain("modelRole");
 
-    const invocation = await resolver.execute("call-1", { handoff: { objective: "Inspect implementation.", primarySkill: "implement", context: [{ inline: "Supplied context.", purpose: "Boundary." }] }, admission: { path: "atomic", basis: ["Bounded."], verification: ["Check result."] }, reasoning: 1, impact: 2 }, undefined, undefined, context(modelRegistry));
-    expect(invocation.details).toMatchObject({ status: "resolved", model: "test/reasoning/model", thinking: "medium" });
+    const calls: Array<{ name: string; args: unknown }> = [];
+    const rawReturn = { result: { content: [{ type: "text", text: "opaque" }], details: { subagentId: "task", generation: 1, status: "running" } }, isError: false };
+    const delegate = { name: "subagent_spawn", params: { label: "Inspect", taskSlug: "inspect-implementation" } };
+    const toolContext = { ...context(modelRegistry), tools: [{ name: "subagent_spawn" }], executeTool: async (name: string, args: unknown) => { calls.push({ name, args }); return rawReturn; } };
+    const invocation = await resolver.execute("call-1", { handoff: { objective: "Inspect implementation.", primarySkill: "implement", context: [{ inline: "Supplied context.", purpose: "Boundary." }] }, admission: { path: "atomic", basis: ["Bounded."], verification: ["Check result."] }, reasoning: 1, impact: 2, delegate }, undefined, undefined, toolContext);
+    expect(invocation.details.resolution).toMatchObject({ status: "resolved", model: "test/reasoning/model", thinking: "medium" });
     expect(invocation.details).not.toHaveProperty("taskSlug");
     expect(registryReads).toBe(1);
-    const handlerPrompt = Bun.YAML.parse(invocation.details.prompt) as Record<string, unknown>;
+    expect(calls).toEqual([{ name: delegate.name, args: { ...delegate.params, agent: "handler", prompt: invocation.details.resolution.prompt, model: "test/reasoning/model", thinking: "medium" } }]);
+    expect(invocation.details.launch.rawReturn).toBe(rawReturn);
+    expect(Object.keys(invocation.details.launch).sort()).toEqual(["rawReturn", "tool"]);
+    const handlerPrompt = Bun.YAML.parse(invocation.details.resolution.prompt) as Record<string, unknown>;
     for (const key of ["model", "modelRole", "thinking", "candidate", "reasoning", "impact"]) expect(handlerPrompt).not.toHaveProperty(key);
+
+    for (const isError of [true, false]) {
+      rawReturn.isError = isError;
+      const captured = await resolver.execute("raw-return", { handoff: { objective: "Check raw evidence.", primarySkill: "implement", context: [] }, admission: { path: "atomic", basis: ["Bounded."], verification: ["Check."] }, reasoning: 1, impact: 1, delegate }, undefined, undefined, toolContext);
+      expect(captured.details.resolution.status).toBe("resolved");
+      expect(captured.details.launch.rawReturn).toBe(rawReturn);
+      expect(Object.keys(captured.details.launch)).toEqual(["tool", "rawReturn"]);
+      const parsed = Bun.YAML.parse(captured.content![0].text) as any;
+      expect(parsed.launch.rawReturn).toEqual(rawReturn);
+      expect(Object.keys(parsed.launch).sort()).toEqual(["rawReturn", "tool"]);
+      expect(parsed.launch).not.toHaveProperty("rawError");
+    }
+    for (const rawError of [new Error("Bridge failure"), { code: "transport_failure" }, undefined]) {
+      let failedCalls = 0;
+      const thrown = await resolver.execute("raw-error", { handoff: { objective: "Check error evidence.", primarySkill: "implement", context: [] }, admission: { path: "atomic", basis: ["Bounded."], verification: ["Check."] }, reasoning: 1, impact: 1, delegate }, undefined, undefined, {
+        ...toolContext, executeTool: async () => { failedCalls++; throw rawError; },
+      } as ExtensionContext);
+      expect(failedCalls).toBe(1);
+      expect(thrown.details.resolution.status).toBe("resolved");
+      expect(thrown.details.launch.tool).toBe("subagent_spawn");
+      expect(Object.prototype.hasOwnProperty.call(thrown.details.launch, "rawError")).toBeTrue();
+      expect(thrown.details.launch.rawError).toBe(rawError);
+      expect(Object.keys(thrown.details.launch)).toEqual(["tool", "rawError"]);
+      expect(thrown.details.launch).not.toHaveProperty("rawReturn");
+      const parsed = Bun.YAML.parse(thrown.content![0].text) as any;
+      expect(Object.prototype.hasOwnProperty.call(parsed.launch, "rawError")).toBeTrue();
+      expect(Object.keys(parsed.launch).sort()).toEqual(["rawError", "tool"]);
+      expect(parsed.launch).not.toHaveProperty("rawReturn");
+      if (rawError instanceof Error) expect(parsed.launch.rawError).toStartWith("Error: Bridge failure");
+      else expect(parsed.launch.rawError).toEqual(rawError === undefined ? "undefined" : rawError);
+    }
 
     const root = mkdtempSync(join(tmpdir(), "pi-harness-planned-"));
     try {
@@ -314,13 +382,13 @@ describe("Pi Harness Extension", () => {
       mkdirSync(directory, { recursive: true });
       const authority = { work: join(directory, "work.md"), plan: join(directory, "plan.md"), waves: join(directory, "waves.md") };
       for (const path of Object.values(authority)) writeFileSync(path, "fixture\n");
-      // The existing API/context doubles expose no Handler launch capability.
-      const plannedContext = { ...context(modelRegistry), cwd: root };
+      // Synthetic host bridge; no live Handler is started.
+      const plannedContext = { ...toolContext, cwd: root };
       const plannedInvocation = await resolver.execute("planned", {
         handoff: { objective: "Resolve only.", primarySkill: "implement", context: Object.values(authority).map((ref) => ({ ref, purpose: "Selected." })) },
-        admission: { path: "planned", authority }, reasoning: 1, impact: 2,
+        admission: { path: "planned", authority }, reasoning: 1, impact: 2, delegate,
       }, undefined, undefined, plannedContext);
-      expect(plannedInvocation.details).toMatchObject({ status: "resolved", model: "test/reasoning/model", thinking: "medium" });
+      expect(plannedInvocation.details.resolution).toMatchObject({ status: "resolved", model: "test/reasoning/model", thinking: "medium" });
       expect([...tools.keys()]).toEqual(["resolve_delegation"]);
     } finally {
       rmSync(root, { recursive: true, force: true });
@@ -335,18 +403,19 @@ describe("Pi Harness Extension", () => {
 
     candidates = { status: "ready", candidates: [{ provider: "missing", modelId: "model", thinking: "medium", reasoning: 1, impact: 1 }] };
     await before!(event([skill("implement")]), context(modelRegistry));
-    const unavailable = await tools.get("resolve_delegation")!.execute("call-2", { handoff: { objective: "Inspect.", primarySkill: "implement", context: [] }, admission: { path: "atomic", basis: ["Bounded."], verification: ["Check."] }, reasoning: 1, impact: 1 }, undefined, undefined, context(modelRegistry));
-    expect(unavailable.details).toMatchObject({ status: "blocked", code: "unavailable_candidate" });
+    const unavailable = await tools.get("resolve_delegation")!.execute("call-2", { handoff: { objective: "Inspect.", primarySkill: "implement", context: [] }, admission: { path: "atomic", basis: ["Bounded."], verification: ["Check."] }, reasoning: 1, impact: 1, delegate }, undefined, undefined, toolContext);
+    expect(unavailable.details.resolution).toMatchObject({ status: "blocked", code: "unavailable_candidate" });
 
     candidates = { status: "ready", candidates: [{ provider: "test", modelId: "reasoning/model", thinking: "medium", reasoning: 1, impact: 1 }] };
     await before!(event([skill("implement")]), context(modelRegistry));
-    const insufficient = await tools.get("resolve_delegation")!.execute("call-3", { handoff: { objective: "Inspect.", primarySkill: "implement", context: [] }, admission: { path: "atomic", basis: ["Bounded."], verification: ["Check."] }, reasoning: 2, impact: 2 }, undefined, undefined, context(modelRegistry));
-    expect(insufficient.details).toMatchObject({ status: "blocked", code: "no_qualified_candidate" });
+    const insufficient = await tools.get("resolve_delegation")!.execute("call-3", { handoff: { objective: "Inspect.", primarySkill: "implement", context: [] }, admission: { path: "atomic", basis: ["Bounded."], verification: ["Check."] }, reasoning: 2, impact: 2, delegate }, undefined, undefined, toolContext);
+    expect(insufficient.details.resolution).toMatchObject({ status: "blocked", code: "no_qualified_candidate" });
 
     candidates = { status: "blocked", code: "invalid_configuration", message: "bad harness settings" };
     const blocked = await before!(event([skill("implement")]), context(modelRegistry)) as { systemPrompt: string };
     expect(active).toEqual(["read"]);
     expect(blocked.systemPrompt).toContain("bad harness settings");
+    expectSingleCallPrompt(blocked.systemPrompt);
   });
 
 
@@ -388,7 +457,8 @@ describe("Pi Harness Extension", () => {
       impact: 1,
     }, undefined, undefined, ctx);
 
-    expect(result.details).toMatchObject({ status: "blocked", code });
+    expect(result.details.resolution).toMatchObject({ status: "blocked", code });
+    expect(result.details).not.toHaveProperty("launch");
     expect(registryReads).toBe(0);
     expect(registered).toBe(1);
     expect(active).toEqual(["read", "resolve_delegation"]);
@@ -416,6 +486,7 @@ describe("Pi Harness Extension", () => {
       } as unknown as ExtensionAPI;
       activateHarness(pi, undefined, async () => {});
       const result = await before!(event([skill("implement")]), { ...context({ getAvailable: () => { registryReads++; return []; } }), cwd });
+      expectSingleCallPrompt((result as { systemPrompt: string }).systemPrompt);
       expect(result).toMatchObject({ systemPrompt: expect.stringContaining("Pi settings could not be read") });
       expect(active).toEqual(["read"]);
       expect(registrations).toBe(0);
@@ -442,15 +513,18 @@ describe("Pi Harness Extension", () => {
     expect(active).toEqual(["read"]);
     expect(registered).toBe(0);
     expect(prompt.systemPrompt).toContain("No candidate is configured");
+    expectSingleCallPrompt(prompt.systemPrompt);
     expect(prompt.systemPrompt).toContain("If absent, hidden, unreadable, incomplete, or conflicting, block new delegation");
     expect(prompt.systemPrompt).toContain("still safely retrieve and project existing Results");
     expect(prompt.systemPrompt).not.toContain("<name>delegation-strategy</name>");
     candidates = { status: "ready", candidates: [{ provider: "p", modelId: "m", thinking: "off", reasoning: 0, impact: 0 }] };
-    await before!(event([skill("hidden", true)]), context({ getAvailable: () => [] }));
+    const noVisibleSkills = await before!(event([skill("hidden", true)]), context({ getAvailable: () => [] })) as { systemPrompt: string };
+    expectSingleCallPrompt(noVisibleSkills.systemPrompt);
     expect(active).toEqual(["read"]);
     expect(registered).toBe(0);
     const hidden = await before!(event([skill("delegation-strategy", true), skill("implement")]), context({ getAvailable: () => [] })) as { systemPrompt: string };
     expect(hidden.systemPrompt).not.toContain("<name>delegation-strategy</name>");
+    expectSingleCallPrompt(hidden.systemPrompt);
     expect(active).toEqual(["read", "resolve_delegation"]);
   });
 
@@ -471,15 +545,16 @@ describe("Pi Harness Extension", () => {
       "least sufficient reasoning and impact independently",
       "reduce impact only when consequences really are isolated",
       "delegation, context transfer, integration, and whole-deliverable verification costs",
-      "Never batch resolves before launches",
+      "In that single call, the Resolver validates and binds agent/prompt/model/thinking, executes the selected delegate once, and returns resolution with one raw launch return value or error",
+      "After the Resolver returns, do not call spawn again, reconstruct the prompt, replace model/thinking, or separately launch the same task",
       "only when the currently registered delegate tool contract and available resources permit it",
-      "An old end-turn rule remains binding while effective",
-      "Obtain the full Result through the backend's supported retrieval path",
+      "An effective end-turn requirement remains binding",
+      "After a terminal notification, obtain the full Result through the backend's supported retrieval path",
       "stop affected unlaunched work",
       "block new delegation rather than substituting a remembered method",
       "Existing complete Results still require safe retrieval and projection",
     ]) expect(body).toContain(phrase);
     expect(body.indexOf("Identify the independently observable results")).toBeLessThan(body.indexOf("choose the domain primary Skill"));
-    expect(body.indexOf("complete reads, compatibility/resource checks")).toBeLessThan(body.indexOf("Resolve one Handoff"));
+    expect(body.indexOf("complete reads, compatibility/resource checks")).toBeLessThan(body.indexOf("Submit one Handoff"));
   });
 });

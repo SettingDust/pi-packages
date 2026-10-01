@@ -1,4 +1,5 @@
 import { access, constants } from "node:fs/promises";
+import type { ExtensionToolContext } from "@earendil-works/pi-coding-agent";
 import {
   buildPlannedSubject,
   canonicalPath,
@@ -83,7 +84,9 @@ export type BlockCode =
   | "invalid_admission"
   | "invalid_atomic_basis"
   | "missing_authority"
-  | "authority_drift";
+  | "authority_drift"
+  | "invalid_delegate"
+  | "unavailable_delegate";
 
 
 
@@ -161,7 +164,46 @@ export interface ResolveOptions {
 }
 
 
-// Legality only: confirmation, explicit migration, semantic readiness, and launch stay Router-owned.
+export type DelegationResponse =
+  | { resolution: BlockedResolution; launch?: never }
+  | { resolution: ResolvedInvocation; launch: { tool: string } & (
+      | { rawReturn: unknown; rawError?: never }
+      | { rawError: unknown; rawReturn?: never }
+    ) };
+
+export async function dispatchDelegation(
+  input: unknown,
+  options: ResolveOptions & Pick<ExtensionToolContext, "tools" | "executeTool">,
+): Promise<DelegationResponse> {
+  if (!isRecord(input) || !hasOnlyKeys(input, ["handoff", "admission", "reasoning", "impact", "delegate"])) {
+    return { resolution: blocked("invalid_configuration", "Resolver input has invalid or unsupported fields") };
+  }
+  const { delegate, ...request } = input;
+  if (!isRecord(delegate) || !exactKeys(delegate, ["name", "params"]) || !nonEmptyString(delegate.name)
+    || !isRecord(delegate.params) || ![Object.prototype, null].includes(Object.getPrototypeOf(delegate.params))) {
+    return { resolution: blocked("invalid_delegate", "delegate requires only a registered name and plain params object") };
+  }
+  if (["agent", "prompt", "model", "thinking"].some((key) => Object.hasOwn(delegate.params, key))) {
+    return { resolution: blocked("invalid_delegate", "delegate.params must not supply protected agent, prompt, model, or thinking bindings") };
+  }
+  const tool = delegate.name;
+  const params = { ...delegate.params };
+  if (!options.tools.some(({ name }) => name === tool)) {
+    return { resolution: blocked("unavailable_delegate", `Delegate tool is not registered: ${tool}`) };
+  }
+  const resolution = await resolveDelegation(request, options);
+  if (resolution.status === "blocked") return { resolution };
+  try {
+    const rawReturn = await options.executeTool(tool, {
+      ...params, agent: "handler", prompt: resolution.prompt, model: resolution.model, thinking: resolution.thinking,
+    });
+    return { resolution, launch: { tool, rawReturn } };
+  } catch (rawError) {
+    return { resolution, launch: { tool, rawError } };
+  }
+}
+
+// Pure resolution: confirmation, explicit migration, and semantic readiness stay Router-owned.
 export async function resolveDelegation(input: unknown, options: ResolveOptions): Promise<Resolution> {
   const parsed = validateInput(input);
   if (!parsed.ok) return blocked(parsed.code, parsed.message);
