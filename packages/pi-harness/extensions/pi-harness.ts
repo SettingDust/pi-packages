@@ -7,7 +7,7 @@ import {
   type ExtensionAPI,
   type ExtensionContext,
 } from "@earendil-works/pi-coding-agent";
-import { Text } from "@earendil-works/pi-tui";
+import { stripTerminalSequences, Text, truncateToWidth } from "@earendil-works/pi-tui";
 import { loadHarnessCandidates, type HarnessCandidates } from "../src/config.js";
 import { runHarnessConfig } from "../src/config-command.js";
 import { dispatchDelegation, type DelegationResponse, type SkillSummary } from "../src/index.js";
@@ -111,20 +111,55 @@ function createResolverTool(skills: SkillSummary[], loadCandidates: CandidateLoa
       }, { additionalProperties: false, description: "Exactly one Router-selected registered delegate invocation; do not launch the same outcome separately after this call returns." }),
     }, { additionalProperties: false }),
     renderCall(args, theme, context) {
-      const text = (context.lastComponent as Text | undefined) ?? new Text("", 0, 0);
-      const handoff = args.handoff as { objective?: string; primarySkill?: string; companionSkills?: string[] } | undefined;
-      const selectedSkills = [handoff?.primarySkill, ...(handoff?.companionSkills ?? [])].filter((name): name is string => Boolean(name));
+      const handoff = args.handoff;
+      const selectedSkills = [handoff?.primarySkill, ...(Array.isArray(handoff?.companionSkills) ? handoff.companionSkills : [])]
+        .filter((name): name is string => typeof name === "string" && name.length > 0);
       const requirements = [
         typeof args.reasoning === "number" ? `reasoning ${args.reasoning}` : "",
         typeof args.impact === "number" ? `impact ${args.impact}` : "",
       ].filter(Boolean).join(", ");
-      const lines = [
-        `${theme.fg("toolTitle", theme.bold(resolverName))}${requirements ? theme.fg("muted", `  ${requirements}`) : ""}`,
-        ...(handoff?.objective ? [theme.fg("dim", `  ${handoff.objective}`)] : []),
-        ...(selectedSkills.length ? [theme.fg("muted", `  ${selectedSkills.join(" + ")}`)] : []),
-      ];
-      text.setText(lines.join("\n"));
-      return text;
+      const title = `${theme.fg("toolTitle", theme.bold(resolverName))}${requirements ? theme.fg("muted", `  ${requirements}`) : ""}`;
+      if (context.expanded) {
+        return resolverText([title, theme.fg("dim", displayText(inspect(args, {
+          depth: null, maxArrayLength: null, maxStringLength: null, colors: false, customInspect: false,
+        })))], true);
+      }
+      const selection = [selectedSkills.join(" + "), singleLine(args.delegate?.name)].filter(Boolean).join(" · ");
+      return resolverText([
+        title,
+        ...(typeof handoff?.objective === "string" ? [theme.fg("dim", `  ${singleLine(handoff.objective)}`)] : []),
+        ...(selection ? [theme.fg("muted", `  ${singleLine(selection)}`)] : []),
+      ], false);
+    },
+    renderResult(result, options, theme) {
+      const output = (result.content ?? []).filter((block) => block.type === "text").map((block) => block.text).join("\n");
+      if (options.expanded) return resolverText([theme.fg("toolOutput", displayText(output || "No text evidence"))], true);
+      const details = displayRecord(result.details);
+      const resolution = displayRecord(details?.resolution);
+      const launch = displayRecord(details?.launch);
+      if (!options.isPartial && resolution?.status === "blocked" && typeof resolution.code === "string"
+        && typeof resolution.message === "string" && details && !Object.hasOwn(details, "launch")) {
+        return resolverText([
+          theme.fg("warning", `blocked · ${singleLine(resolution.code)}`),
+          theme.fg("dim", `  ${singleLine(resolution.message)}`),
+        ], false);
+      }
+      if (!options.isPartial && resolution?.status === "resolved" && typeof resolution.model === "string"
+        && typeof resolution.thinking === "string" && typeof resolution.prompt === "string" && typeof launch?.tool === "string"
+        && Object.hasOwn(launch, "rawError") !== Object.hasOwn(launch, "rawReturn")) {
+        const failed = Object.hasOwn(launch, "rawError");
+        const cause = failed ? singleLine(launch.rawError instanceof Error ? launch.rawError.message
+          : inspect(launch.rawError, { depth: 0, maxArrayLength: 3, maxStringLength: 200, colors: false, customInspect: false })) : "";
+        return resolverText([
+          theme.fg(failed ? "warning" : "toolOutput", failed ? "resolved · launch error" : "resolved"),
+          theme.fg("muted", `  ${singleLine(resolution.model)} · thinking ${singleLine(resolution.thinking)} · delegate ${singleLine(launch.tool)}`),
+          theme.fg("dim", failed ? `  cause: ${cause}` : "  raw return captured (expand for evidence)"),
+        ], false);
+      }
+      return resolverText([
+        theme.fg("muted", options.isPartial ? "Partial resolver output" : "Resolver output (details unavailable)"),
+        ...(output ? [theme.fg("dim", `  ${singleLine(output)}`)] : []),
+      ], false);
     },
     async execute(_toolCallId, params, _signal, _onUpdate, ctx) {
       const current = currentCandidates(ctx, loadCandidates);
@@ -145,6 +180,30 @@ function createResolverTool(skills: SkillSummary[], loadCandidates: CandidateLoa
       return { content: [{ type: "text", text: Bun.YAML.stringify(display) }], details: result };
     },
   });
+}
+
+function displayText(value: string): string {
+  return stripTerminalSequences(value).replace(/\r\n?/g, "\n").replace(/\t/g, "   ")
+    .replace(/[\u0000-\u0008\u000b-\u001f\u007f-\u009f]/g, "").replace(/[\u2028\u2029]/g, "\n");
+}
+
+function singleLine(value: unknown): string {
+  return typeof value === "string" ? displayText(value).replace(/\s+/g, " ").trim() : "";
+}
+
+function displayRecord(value: unknown): Record<string, unknown> | undefined {
+  return value !== null && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : undefined;
+}
+
+function resolverText(lines: string[], expanded: boolean) {
+  const text = new Text(lines.join("\n"), 0, 0);
+  return {
+    render(width: number): string[] {
+      if (width < 1) return [];
+      return (expanded ? text.render(width) : lines).map((line) => truncateToWidth(line, width, "…", true));
+    },
+    invalidate() { text.invalidate(); },
+  };
 }
 
 function visibleSkills(event: BeforeAgentStartEvent): SkillSummary[] {

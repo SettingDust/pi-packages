@@ -4,6 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { loadSkillsFromDir } from "@earendil-works/pi-coding-agent";
 import type { BeforeAgentStartEvent, ExtensionAPI, ExtensionContext, Skill } from "@earendil-works/pi-coding-agent";
+import { stripTerminalSequences, visibleWidth } from "@earendil-works/pi-tui";
 import activateHarness from "../extensions/pi-harness.js";
 import { loadHarnessCandidates, type HarnessCandidates } from "../src/config.js";
 import type { RegistryModel } from "../src/protocol.js";
@@ -14,6 +15,7 @@ type RegisteredTool = {
   description?: string;
   parameters: any;
   renderCall?: (args: any, theme: any, context: any) => { render(width: number): string[] };
+  renderResult?: (result: any, options: { expanded: boolean; isPartial: boolean }, theme: any, context: any) => { render(width: number): string[] };
   execute(toolCallId: string, params: unknown, signal: AbortSignal | undefined, onUpdate: undefined, ctx: ExtensionContext): Promise<{ content?: Array<{ type: string; text: string }>; details?: any }>;
 };
 
@@ -77,6 +79,101 @@ function expectClosedResolverSchema(schema: unknown): void {
 }
 
 describe("Pi Harness Extension", () => {
+  test("renders bounded resolver summaries and full safe details without interpreting backend evidence", async () => {
+    let before: BeforeHandler | undefined;
+    let resolver: RegisteredTool | undefined;
+    const pi = {
+      on(name: string, handler: BeforeHandler) { if (name === "before_agent_start") before = handler; },
+      registerCommand() {},
+      registerTool(tool: RegisteredTool) { resolver = tool; },
+      getActiveTools: () => ["read"], setActiveTools() {},
+    } as unknown as ExtensionAPI;
+    activateHarness(pi, () => ({ status: "ready", candidates: [{ provider: "test", modelId: "model", thinking: "off", reasoning: 1, impact: 1 }] }), async () => {});
+    await before!(event([skill("implement")]), context({ getAvailable: () => [] }));
+    const theme = { fg: (_color: string, text: string) => `\x1b[36m${text}\x1b[39m`, bold: (text: string) => `\x1b[1m${text}\x1b[22m` };
+    const unsafe = "\x1b[2J\x1b]52;c;clipboard\x07\x1b]8;;https://example.com\x1b\\link\x1b]8;;\x1b\\\x1b_cursor\x1b\\\x00\x07\x08\x9b2J";
+    const args = {
+      handoff: {
+        objective: `${unsafe}检查 👩‍💻 e\u0301\n${"long objective ".repeat(800)}objective-tail`, primarySkill: `implement${unsafe}`,
+        companionSkills: ["review", `check${unsafe}`],
+        context: Array.from({ length: 105 }, (_, index) => ({ inline: `context-${index}`, purpose: "Original context" })),
+        constraints: ["constraint-tail"], deliverables: ["deliverable-tail"],
+      },
+      admission: { path: "atomic", basis: ["basis-tail"], verification: ["verification-tail"] },
+      reasoning: 2, impact: 3, delegate: { name: `delegate${unsafe}`, params: { label: "startup-tail" } },
+    };
+    const originalArgs = JSON.stringify(args);
+    const compactCall = resolver!.renderCall!(args, theme, { expanded: false });
+    const expandedCall = resolver!.renderCall!(args, theme, { expanded: true, lastComponent: compactCall });
+    const callPreview = stripTerminalSequences(compactCall.render(120).join("\n"));
+    expect(callPreview).toContain("resolve_delegation  reasoning 2, impact 3");
+    expect(callPreview).toContain("implement");
+    expect(callPreview).toContain("delegate");
+    expect(callPreview).not.toContain("objective-tail");
+    const callDetails = stripTerminalSequences(expandedCall.render(120).join("\n"));
+    for (const value of ["objective-tail", "context-104", "constraint-tail", "deliverable-tail", "basis-tail", "verification-tail", "startup-tail"])
+      expect(callDetails).toContain(value);
+    for (const companionSkills of [undefined, null, "do-not-spread", 123, {}, [null, 123, "valid-companion"]]) {
+      const malformed = resolver!.renderCall!({ ...args, handoff: { ...args.handoff, companionSkills } }, theme, {}).render(120);
+      expect(malformed).toHaveLength(3);
+      expect(malformed.join("\n")).not.toContain("do-not-spread");
+    }
+    expect(resolver!.renderCall!({}, theme, {}).render(60)).toHaveLength(1);
+    expect(JSON.stringify(args)).toBe(originalArgs);
+
+    const resolution = { status: "resolved", model: "test/model", thinking: "off", prompt: "Original prompt" };
+    const content = [
+      { type: "text", text: `first-block\n${unsafe}\tvisible\rcarriage\n${"检查 👩‍💻 e\u0301\n".repeat(30)}first-tail` },
+      { type: "image", data: "opaque" },
+      { type: "text", text: "last-block\nlast-tail" },
+    ];
+    const rawReturn = { status: "completed", isError: true, details: { subagentId: "opaque-identity", status: "running" } };
+    const details = { resolution, launch: { tool: "delegate", rawReturn } };
+    const result = { content, details };
+    const originalResult = JSON.stringify(result);
+    const compactResult = resolver!.renderResult!(result, { expanded: false, isPartial: false }, theme, {});
+    const expandedResult = resolver!.renderResult!(result, { expanded: true, isPartial: false }, theme, {});
+    const resultPreview = stripTerminalSequences(compactResult.render(120).join("\n"));
+    for (const value of ["resolved", "test/model", "thinking off", "delegate", "raw return captured"]) expect(resultPreview).toContain(value);
+    for (const value of ["completed", "running", "active", "opaque-identity", "launch error"]) expect(resultPreview).not.toContain(value);
+    const resultDetails = stripTerminalSequences(expandedResult.render(120).join("\n"));
+    for (const value of ["first-block", "visible", "carriage", "first-tail", "last-block", "last-tail"]) expect(resultDetails).toContain(value);
+    expect(resultDetails).not.toContain("Original prompt"); // Expanded result uses existing text, never reserializes raw details.
+    expect(expandedResult.render(2000).map((line) => stripTerminalSequences(line).trimEnd()).join("\n"))
+      .toBe(`first-block\nlink2J   visible\ncarriage\n${"检查 👩‍💻 e\u0301\n".repeat(30)}first-tail\nlast-block\nlast-tail`);
+    expect(JSON.stringify(result)).toBe(originalResult);
+    expect(result.details.launch.rawReturn).toBe(rawReturn);
+    for (const component of [compactCall, expandedCall, compactResult, expandedResult]) {
+      for (const width of [0, 1, 2, 3, 8, 40, 80, 120]) {
+        const lines = component.render(width);
+        expect(lines.length).toBeLessThan(50000);
+        if (component === compactCall || component === compactResult) expect(lines.length).toBeLessThanOrEqual(3);
+        expect(lines.every((line) => visibleWidth(line) <= width)).toBeTrue();
+        const rendered = lines.join("");
+        expect(stripTerminalSequences(rendered)).not.toMatch(/[\u0000-\u001f\u007f-\u009f]/);
+        expect(rendered).not.toMatch(/\x1b(?:\[2J|\]52;|\]8;|_)/);
+      }
+    }
+    const blocked = resolver!.renderResult!({ content, details: { resolution: { status: "blocked", code: `invalid_skill${unsafe}`, message: `${unsafe}\n${"long message ".repeat(50)}` } } }, { expanded: false, isPartial: false }, theme, {}).render(80);
+    expect(blocked).toHaveLength(2);
+    expect(stripTerminalSequences(blocked.join("\n"))).toContain("blocked · invalid_skill");
+    for (const rawError of [new Error(`${unsafe}error-cause\nsecond line`), { code: "error-cause" }, undefined]) {
+      const failed = resolver!.renderResult!({ content, details: { resolution, launch: { tool: "delegate", rawError } } }, { expanded: false, isPartial: false }, theme, {}).render(80);
+      expect(failed).toHaveLength(3);
+      expect(stripTerminalSequences(failed.join("\n"))).toContain("resolved · launch error");
+      expect(stripTerminalSequences(failed[2])).toContain(rawError === undefined ? "undefined" : "error-cause");
+      for (const line of failed) expect(stripTerminalSequences(line)).not.toMatch(/[\u0000-\u001f\u007f-\u009f]/);
+    }
+    for (const invalidDetails of [undefined, null, [], {}, { resolution }, { resolution, launch: { tool: "delegate", rawError: undefined, rawReturn } }, { resolution: { status: "blocked", code: [], message: 1 } }, { resolution: { status: "blocked", code: "invalid_skill", message: "Invalid" }, launch: "invalid" }]) {
+      const fallback = resolver!.renderResult!({ content, details: invalidDetails }, { expanded: false, isPartial: false }, theme, {}).render(80);
+      expect(fallback).toHaveLength(2);
+      expect(stripTerminalSequences(fallback[0])).toContain("Resolver output (details unavailable)");
+    }
+    const partial = resolver!.renderResult!(result, { expanded: false, isPartial: true }, theme, {}).render(80);
+    expect(stripTerminalSequences(partial[0])).toContain("Partial resolver output");
+    expect(resolver!.renderResult!({ content: [], details: undefined }, { expanded: false, isPartial: false }, theme, {}).render(80)).toHaveLength(1);
+  });
+
   test("registers a Registry-free root capability resolver and forwards exact resolution", async () => {
     let before: BeforeHandler | undefined;
     let command: ((args: string, ctx: unknown) => Promise<void>) | undefined;
@@ -355,6 +452,14 @@ describe("Pi Harness Extension", () => {
       expect(parsed.launch.rawReturn).toEqual(rawReturn);
       expect(Object.keys(parsed.launch).sort()).toEqual(["rawReturn", "tool"]);
       expect(parsed.launch).not.toHaveProperty("rawError");
+      const beforeRender = captured.content![0].text;
+      const theme = { fg: (_color: string, text: string) => text, bold: (text: string) => text };
+      const preview = resolver.renderResult!(captured, { expanded: false, isPartial: false }, theme, {}).render(120).join("\n");
+      expect(preview).toContain("raw return captured");
+      expect(preview).not.toMatch(/launch error|completed|running|subagentId/);
+      expect(resolver.renderResult!(captured, { expanded: true, isPartial: false }, theme, {}).render(120).join("\n")).toContain("subagentId:");
+      expect(captured.content![0].text).toBe(beforeRender);
+      expect(captured.details.launch.rawReturn).toBe(rawReturn);
     }
     for (const rawError of [new Error("Bridge failure"), { code: "transport_failure" }, undefined]) {
       let failedCalls = 0;
