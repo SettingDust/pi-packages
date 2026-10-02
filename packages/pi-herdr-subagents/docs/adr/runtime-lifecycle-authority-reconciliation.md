@@ -43,7 +43,7 @@ This amendment does not reopen recovery, notification, or continuation semantics
 
 - A single lifecycle Spec follows the shared identity/generation state machine and avoids contradictory contracts for recovery, notification, and continuation.
 - `task.json`, generation-specific Result files, and the stable session path already form the implementation's persistence boundary; documenting that boundary is lower risk than inventing a second queue or migration.
-- Notification summaries protect the full Result retrieval path and permit parent triggering without leaking Handler output into a terminal event.
+- Notification summaries protect the full Result retrieval path and permit parent triggering without leaking final result text into a terminal event. That text is opaque to the runtime and uses the caller/Agent-required format; integration-specific Agent names and caller protocols are not package prerequisites.
 - Child-owned follow-up keeps continuation local to the child execution and avoids coupling parent scheduling to child turn timing.
 - Caller cancellation belongs at `subagent_join`'s retrieval boundary: forwarding its `AbortSignal` to the wait preserves explicit lifecycle operations as the only task-mutating operations.
 - The existing task-derived ID Spec remains the owner of allocation and legacy identity rules; duplicating those rules here would create authority drift.

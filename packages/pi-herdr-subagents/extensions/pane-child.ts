@@ -73,7 +73,7 @@ export default function paneChild(
   pi.registerTool({
     name: "subagent_done",
     label: "Subagent Done",
-    description: "Write the final YAML Handler Result and end this execution.",
+    description: "Write the complete final result text in the caller/Agent-required format and end this execution.",
     parameters: Type.Object({ result: Type.String({ minLength: 1 }) }),
     renderCall(args, theme) {
       const title = theme.fg("toolTitle", theme.bold("subagent_done"));

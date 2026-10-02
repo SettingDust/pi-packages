@@ -2,22 +2,22 @@
 
 ## 1. Scope
 
-This specification defines task-derived `subagentId` allocation and allocation-failure observability for the `@settingdust/pi-herdr-subagents` parent runtime and the Router-to-runtime interface that supplies it.
+This specification defines task-derived `subagentId` allocation and allocation-failure observability for the `@settingdust/pi-herdr-subagents` parent runtime and its caller-to-runtime interface.
 
-A Router derives a concise ASCII `taskSlug` from the concrete Handoff execution, supplies it to `subagent_spawn`, and supplies the independent human-readable `label`. For example:
+A caller derives a concise ASCII `taskSlug` from the concrete task, supplies it to `subagent_spawn`, and supplies the independent human-readable `label`. For example:
 
 ```text
 taskSlug: fix-steer-submit
 label: Repair steer input submission
 ```
 
-The Router owns semantic derivation. The runtime owns only validation, collision resolution, artifact reservation, compatibility recovery, and stable allocation-failure reporting. The runtime must not derive a slug from `prompt`, `label`, Agent instructions, or any other free text, and must not generate `subagent-N` or adjective-noun IDs for a new task.
+The caller owns semantic derivation. The runtime owns only validation, collision resolution, artifact reservation, compatibility recovery, and stable allocation-failure reporting. The runtime must not derive a slug from `prompt`, `label`, Agent instructions, or any other free text, and must not generate `subagent-N` or adjective-noun IDs for a new task.
 
-This specification does not change Handoff fields, Handler Result semantics, Router scheduling, Agent discovery, generation behavior, or Herdr pane lifecycle.
+This specification does not change caller protocols, final result interpretation, scheduling, Agent discovery, generation behavior, or Herdr pane lifecycle.
 
 ## 2. Terms
 
-- **task slug:** Router-provided canonical ASCII identifier for the concrete task before collision suffixing.
+- **task slug:** Caller-provided canonical ASCII identifier for the concrete task before collision suffixing.
 - **subagent ID:** Stable task identity. It equals the task slug when available, otherwise the task slug plus its collision suffix.
 - **legacy ID:** A pre-existing `subagent-<positive decimal integer>` identity. Legacy IDs are recovery-compatible only.
 - **artifact directory:** `<tasksDir>/<subagentId>-artifacts/`; its successful exclusive creation is the allocation reservation.
@@ -114,23 +114,23 @@ Malformed, unsupported, or mismatched records must be ignored safely and must no
 
 Legacy notification parsing must continue accepting legacy IDs, including V2 records that retain such IDs after migration. New canonical IDs must be accepted in notifications only when they satisfy the canonical final-ID form. The notification payload remains summary-only and retains its existing shape.
 
-## 7. Router And Tool Contract
+## 7. Caller And Tool Contract
 
-The Harness Router must derive one concrete task slug directly from each Handoff before `subagent_spawn`. It must use the Handoff objective and settled execution context to select concise action-and-subject words, and must pass the resolved prompt, model, thinking, `agent: "handler"`, `taskSlug`, and independently useful `label` to the runtime. The Router must not ask the runtime to infer semantics and must not use random adjective-noun names.
+The caller must derive one concrete task slug from the task objective and settled execution context before `subagent_spawn`, using concise action-and-subject words. It must supply a registered `agent` name, `prompt`, `taskSlug`, an independently useful `label`, and optional exact `model` and `thinking` settings. Calls may be direct or forwarded by a caller-owned tool wrapper using the same invocation fields. No fixed Agent name or caller preparation protocol is required. The caller must not ask the runtime to infer semantics and must not use random adjective-noun names.
 
-`resolve_delegation` continues to validate and serialize the existing Handoff schema; `taskSlug` is an invocation field derived after resolution, not a Handoff field. The Router prompt and the spawn tool schema must make this division explicit.
+`taskSlug` is a runtime invocation field, independent of any caller-owned handoff schema. The runtime validates it without interpreting or rewriting caller protocols or final result text. The final result format is owned by the caller and selected Agent, not by this package.
 
 The spawn call renderer may show the `label` and Agent as today. The spawn-result renderer must show the final allocated `subagentId`; it must not imply that an unsuffixed requested slug was always allocated. Existing renderers and lifecycle tools must accept both supported ID forms.
 
 ## 8. Non-Goals
 
-This work does not introduce random names, semantic parsing in the runtime, task queues, global cross-scope IDs, an ID database, Handoff schema fields, automatic cleanup, automatic retry after exhaustion, or renaming of existing tasks. It authorizes only the supported V1-to-V2 manifest-format migrations defined in sections 5 and 6; it does not authorize an identity, artifact, Result, slug, or path migration.
+This work does not introduce random names, semantic parsing in the runtime, task queues, global cross-scope IDs, an ID database, caller protocol fields, automatic cleanup, automatic retry after exhaustion, or renaming of existing tasks. It authorizes only the supported V1-to-V2 manifest-format migrations defined in sections 5 and 6; it does not authorize an identity, artifact, Result, slug, or path migration.
 
 ## 9. Acceptance
 
 The implementation satisfies this specification when focused checks demonstrate all of the following:
 
-- Router guidance derives and passes `taskSlug` separately from `label`, while `resolve_delegation` retains the existing Handoff schema.
+- Caller guidance derives and passes `taskSlug` separately from `label`, without requiring a fixed Agent name or caller protocol.
 - The spawn tool requires `taskSlug`; valid slugs retain their exact value as the initial final ID, and invalid or missing slugs perform no artifact or Herdr side effect.
 - Invalid or missing slugs fail with `TaskIdAllocationError`, code `invalid_task_slug`, and the exact stable message `Invalid task slug.` rather than an environment-dependent validation message.
 - Boundary-valid and boundary-invalid lengths, pattern violations, the reserved prefix, and Windows-path-sensitive characters are checked without silent normalization.

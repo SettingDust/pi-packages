@@ -18,13 +18,13 @@ No new PRD is created. These behaviors preserve the existing delegation product 
 
 ## 2. Scope And Terms
 
-This specification covers the parent `SubagentRuntime`, its persisted task artifacts, its completion notifier, and the child `pane-child` extension. Section 9 additionally bounds caller cancellation while `subagent_join` waits for a Result. Section 10 defines the later prospective automatic terminal-surface cleanup amendment. It does not define task-derived ID allocation, steering submission, the running-status widget, Agent discovery, or Handler Result parsing beyond the lifecycle obligations needed to transport a Result.
+This specification covers the parent `SubagentRuntime`, its persisted task artifacts, its completion notifier, and the child `pane-child` extension. Section 9 additionally bounds caller cancellation while `subagent_join` waits for a Result. Section 10 defines the later prospective automatic terminal-surface cleanup amendment. It does not define task-derived ID allocation, steering submission, the running-status widget, Agent discovery, or caller/Agent-owned final result interpretation beyond the lifecycle obligations needed to transport a Result.
 
 - **task**: one stable `subagentId` conversation identity.
 - **generation**: one execution revision of a task. A resume increments it while retaining the task identity and session file.
 - **terminal state**: `completed`, `failed`, or `cancelled`.
 - **manifest**: the supported `task.json` record in the task artifact directory.
-- **Result**: the generation-specific Result artifact written by the child.
+- **Result**: the generation-specific JSON transport artifact written by the child; its `result` member is opaque final result text in the caller/Agent-required format, with no package-prescribed content schema.
 - **terminal notification**: a summary-only parent message for one task and generation.
 - **continuation**: a child-side follow-up user message that keeps the same child session and generation active after an unfinished agent turn.
 - **caller cancellation**: aborting the caller's `subagent_join` Result-retrieval wait without changing child task lifecycle state.
@@ -87,7 +87,7 @@ When a completion notifier is configured, every persisted terminal generation mu
 - launch or launch-script failure before `spawn` rejects; and
 - an interrupted persisted V2 queued admission settled as `failed/launch_interrupted` under section 3.2.
 
-The existing persisted terminal task state is the durable outbox. It consists of the validated terminal manifest and the generation-specific Result artifact when one exists; no second outbox file, queue, receipt store, or broker may be introduced. Delivery eligibility must survive process restart and must be reconstructed from those existing artifacts. A full Handler Result remains private to `subagent_join` and must not be copied into the parent notification.
+The existing persisted terminal task state is the durable outbox. It consists of the validated terminal manifest and the generation-specific Result artifact when one exists; no second outbox file, queue, receipt store, or broker may be introduced. Delivery eligibility must survive process restart and must be reconstructed from those existing artifacts. The full final result text is available through `subagent_join` and terminal `subagent_inspect` snapshots and must not be copied into the parent notification.
 
 The parent notification details must contain `schema`, `subagentId`, `generation`, terminal `status`, `label`, and an optional bounded `reason`. `schema` must identify the supported notification-correlation schema. The delivery correlation is exactly `<schema, subagentId, generation, status>`; `label` and `reason` are display data and are not correlation fields.
 
@@ -113,7 +113,7 @@ The custom-message envelope must be visible, summary-only, and instruct the pare
 
 ### 4.4 Delivery Guarantee And Failures
 
-The contract is at-least-once delivery into the current parent branch, not exactly-once delivery and not a guarantee that the Router processes or acts on the message. A process crash before append leaves no current-branch acknowledgement and restart must resend. A crash after append is recovered by branch correlation and must not require a separate receipt. If append visibility is delayed or uncertain, a later safe flush may send a duplicate.
+The contract is at-least-once delivery into the current parent branch, not exactly-once delivery and not a guarantee that the caller processes or acts on the message. A process crash before append leaves no current-branch acknowledgement and restart must resend. A crash after append is recovered by branch correlation and must not require a separate receipt. If append visibility is delayed or uncertain, a later safe flush may send a duplicate.
 
 Notification send or branch-inspection failure must not change task status, Result data, cleanup state, `inspect`, `join`, resume, remove, or unrelated task operation. The durable terminal source remains retryable. Unsupported markers must be ignored rather than rewritten or treated as proof of delivery.
 
@@ -165,7 +165,7 @@ The lifecycle behavior must preserve:
 - terminal status and original error independently of surface-cleanup outcome;
 - one terminal settlement per `<subagentId>:<generation>`, with concurrent terminal triggers converging on the same settlement and cleanup operation;
 - defensive-copy cleanup evidence in task snapshots; and
-- existing task-derived ID, steering, widget, Agent, and Handler Result contracts.
+- existing task-derived ID, steering, widget, Agent, and opaque final result transport contracts.
 
 This Spec does not add a persistent notification queue separate from the existing terminal task artifacts, a separate delivery receipt, delivery processing receipts, a continuation retry policy, a maximum continuation count, a new parent tool, a cleanup daemon, cleanup timeout policy, automatic artifact deletion, a launch journal, distributed launch/settlement locking, cross-process Result publication guarantees, or a new dependency. It does not change Host behavior or cancelled-recovery wake-up behavior.
 

@@ -6,7 +6,7 @@ This specification defines the child-side terminal input barrier and completion-
 
 Implementation provenance is recorded in the derived Work documents: `extensions/pane-child.ts` and `tests/pane-child.test.ts` are committed in `2a49f9936cc3c6e76041696ea11004a1afbf93ff`, while this #18 documentation/evidence set remains uncommitted until a later documentation commit.
 
-It does not change parent runtime state, `subagent_steer` eligibility or transport submission, Handler Result parsing, notification, join, cancellation, removal, surface cleanup, task identity, or generation semantics. Review items `#13` and `#25` remain outside this authority.
+It does not change parent runtime state, `subagent_steer` eligibility or transport submission, caller/Agent-owned final result interpretation, notification, join, cancellation, removal, surface cleanup, task identity, or generation semantics. Review items `#13` and `#25` remain outside this authority.
 
 ## 2. Terms And State
 
@@ -16,7 +16,7 @@ It does not change parent runtime state, `subagent_steer` eligibility or transpo
 - **pre-barrier input**: an `input` event whose handler begins while the child is `active`.
 - **barrier-window input**: an `input` event whose handler begins while the child is `settling` or `settled` and before process shutdown completes.
 - **consumed**: the input handler returns `{ action: "handled" }`, so Pi must not expand, append, queue, or start an agent turn for that input.
-- **Result artifact**: the existing generation-specific JSON Result written by `subagent_done`.
+- **Result artifact**: the existing generation-specific JSON Result written by `subagent_done`; its `result` member is opaque final result text in the caller/Agent-required format, not a package-prescribed content schema.
 
 For a valid child environment, `pane-child` has these states:
 

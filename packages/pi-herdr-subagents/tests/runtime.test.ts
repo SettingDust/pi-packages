@@ -90,7 +90,7 @@ describe("pi-herdr-subagents runtime", () => {
     expect(spec.args.slice(1)).toEqual([
       "--session", task.sessionFile, "-e", paneChildExtensionPath, "--system-prompt", "Execute the Handoff.",
       "--exclude-tools", childToolExclusions, "--model", "test/model", "--thinking", "high",
-      "Do\nthe work\n\nWhen subagent_done is available, submit the full YAML Handler Result once as its result argument. Do not output the full Result separately before or after successful submission. If unavailable, return the YAML as your final assistant response. If submission fails, correct and retry or report the failure.",
+      "Do\nthe work\n\nWhen subagent_done is available, submit the complete final result text in the caller/Agent-required format once as its result argument. Do not output the full result separately before or after successful submission. If unavailable, return that text as your final assistant response; this alone does not record successful runtime completion. If submission fails, correct and retry or report the failure.",
     ]);
     expect(spec.args).not.toContain("--tools");
     expect(spec.args).toContain("Execute the Handoff.");
@@ -138,38 +138,44 @@ describe("pi-herdr-subagents runtime", () => {
     const { transport } = fakeTransport();
     const parentDir = mkdtempSync(join(tmpdir(), "subagents-parent-"));
     const parentSessionFile = join(parentDir, "parent.jsonl");
-    const tools = createSubagentTools(new SubagentRuntime(transport, registry), "/repo", parentSessionFile);
+    const runtime = new SubagentRuntime(transport, registry);
+    const tools = createSubagentTools(runtime, "/repo", parentSessionFile);
     expect(tools.map(tool => tool.name)).toEqual(["subagent_spawn", "subagent_resume", "subagent_inspect", "subagent_join", "subagent_steer", "subagent_cancel", "subagent_remove"]);
     const parameters = tools[0]!.parameters as { required?: string[]; properties: Record<string, { enum?: unknown }> };
     expect(parameters.properties.agent?.enum).toEqual(["handler", "reviewer"]);
     expect(parameters.properties).toHaveProperty("taskSlug");
+    expect(parameters.required).toEqual(["agent", "prompt", "label"]);
     expect(tools[0]!.description).toContain("taskSlug is required");
-    expect(tools[0]!.description).toContain("another independent, authorized, nonconflicting ready branch in the same turn");
-    expect(tools[0]!.description).toContain("only when the effective registered tool contract and available resources permit it");
-    expect(tools[0]!.description).toContain("ordered resolve_delegation -> exact subagent_spawn pair");
-    expect(tools[0]!.description).toContain("spawn as the next environment action after resolution; do not batch resolutions");
-    expect(tools[0]!.description).toContain("End the Router turn after the eligible wave or at a contract/resource boundary");
-    expect(tools[0]!.description).toContain("overlap permission is unknown or stale, end the turn after that spawn");
+    expect(tools[0]!.description).toContain("without waiting for completion");
+    expect(tools[0]!.description).toContain("Select a registered agent");
+    expect(tools[0]!.description).toContain("Call directly or through a caller-owned tool wrapper using the same inputs");
+    expect(tools[0]!.description).toContain("When the effective registered tool contract and available resources permit it");
+    expect(tools[0]!.description).toContain("successively launch independent, authorized, nonconflicting tasks");
     expect(tools[0]!.description).toContain("instead of polling or routinely calling inspect or join");
-    expect(tools[0]!.description).toContain("Use subagent_join after a terminal notification for the full Result");
-    expect(tools[0]!.description).not.toContain("After spawning, end the Router turn");
+    expect(tools[0]!.description).toContain("subagent_join after a terminal notification");
+    expect(tools[0]!.description).not.toMatch(/Harness|Router|Resolver|resolve_delegation|Handler|YAML|next environment action/);
     expect(tools.find(tool => tool.name === "subagent_inspect")!.description).toContain("do not poll this tool while waiting");
     expect(tools.find(tool => tool.name === "subagent_join")!.description).toContain("Caller cancellation, including ESC, stops only this wait");
 
-    const spawned = await (tools[0]!.execute as any)("call-1", {
-      agent: "handler",
-      prompt: "Do the work",
-      label: "task",
-      taskSlug: "tool-spawn",
-      model: "test/model",
-      thinking: "high",
-    }, undefined, undefined, { modelRegistry: modelRegistry("test/model") });
-    expect(spawned.details).toMatchObject({
-      model: "test/model",
-      thinking: "high",
-      sessionFile: join(parentDir, "parent", "tasks", "tool-spawn-g1.jsonl"),
-      status: "running",
-    });
+    const invoke = (params: Record<string, string>) => (tools[0]!.execute as any)("call-1", params, undefined, undefined, { modelRegistry: modelRegistry("test/model") });
+    const callerWrapper = (params: Record<string, string>) => invoke(params);
+    for (const [taskSlug, call] of [["tool-direct", invoke], ["tool-wrapper", callerWrapper]] as const) {
+      const spawned = await call({
+        agent: "reviewer", prompt: "Review the work", label: "review", taskSlug, model: "test/model", thinking: "high",
+      });
+      expect(spawned.details).toMatchObject({
+        agent: "reviewer", model: "test/model", thinking: "high", subagentId: taskSlug,
+        sessionFile: join(parentDir, "parent", "tasks", `${taskSlug}-g1.jsonl`), status: "running",
+      });
+      expect(spawned.content).toEqual([{ type: "text", text: JSON.stringify(spawned.details) }]);
+      const result = taskSlug === "tool-direct" ? "# Review\nNo findings." : '{"ok":true,"findings":[]}';
+      writeFileSync(spawned.details.resultPath, JSON.stringify({ subagentId: taskSlug, generation: 1, status: "completed", result }));
+      const joined = await (tools.find(tool => tool.name === "subagent_join")!.execute as any)("join-1", { subagentId: taskSlug });
+      expect(joined.details).toMatchObject({ status: "completed", result });
+      expect(joined.content).toEqual([{ type: "text", text: JSON.stringify(joined.details) }]);
+      expect(runtime.inspect(taskSlug).result).toBe(result);
+    }
+    runtime.stop();
   });
 
   test("successive ready-branch spawn calls return two active identities before either completion", async () => {
@@ -261,20 +267,36 @@ describe("pi-herdr-subagents runtime", () => {
     }
   });
 
-  test("resolves the requested Agent locally without exposing its body", async () => {
+  test("registered Agent launches and resumes with generic completion instructions and opaque results", async () => {
     const registry = new AgentRegistry();
     registry.setFiles([{ path: "/reviewer.md", content: "---\nname: reviewer\n---\nReview the work." }]);
     const { transport } = fakeTransport();
     const root = mkdtempSync(join(tmpdir(), "subagents-agent-"));
     const runtime = new SubagentRuntime(transport, registry, root);
 
-    const task = await runtime.spawn({ agent: "reviewer", cwd: "/repo", prompt: "Review", label: "review", taskSlug: "task",});
-    expect(task).toMatchObject({ agent: "reviewer" });
-    expect(task).not.toHaveProperty("handlerBody");
-    const bootstrap = readFileSync(join(root, "tasks", "task-artifacts", "launch-1.cjs"), "utf8");
-    const encoded = bootstrap.match(/Buffer\.from\(\"([^\"]+)\"/)?.[1];
-    const spec = JSON.parse(Buffer.from(encoded!, "base64").toString("utf8")) as { args: string[] };
-    expect(spec.args).toContain("Review the work.");
+    const first = await runtime.spawn({ agent: "reviewer", cwd: "/repo", prompt: "Review", label: "review", taskSlug: "task" });
+    for (const generation of [1, 2]) {
+      const task = generation === 1 ? first : await runtime.resume(first.subagentId, "Review again");
+      expect(task).toMatchObject({ agent: "reviewer", subagentId: first.subagentId, sessionFile: first.sessionFile, generation });
+      expect(task).not.toHaveProperty("handlerBody");
+      const bootstrap = readFileSync(join(root, "tasks", "task-artifacts", `launch-${generation}.cjs`), "utf8");
+      const encoded = bootstrap.match(/Buffer\.from\(\"([^\"]+)\"/)?.[1];
+      const spec = JSON.parse(Buffer.from(encoded!, "base64").toString("utf8")) as { args: string[] };
+      expect(spec.args).toContain("Review the work.");
+      expect(spec.args).toContain(childToolExclusions);
+      expect(spec.args).not.toContain("--tools");
+      const prompt = spec.args.at(-1)!;
+      expect(prompt).toContain("complete final result text in the caller/Agent-required format");
+      expect(prompt).toContain("submit");
+      expect(prompt).toContain("once as its result argument");
+      expect(prompt).toContain("this alone does not record successful runtime completion");
+      expect(prompt).not.toMatch(/Harness|Router|Resolver|resolve_delegation|Handler|YAML/);
+      const result = generation === 1 ? "# Review\nNo findings.\n" : '{"ok":true,"findings":[]}';
+      writeFileSync(task.resultPath, JSON.stringify({ subagentId: task.subagentId, generation, status: "completed", result }));
+      await expect(runtime.join(task.subagentId)).resolves.toMatchObject({ status: "completed", result });
+      expect(runtime.inspect(task.subagentId).result).toBe(result);
+    }
+    runtime.stop();
   });
 
   test("requires the requested Agent in its registry", async () => {
@@ -863,7 +885,16 @@ describe("/subagent-open command wiring", () => {
     expect(readme).toContain("may be written or migrated by Pi");
     expect(readme.toLowerCase()).not.toContain("read-only");
     expect(readme).not.toContain("generation snapshot");
+    expect(readme).toContain("Calls may be direct or forwarded by a caller-owned tool wrapper");
+    expect(readme).toContain("no fixed Agent name or caller protocol is required");
+    expect(readme).toContain("opaque to this runtime");
+    expect(readme).toContain("without waiting for completion");
+    expect(readme).toContain("at-least-once in the current parent branch");
+    expect(readme).toContain("a final assistant response alone does not record successful runtime completion");
+    expect(readme).not.toMatch(/Harness|Router|Resolver|resolve_delegation|YAML Handler Result/);
     expect(readme).not.toMatch(/\[.*?\]\(.*?\)/);
+    const paneChild = readFileSync(paneChildExtensionPath, "utf8");
+    expect(paneChild).toContain('description: "Write the complete final result text in the caller/Agent-required format and end this execution."');
   });
 });
 
@@ -2875,7 +2906,7 @@ test("resume preserves the persisted generation-2 combined argv", async () => {
   expect(spec.args.slice(1)).toEqual([
     "--session", first.sessionFile, "-e", paneChildExtensionPath, "--system-prompt", "Handler",
     "--exclude-tools", childToolExclusions, "--model", "test/family/model:high",
-    "two\n\nWhen subagent_done is available, submit the full YAML Handler Result once as its result argument. Do not output the full Result separately before or after successful submission. If unavailable, return the YAML as your final assistant response. If submission fails, correct and retry or report the failure.",
+    "two\n\nWhen subagent_done is available, submit the complete final result text in the caller/Agent-required format once as its result argument. Do not output the full result separately before or after successful submission. If unavailable, return that text as your final assistant response; this alone does not record successful runtime completion. If submission fails, correct and retry or report the failure.",
   ]);
   expect(spec.args).not.toContain("--tools");
   expect(spec.args.slice(modelIndex, modelIndex + 2)).toEqual(["--model", "test/family/model:high"]);
