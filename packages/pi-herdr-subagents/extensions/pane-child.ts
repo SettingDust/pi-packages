@@ -2,6 +2,7 @@ import { renameSync } from "node:fs";
 import { writeFile } from "node:fs/promises";
 import { Type } from "@earendil-works/pi-ai";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import { stripTerminalSequences, Text } from "@earendil-works/pi-tui";
 
 type CompletionState = "active" | "settling" | "settled";
 type PaneChildOperations = {
@@ -74,6 +75,10 @@ export default function paneChild(
     label: "Subagent Done",
     description: "Write the final YAML Handler Result and end this execution.",
     parameters: Type.Object({ result: Type.String({ minLength: 1 }) }),
+    renderCall(args, theme) {
+      const title = theme.fg("toolTitle", theme.bold("subagent_done"));
+      return new Text(typeof args.result === "string" ? `${title}\n${stripTerminalSequences(args.result)}` : title, 0, 0);
+    },
     async execute(_id, params, _signal, _update, ctx) {
       await finish(params.result, ctx);
       return { content: [{ type: "text", text: "Subagent result recorded." }], details: {} };

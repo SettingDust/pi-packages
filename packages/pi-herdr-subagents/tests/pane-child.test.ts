@@ -3,10 +3,18 @@ import { existsSync, mkdtempSync, readFileSync, renameSync, rmSync } from "node:
 import { writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { visibleWidth, type Component } from "@earendil-works/pi-tui";
 import paneChild from "../extensions/pane-child.js";
 
 type Handler = (...args: any[]) => unknown;
-type DoneTool = { execute: (...args: any[]) => Promise<unknown> };
+type DoneTool = {
+  execute: (...args: any[]) => Promise<unknown>;
+  renderCall: (args: { result?: unknown }, renderTheme: typeof theme, context?: unknown) => Component;
+};
+const theme = {
+  fg(_color: string, text: string) { return text; },
+  bold(text: string) { return text; },
+};
 type Operations = {
   writeFile(path: string, data: string): Promise<void>;
   rename(source: string, destination: string): void;
@@ -107,6 +115,58 @@ function childFixture(operations?: Operations) {
 
 const completed = (summary: string) => `status: completed\nsummary: ${summary}\nreport: ok`;
 const realOperations: Operations = { writeFile, rename: renameSync };
+
+function rendered(component: Component, width = 1000): string {
+  return component.render(width).map(line => line.trimEnd()).join("\n");
+}
+
+test("subagent_done shows the entire Result by default, expanded, after completion, and at narrow widths", async () => {
+  const child = childFixture();
+  const result = [...Array.from({ length: 20 }, (_, i) => `line-${i}`), "x".repeat(240), "FINAL-MARKER"].join("\n");
+  try {
+    for (const expanded of [false, true]) {
+      expect(rendered(child.done.renderCall({ result }, theme, { expanded }))).toBe(`subagent_done\n${result}`);
+    }
+    const narrow = child.done.renderCall({ result }, theme).render(12);
+    expect(narrow.length).toBeGreaterThan(10);
+    expect(narrow.every(line => visibleWidth(line) <= 12)).toBe(true);
+    expect(narrow.map(line => line.trimEnd()).join("")).toBe(`subagent_done${result.replaceAll("\n", "")}`);
+    expect(await child.done.execute("done-render", { result }, undefined, undefined, { shutdown() {} })).toEqual({
+      content: [{ type: "text", text: "Subagent result recorded." }], details: {},
+    });
+    expect(rendered(child.done.renderCall({ result }, theme, { expanded: false, executionStarted: true, argsComplete: true }))).toBe(`subagent_done\n${result}`);
+  } finally {
+    child.cleanup();
+  }
+});
+
+test("subagent_done renders current partial argument snapshots and only a title for non-strings", () => {
+  const child = childFixture();
+  try {
+    for (const args of [{}, { result: null }, { result: 123 }, { result: {} }]) {
+      expect(rendered(child.done.renderCall(args, theme, { argsComplete: false }))).toBe("subagent_done");
+    }
+    for (const result of ["status: comp", "status: completed\nreport: |\n  partial", "replacement"]) {
+      expect(rendered(child.done.renderCall({ result }, theme, { argsComplete: false, expanded: false }))).toBe(`subagent_done\n${result}`);
+    }
+  } finally {
+    child.cleanup();
+  }
+});
+
+test("subagent_done strips supported terminal sequences from display while persisting the raw Result", async () => {
+  const child = childFixture();
+  const result = "\nstatus: completed\nreport: |\n  \u001b[31mred\u001b[0m\u001b[2K\n  \u001b]8;;https://example.com\u0007link\u001b]8;;\u0007\n  literal\\n\n\n";
+  const args = { result };
+  try {
+    expect(rendered(child.done.renderCall(args, theme))).toBe("subagent_done\n\nstatus: completed\nreport: |\n  red\n  link\n  literal\\n\n\n");
+    expect(args.result).toBe(result);
+    await child.done.execute("done-raw", args, undefined, undefined, { shutdown() {} });
+    expect(JSON.parse(readFileSync(child.resultPath, "utf8")).result).toBe(result);
+  } finally {
+    child.cleanup();
+  }
+});
 
 test("nudges one unfinished turn and deduplicates repeated agent_end events", () => {
   const child = childFixture();
