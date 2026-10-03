@@ -26,13 +26,13 @@ test("todo widget counts complete snapshot and shows one representative per task
   const before = structuredClone(state);
   const lines = renderTodoWidgetLines(state, undefined, 80, { maxVisible: 1, fallbackGlyphs: true });
   assert.deepEqual(lines, [
-    " Todos  2 tasks · ◔ 1 · ○ 2 · ✓ 1 · × 1",
-    "  ◔ Plan › Active todo",
-    "  ○ Build › Second pending todo",
+    "Todos  2 tasks · ◔ 1 · ○ 2 · ✓ 1 · × 1",
+    " ◔ Plan › Active todo",
+    " ○ Build › Second pending todo",
   ]);
-  assert.equal(renderTodoWidgetLines(state, undefined, 80)[0], " Todos  2 tasks · 󰦖 1 · 󰄰 2 · 󰄴 1 · 󰍷 1");
+  assert.equal(renderTodoWidgetLines(state, undefined, 80)[0], "Todos  2 tasks · 󰦖 1 · 󰄰 2 · 󰄴 1 · 󰍷 1");
   assert.deepEqual(renderTodoWidgetLines(state, undefined, 80).slice(1), [
-    "  󰦖 Plan 󰄾 Active todo", "  󰄰 Build 󰄾 Second pending todo",
+    " 󰦖 Plan 󰄾 Active todo", " 󰄰 Build 󰄾 Second pending todo",
   ]);
   assert.doesNotMatch(lines.join("\n"), /Detailed description|First pending todo|Finished todo|Cancelled todo/);
   assert.deepEqual(state, before);
@@ -125,7 +125,7 @@ test("selected header uses theme background without replacing status foreground"
   check(80, "Build");
   widget.end();
   check(80, undefined);
-  assert.ok(widget.render(80).some((row) => row.startsWith(" ▾ ") && row.includes("Build")));
+  assert.ok(widget.render(80).some((row) => row.startsWith("▾ ") && row.includes("Build")));
   assert.equal(widget.start(), true);
   check(80, "Plan");
   for (const width of [1, 2, 3, 4, 8, 12]) {
@@ -146,10 +146,10 @@ test("todo widget selects first active independently for each task", () => {
   };
   const lines = renderTodoWidgetLines(multiState, undefined, 80, { maxVisible: 1, fallbackGlyphs: true });
   assert.deepEqual(lines, [
-    " Todos  3 tasks · ◔ 3 · ○ 3 · ✓ 1 · × 0",
-    "  ○ Pending first › first pending",
-    "  ◔ First › first active",
-    "  ◔ Second › second active",
+    "Todos  3 tasks · ◔ 3 · ○ 3 · ✓ 1 · × 0",
+    " ○ Pending first › first pending",
+    " ◔ First › first active",
+    " ◔ Second › second active",
   ]);
   assert.doesNotMatch(lines.join("\n"), /earlier pending|another active|last pending|\+2/);
 });
@@ -163,17 +163,17 @@ test("todo widget falls back to the first todo, even terminal, and keeps empty t
     ],
   };
   assert.deepEqual(renderTodoWidgetLines(snapshot, undefined, 80, { fallbackGlyphs: true }), [
-    " Todos  3 tasks · ◔ 0 · ○ 2 · ✓ 1 · × 1",
-    "  ✓ Done › old",
-    "  × Cancelled › stopped",
-    "  Empty",
+    "Todos  3 tasks · ◔ 0 · ○ 2 · ✓ 1 · × 1",
+    " ✓ Done › old",
+    " × Cancelled › stopped",
+    " Empty",
   ]);
   assert.deepEqual(renderTodoWidgetLines({ tasks: [{ name: "Done", todos: [todo("finished", "completed")] }] }, undefined, 80, { fallbackGlyphs: true }), [
-    " Todos  1 task · ◔ 0 · ○ 0 · ✓ 1 · × 0",
-    "  ✓ Done › finished",
+    "Todos  1 task · ◔ 0 · ○ 0 · ✓ 1 · × 0",
+    " ✓ Done › finished",
   ]);
   assert.deepEqual(renderTodoWidgetLines(undefined, undefined, 80), [
-    " Todos  0 tasks · 󰦖 0 · 󰄰 0 · 󰄴 0 · 󰍷 0",
+    "Todos  0 tasks · 󰦖 0 · 󰄰 0 · 󰄴 0 · 󰍷 0",
   ]);
 });
 
@@ -202,8 +202,8 @@ test("todo widget emits every task and fits narrow widths", () => {
 test("detail lines wrap complete names and descriptions for terminal todos", () => {
   const item = todo("A complete multi word task name", "completed", "The final description continues beyond the viewport");
   const lines = renderTodoWidgetDetailLines(item, undefined, 12, true);
-  assert.deepEqual(lines.slice(0, 3), ["    ✓ A", "      comple", "      te"]);
-  assert.ok(lines.slice(1).every((line) => line.startsWith("      ")));
+  assert.deepEqual(lines.slice(0, 3), ["   ✓ A", "     complet", "     e multi"]);
+  assert.ok(lines.slice(1).every((line) => line.startsWith("     ")));
   assert.ok(lines.every((line) => visibleWidth(line) <= 12));
   assert.equal(lines.join("").replace(/\s/g, "").includes(item.name.replace(/\s/g, "")), true);
   assert.equal(lines.join("").replace(/\s/g, "").includes(item.description.replace(/\s/g, "")), true);
@@ -264,15 +264,15 @@ test("collapsed separator keeps slashes in user text; expanded header and indent
   const tui = { terminal: { rows: 40 }, requestRender: vi.fn() };
   for (const [fallbackGlyphs, separator] of [[false, "󰄾"], [true, "›"]] as const) {
     const widget = new TodoWidgetComponent(snapshot, undefined, { fallbackGlyphs }, tui as never);
-    assert.equal(widget.render(80)[1], `  ${fallbackGlyphs ? "◔" : "󰦖"} Plan / draft ${separator} first / second`);
+    assert.equal(widget.render(80)[1], ` ${fallbackGlyphs ? "◔" : "󰦖"} Plan / draft ${separator} first / second`);
     widget.start();
     widget.handleKey("\x1b[C");
     const rows = widget.render(80);
-    assert.equal(rows[1], ` ${fallbackGlyphs ? "▾" : "󰅀"} Plan / draft`);
-    assert.equal(rows[2], `    ${fallbackGlyphs ? "◔" : "󰦖"} first / second`);
-    assert.equal(rows[3], "      description / text");
+    assert.equal(rows[1], `${fallbackGlyphs ? "▾" : "󰅀"} Plan / draft`);
+    assert.equal(rows[2], `   ${fallbackGlyphs ? "◔" : "󰦖"} first / second`);
+    assert.equal(rows[3], "     description / text");
     widget.end();
-    assert.equal(widget.render(80)[1], ` ${fallbackGlyphs ? "▾" : "󰅀"} Plan / draft`);
+    assert.equal(widget.render(80)[1], `${fallbackGlyphs ? "▾" : "󰅀"} Plan / draft`);
   }
 });
 
@@ -349,33 +349,33 @@ test("inline listener consumes only exact keys, passes paste and retires on ever
   enterTodoWidget(ctx, {}, lifecycle);
   assert.equal(listeners.size, 1);
   assert.deepEqual(input("\x1b[1;1:1B"), { consume: true });
-  assert.match(mounted!.render(80)[2]!, /^ 󰅂/);
+  assert.match(mounted!.render(80)[2]!, /^󰅂/);
   assert.equal(input("\x1b[1;1:3B"), undefined);
-  assert.match(mounted!.render(80)[2]!, /^ 󰅂/);
+  assert.match(mounted!.render(80)[2]!, /^󰅂/);
   assert.deepEqual(input("\x1b[1;1:2B"), { consume: true });
-  assert.match(mounted!.render(80)[3]!, /^ 󰅂/);
+  assert.match(mounted!.render(80)[3]!, /^󰅂/);
   assert.equal(input("\x1b[1;1:3B"), undefined);
-  assert.match(mounted!.render(80)[3]!, /^ 󰅂/);
+  assert.match(mounted!.render(80)[3]!, /^󰅂/);
   assert.deepEqual(input("\x1b[1;1:1A"), { consume: true });
   assert.equal(input("\x1b[1;1:3A"), undefined);
-  assert.match(mounted!.render(80)[2]!, /^ 󰅂/);
+  assert.match(mounted!.render(80)[2]!, /^󰅂/);
   assert.deepEqual(input("\x1b[13;1:1u"), { consume: true });
   assert.equal(input("\x1b[13;1:3u"), undefined);
-  assert.match(mounted!.render(80)[2]!, /^ 󰅀/);
+  assert.match(mounted!.render(80)[2]!, /^󰅀/);
   assert.equal(input(" ")?.consume, true);
-  assert.match(mounted!.render(80)[2]!, /^ 󰅂/);
+  assert.match(mounted!.render(80)[2]!, /^󰅂/);
   assert.equal(input(" ")?.consume, true);
-  assert.match(mounted!.render(80)[2]!, /^ 󰅀/);
+  assert.match(mounted!.render(80)[2]!, /^󰅀/);
   assert.equal(input("\x1b[27;1:3u"), undefined);
   assert.equal(listeners.size, 1);
   assert.deepEqual(input("\x1b"), { consume: true });
   assert.equal(listeners.size, 0);
   assert.equal(unsubscribe.mock.calls.length, 1);
-  assert.match(mounted!.render(80).join("\n"), /󰅀 Build.*\n    󰄰 Second pending todo/);
+  assert.match(mounted!.render(80).join("\n"), /󰅀 Build.*\n   󰄰 Second pending todo/);
   assert.doesNotMatch(mounted!.render(80).join("\n"), /> 󰅀/);
   enterTodoWidget(ctx, {}, lifecycle);
   assert.equal(listeners.size, 1);
-  assert.match(mounted!.render(80).join("\n"), /󰅀 Build.*\n    󰄰 Second pending todo/);
+  assert.match(mounted!.render(80).join("\n"), /󰅀 Build.*\n   󰄰 Second pending todo/);
   assert.deepEqual(input("\x1b"), { consume: true });
   assert.equal(listeners.size, 0);
   assert.equal(unsubscribe.mock.calls.length, 2);
@@ -424,7 +424,7 @@ test("passthrough and bracketed paste release Todo without consuming the forward
     assert.ok(listener, "key release leaves Todo active");
     assert.equal(listener?.(key), undefined);
     assert.equal(listener, undefined, "passthrough yields input ownership");
-    assert.match(mounted!.render(80)[1]!, /^  󰦖/);
+    assert.match(mounted!.render(80)[1]!, /^ 󰦖/);
     resetTodoWidgetLifecycle(ctx, lifecycle);
   }
 });
@@ -438,16 +438,16 @@ test("collapsed chevrons have exactly one space before status or task name at bo
     const widget = new TodoWidgetComponent(snapshot, undefined, { fallbackGlyphs }, tui as never);
     assert.equal(widget.start(), true);
     const rows = widget.render(80);
-    assert.equal(rows[1], ` ${chevron} ${active} Plan ${fallbackGlyphs ? "›" : "󰄾"} Active todo`);
-    assert.equal(rows[2], ` ${chevron} ${pending} Build ${fallbackGlyphs ? "›" : "󰄾"} Second pending todo`);
-    assert.equal(rows[3], ` ${chevron} Empty`);
+    assert.equal(rows[1], `${chevron} ${active} Plan ${fallbackGlyphs ? "›" : "󰄾"} Active todo`);
+    assert.equal(rows[2], `${chevron} ${pending} Build ${fallbackGlyphs ? "›" : "󰄾"} Second pending todo`);
+    assert.equal(rows[3], `${chevron} Empty`);
     for (const width of [1, 2, 3, 4, 5, 8, 12]) {
       const narrow = widget.render(width);
       assert.ok(narrow.every((row) => visibleWidth(row) <= width));
-      if (width >= 8) assert.equal(narrow[1]?.startsWith(` ${chevron} ${active}`), true);
+      if (width >= 8) assert.equal(narrow[1]?.startsWith(`${chevron} ${active}`), true);
     }
     widget.end();
-    assert.equal(widget.render(80)[1], `  ${active} Plan ${fallbackGlyphs ? "›" : "󰄾"} Active todo`);
+    assert.equal(widget.render(80)[1], ` ${active} Plan ${fallbackGlyphs ? "›" : "󰄾"} Active todo`);
   }
 });
 
@@ -456,13 +456,13 @@ test("expanded glyphs honor Nerd Font and fallback settings without changing com
   for (const [fallbackGlyphs, closed, open] of [[false, "󰅂", "󰅀"], [true, "▸", "▾"]] as const) {
     const widget = new TodoWidgetComponent(state, undefined, { fallbackGlyphs }, tui as never);
     assert.equal(widget.start(), true);
-    assert.match(widget.render(80)[1]!, new RegExp(`^ ${closed} .* Plan`));
+    assert.match(widget.render(80)[1]!, new RegExp(`^${closed} .* Plan`));
     widget.handleKey("\x1b[C");
-    assert.match(widget.render(80)[1]!, new RegExp(`^ ${open} Plan$`));
+    assert.match(widget.render(80)[1]!, new RegExp(`^${open} Plan$`));
     widget.end();
-    assert.match(widget.render(80)[1]!, new RegExp(`^ ${open} Plan$`));
+    assert.match(widget.render(80)[1]!, new RegExp(`^${open} Plan$`));
     widget.handleKey("\x1b[D");
-    assert.match(widget.render(80)[1]!, new RegExp(`^ ${open} Plan$`));
+    assert.match(widget.render(80)[1]!, new RegExp(`^${open} Plan$`));
     widget.dispose();
   }
   assert.deepEqual(new TodoWidgetComponent(state, undefined, { fallbackGlyphs: true }).render(80), renderTodoWidgetLines(state, undefined, 80, { fallbackGlyphs: true }));
@@ -488,7 +488,7 @@ test("refresh retains expansion by task name, prunes removed tasks and resets on
   enterTodoWidget(ctx, {}, lifecycle);
   assert.equal(input("\x1b[C")?.consume, true);
   assert.equal(input("\x1b")?.consume, true);
-  assert.match(mounted!.render(80).join("\n"), /▾ Plan.*\n    ◔ Active todo/);
+  assert.match(mounted!.render(80).join("\n"), /▾ Plan.*\n   ◔ Active todo/);
   const reordered: TodoState = { tasks: [state.tasks[1]!, state.tasks[0]!] };
   updateTodoWidget(ctx, reordered, { fallbackGlyphs: true }, lifecycle);
   assert.equal(listeners.size, 0);

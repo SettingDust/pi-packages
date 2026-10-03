@@ -136,7 +136,7 @@ export class TodoWidgetComponent implements Component {
     this.state.tasks.forEach((task, index) => {
       headers[index] = lines.length;
       const glyphs = this.options.fallbackGlyphs ? EXPAND_GLYPHS.fallback : EXPAND_GLYPHS.nerd;
-      const prefix = ` ${this.expanded.has(task.name) ? glyphs.open : glyphs.closed} `;
+      const prefix = `${this.expanded.has(task.name) ? glyphs.open : glyphs.closed} `;
       const row = this.expanded.has(task.name)
         ? fit(`${prefix}${renderTodoWidgetTaskName(task, this.theme)}`, this.width)
         : renderTodoWidgetTaskRow(task, this.theme, this.width, this.options, prefix);
@@ -147,7 +147,7 @@ export class TodoWidgetComponent implements Component {
         for (const todo of task.todos) lines.push(...renderTodoWidgetDetailLines(todo, this.theme, this.width, this.options.fallbackGlyphs));
       }
     });
-    if (!lines.length) lines.push(fit(" No todos", this.width));
+    if (!lines.length) lines.push(fit("No todos", this.width));
     return { lines, headers };
   }
 }

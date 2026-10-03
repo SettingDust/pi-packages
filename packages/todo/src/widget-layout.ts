@@ -26,7 +26,7 @@ export function renderTodoWidgetLines(
     .map((status) => `${todoGlyph(status, options.fallbackGlyphs)} ${counts[status]}`)
     .join(` ${TODO_SEPARATOR_GLYPH} `);
   const title = toolTitle("Todos", theme);
-  const lines = [fit(` ${title}  ${tasks.length} ${tasks.length === 1 ? "task" : "tasks"} ${TODO_SEPARATOR_GLYPH} ${theme?.fg ? theme.fg("muted", summary) : summary}`, safeWidth)];
+  const lines = [fit(`${title}  ${tasks.length} ${tasks.length === 1 ? "task" : "tasks"} ${TODO_SEPARATOR_GLYPH} ${theme?.fg ? theme.fg("muted", summary) : summary}`, safeWidth)];
 
   for (const task of tasks) lines.push(renderTodoWidgetTaskRow(task, theme, safeWidth, options));
 
@@ -46,7 +46,7 @@ function taskColor(task: TodoTask): "accent" | "text" | "success" | "error" | "m
 }
 
 export function renderTodoWidgetTaskRow(
-  task: TodoTask, theme: ThemeLike | undefined, width: number, options: TodoWidgetLayoutOptions = {}, prefix = "  ",
+  task: TodoTask, theme: ThemeLike | undefined, width: number, options: TodoWidgetLayoutOptions = {}, prefix = " ",
 ): string {
   const todo = task.todos.find((item) => item.status === "in_progress") ?? task.todos[0];
   const color = (text: string, token: ReturnType<typeof taskColor>) => theme?.fg ? theme.fg(token, text) : text;
@@ -88,7 +88,7 @@ export function renderTodoLine(todo: Todo, theme: ThemeLike | undefined, fallbac
 
 export function renderTodoWidgetDetailLines(todo: Todo, theme: ThemeLike | undefined, width: number, fallbackGlyphs = false): string[] {
   const glyph = todoGlyph(todo.status, fallbackGlyphs);
-  const marker = `    ${glyph} `;
+  const marker = `   ${glyph} `;
   const label = width > visibleWidth(marker) ? marker : width > 2 ? `${glyph} ` : "";
   const indent = " ".repeat(Math.min(visibleWidth(label), Math.max(0, width - 1)));
   return [
