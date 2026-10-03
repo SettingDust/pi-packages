@@ -9,11 +9,11 @@ Imported from [`Chase-C/pi9`](https://github.com/Chase-C/pi9) commit [`94405f79b
 Pi receives exactly four tools:
 
 - `todo_set { tasks }` replaces the plan. Each task is `{ name, todos }`; each creation is `{ name, description }` and starts `pending`.
-- `todo_add { task, todos }` appends one or more pending todos to an existing task.
+- `todo_add { task, todos }` appends one or more pending todos to the exact existing task, or creates a task at the end of the plan if it is missing. Existing task/todo order, names, descriptions, and statuses are preserved; new todos follow request order.
 - `todo_transition { transitions }` is the only lifecycle operation. A transition is `{ task, todo, status }`; request-level `workingOn` is not accepted, and old requests carrying it fail closed as unknown input.
 - `todo_view {}` reads the current snapshot without changing it.
 
-A snapshot is `{ tasks }`. Every task has globally unique `name` and `todos`; every todo has a task-local unique `name`, `description`, and `status`. Status is `pending`, `in_progress`, `completed`, or `cancelled`. Names and descriptions are trimmed non-empty strings and matching is exact and case-sensitive. Multiple task groups may contain `in_progress` todos simultaneously; each remains represented independently.
+A snapshot is `{ tasks }`. Every task has globally unique `name` and `todos`; every todo has a task-local unique `name`, `description`, and `status`. Status is `pending`, `in_progress`, `completed`, or `cancelled`. Names and descriptions are trimmed non-empty strings and matching is exact and case-sensitive. A typo or different case in `todo_add` creates a distinct task: `BUILD` does not append to `Build`. Duplicate todo names within an add request or against its existing target fail without changing the plan; the same todo name in different tasks is allowed. `todo_transition` still rejects missing targets. Multiple task groups may contain `in_progress` todos simultaneously; each remains represented independently.
 
 `workingOn` is not part of the state, request, result, restore, or widget contract. Old-version clients are unsupported; there is no compatibility parsing, dual-read, dual-write, or migration window.
 

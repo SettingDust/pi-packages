@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { restoreTodoState } from "../src/persistence.js";
-import type { TodoState } from "../src/types.js";
+import { applyTodoAdd } from "../src/state.js";
+import { TODO_STATUSES, type TodoState } from "../src/types.js";
 
 const state = (name: string, status: "pending" | "in_progress" = "pending"): TodoState => ({
   tasks: [{ name, todos: [{ name: `Complete ${name}`, description: `Detailed description for ${name}.`, status }] }],
@@ -44,6 +45,25 @@ describe("todo persistence", () => {
     expect(restored).not.toBe(snapshot);
   });
 
+  it("restores a complete add creation checkpoint with all previous statuses, then appends to the restored task", () => {
+    const prior: TodoState = { tasks: [{ name: "Build", todos: TODO_STATUSES.map((status) => ({
+      name: status, description: `${status} description.`, status,
+    })) }, { name: "Empty", todos: [] }] };
+    const snapshot = applyTodoAdd(prior, { task: "New", todos: [{ name: "First", description: "First description." }] });
+    const { context, notify } = contextFor([canonicalResult(prior), canonicalResult(snapshot, { result: "add", toolName: "todo_add" })]);
+    const restored = restoreTodoState(context);
+    expect(restored).toEqual({ tasks: [...prior.tasks, { name: "New", todos: [{ name: "First", description: "First description.", status: "pending" }] }] });
+    expect(notify).not.toHaveBeenCalled();
+    const appended = applyTodoAdd(restored, { task: "New", todos: [{ name: "Second", description: "Second description." }] });
+    expect(appended).toEqual({ tasks: [...prior.tasks, { name: "New", todos: [
+      { name: "First", description: "First description.", status: "pending" },
+      { name: "Second", description: "Second description.", status: "pending" },
+    ] }] });
+    expect(restored).toEqual(snapshot);
+    expect(Reflect.set(restored.tasks[0].todos[0], "description", "Changed restored snapshot.")).toBe(true);
+    expect(snapshot.tasks[0].todos[0].description).toBe("pending description.");
+  });
+
   it("restores strict legacy phases/tasks into canonical state", () => {
     const { context } = contextFor([legacyResult(legacyState("Build", "in_progress"))]);
     expect(restoreTodoState(context)).toEqual(state("Build", "in_progress"));
@@ -84,27 +104,37 @@ describe("todo persistence", () => {
     expect(notify).toHaveBeenCalledTimes(2);
   });
 
-  it("skips failed, incomplete, wrong-tool, wrong-version, and malformed checkpoints", () => {
-    const valid = canonicalResult(state("Plan"));
-    const failed = canonicalResult(state("Failed"), { isError: true });
-    const incomplete = { type: "message", message: { role: "toolResult", toolName: "todo_set", details: { result: "set" } } };
-    const wrongTool = canonicalResult(state("Other"), { toolName: "other" });
-    const wrongVersion = { ...canonicalResult(state("Future")), message: { ...canonicalResult(state("Future")).message, details: { result: "set", snapshot: state("Future"), version: 2 } } };
-    const malformed = canonicalResult(state("Bad"), { result: "unknown" });
-    const mismatchedResult = canonicalResult(state("Mismatch"), { result: "view", toolName: "todo_set" });
+  it.each(["todo_set", "todo_add"])("skips failed, incomplete, wrong-tool, wrong-version, and malformed %s checkpoints", (toolName) => {
+    const result = toolName === "todo_add" ? "add" : "set";
+    const valid = canonicalResult(state("Plan"), { toolName, result });
+    const failed = canonicalResult(state("Failed"), { toolName, result, isError: true });
+    const incomplete = { type: "message", message: { role: "toolResult", toolName, isError: false, details: { result } } };
+    const errorEnvelope = { type: "message", message: { role: "toolResult", toolName, isError: false, details: { result: "error", error: { code: "duplicate", message: "Duplicate todo name." } } } };
+    const wrongTool = canonicalResult(state("Other"), { toolName: "other", result });
+    const wrongVersion = { ...valid, message: { ...valid.message, details: { result, snapshot: state("Future"), version: 2 } } };
+    const malformed = canonicalResult({ tasks: [{ name: "Bad", todos: [{ name: "Todo", description: "Description.", status: "active" }] }] }, { toolName, result });
+    const unknownResult = canonicalResult(state("Bad"), { toolName, result: "unknown" });
+    const mismatchedResult = canonicalResult(state("Mismatch"), { result: "view", toolName });
     const canonicalThroughLegacyTool = legacyResult(state("Not legacy"));
-    const { context, notify } = contextFor([valid, failed, incomplete, wrongTool, wrongVersion, malformed, mismatchedResult, canonicalThroughLegacyTool]);
-    expect(restoreTodoState(context)).toEqual(state("Plan"));
-    expect(notify).toHaveBeenCalledTimes(7);
+    const candidates = [failed, incomplete, errorEnvelope, wrongTool, wrongVersion, malformed, unknownResult, mismatchedResult, canonicalThroughLegacyTool];
+    for (const candidate of candidates) {
+      const { context, notify } = contextFor([valid, candidate]);
+      expect(restoreTodoState(context)).toEqual(state("Plan"));
+      expect(notify).toHaveBeenCalledExactlyOnceWith("Skipped invalid Todo restore checkpoint.", "warning");
+    }
   });
 
-  it("requires boolean false for checkpoint eligibility", () => {
-    const valid = canonicalResult(state("Plan"));
-    const stringIsError = { ...canonicalResult(state("String")), message: { ...canonicalResult(state("String")).message, isError: "false" } };
-    const missingIsError = { type: "message", message: { role: "toolResult", toolName: "todo_set", details: { result: "set", snapshot: state("Missing") } } };
-    const { context, notify } = contextFor([valid, stringIsError, missingIsError]);
-    expect(restoreTodoState(context)).toEqual(state("Plan"));
-    expect(notify).toHaveBeenCalledTimes(2);
+  it.each(["todo_set", "todo_add"])("requires boolean false for %s checkpoint eligibility", (toolName) => {
+    const result = toolName === "todo_add" ? "add" : "set";
+    const valid = canonicalResult(state("Plan"), { toolName, result });
+    for (const isError of [undefined, "false", 0, null, true]) {
+      const candidate = canonicalResult(state("Bad"), { toolName, result });
+      Reflect.set(candidate.message, "isError", isError);
+      if (isError === undefined) Reflect.deleteProperty(candidate.message, "isError");
+      const { context, notify } = contextFor([valid, candidate]);
+      expect(restoreTodoState(context)).toEqual(state("Plan"));
+      expect(notify).toHaveBeenCalledExactlyOnceWith("Skipped invalid Todo restore checkpoint.", "warning");
+    }
   });
 
   it("returns independent empty states when no checkpoint exists", () => {

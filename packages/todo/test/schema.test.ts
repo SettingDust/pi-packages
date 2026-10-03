@@ -45,6 +45,34 @@ describe("Todo request schemas", () => {
     expect(Check(TodoViewParamsSchema, { tasks: [] })).toBe(false);
   });
 
+  it("keeps add shape and minItems strict while text and uniqueness remain runtime invariants", () => {
+    const todo = { name: "Test", description: "Description." };
+    const valid = { task: "Missing", todos: [todo] };
+    expect(TodoAddParamsSchema.required).toEqual(["task", "todos"]);
+    expect(Object.keys(TodoAddParamsSchema.properties)).toEqual(["task", "todos"]);
+    expect(TodoAddParamsSchema.properties.todos).toMatchObject({ minItems: 1, items: { additionalProperties: false } });
+    expect(Check(TodoAddParamsSchema, valid)).toBe(true);
+    expect(parseTodoAddRequest(valid)).toEqual(valid);
+    for (const invalid of [
+      { task: "Missing" }, { todos: [todo] }, { ...valid, todos: [] }, { ...valid, extra: true },
+      { ...valid, todos: [{ name: "Test" }] }, { ...valid, todos: [{ description: "Description." }] },
+      { ...valid, todos: [{ ...todo, status: "pending" }] }, { ...valid, todos: [{ ...todo, extra: true }] },
+      { ...valid, task: 42 }, { ...valid, todos: [{ ...todo, name: 42 }] }, { ...valid, todos: [{ ...todo, description: 42 }] },
+    ]) {
+      expect(Check(TodoAddParamsSchema, invalid)).toBe(false);
+      expect(() => parseTodoAddRequest(invalid)).toThrow();
+    }
+    for (const invalid of [
+      { ...valid, task: "" }, { ...valid, task: " Missing" },
+      { ...valid, todos: [{ ...todo, name: "" }] }, { ...valid, todos: [{ ...todo, name: "Test " }] },
+      { ...valid, todos: [{ ...todo, description: "" }] }, { ...valid, todos: [{ ...todo, description: " Description." }] },
+      { ...valid, todos: [todo, todo] },
+    ]) {
+      expect(Check(TodoAddParamsSchema, invalid)).toBe(true);
+      expect(() => parseTodoAddRequest(invalid)).toThrow();
+    }
+  });
+
   it("has equivalent strict runtime parsers for schema-valid inputs", () => {
     expect(parseTodoSetRequest({ tasks: [] })).toEqual({ tasks: [] });
     expect(parseTodoAddRequest({

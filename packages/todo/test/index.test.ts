@@ -6,9 +6,11 @@ import todoExtension from "../src/index.js";
 import { Text, Key } from "@earendil-works/pi-tui";
 import { DefaultResourceLoader, SessionManager, createAgentSession, type ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { FALLBACK_TODO_GLYPHS, NERD_FONT_TODO_GLYPHS } from "../src/glyphs.js";
+import { TODO_STATUSES } from "../src/types.js";
 
 type Tool = {
   name: string;
+  description: string;
   parameters: { additionalProperties?: boolean };
   execute: (...args: any[]) => Promise<any>;
   renderCall: (args: unknown, theme: any, context?: { isPartial?: boolean; isError?: boolean }) => { render: (width: number) => string[] };
@@ -40,6 +42,7 @@ describe("Todo four-tool coordinator", () => {
     const { tools, handlers } = setup();
     expect([...tools.keys()]).toEqual(["todo_set", "todo_add", "todo_transition", "todo_view"]);
     expect(tools.has("todo")).toBe(false);
+    expect(tools.get("todo_add")!.description).toBe("Append pending todos to an exact, case-sensitive task, or create it at the end if missing.");
     for (const tool of tools.values()) expect(tool.parameters.additionalProperties).toBe(false);
     expect([...handlers.keys()]).toEqual(["session_start", "session_tree", "session_compact", "session_shutdown", "before_agent_start", "agent_start", "agent_settled", "turn_end", "context"]);
   });
@@ -145,7 +148,7 @@ describe("Todo four-tool coordinator", () => {
   });
 
 
-  it("sets pending todos, adds only to an exact existing task, transitions, and returns canonical snapshots", async () => {
+  it("sets pending todos, appends or creates an exact task, transitions, and returns canonical snapshots", async () => {
     const { tools } = setup();
     const set = await run(tools.get("todo_set")!, {
       tasks: [{ name: "Build", todos: [creation("Code")] }, { name: "build", todos: [] }],
@@ -164,9 +167,18 @@ describe("Todo four-tool coordinator", () => {
     expect(add.details.snapshot.tasks[0].todos.map((todo: any) => [todo.name, todo.status])).toEqual([
       ["Code", "pending"], ["Test", "pending"],
     ]);
-    expect((await run(tools.get("todo_add")!, { task: "BUILD", todos: [creation("Nope")] })).details).toEqual({
-      result: "error", error: { code: "not_found", message: "Todo task does not exist." },
-    });
+    expect(add.details).toEqual({ result: "add", snapshot: { tasks: [
+      { name: "Build", todos: [{ ...creation("Code"), status: "pending" }, { ...creation("Test"), status: "pending" }] },
+      { name: "build", todos: [] },
+    ] } });
+    const created = await run(tools.get("todo_add")!, { task: "BUILD", todos: [creation("Code")] });
+    expect(created.details).toEqual({ result: "add", snapshot: { tasks: [
+      ...add.details.snapshot.tasks, { name: "BUILD", todos: [{ ...creation("Code"), status: "pending" }] },
+    ] } });
+    expect(JSON.parse(created.content[0].text)).toEqual(created.details);
+    const emptyAppend = await run(tools.get("todo_add")!, { task: "build", todos: [creation("Code")] });
+    expect(emptyAppend.details.snapshot.tasks.map((task: any) => task.name)).toEqual(["Build", "build", "BUILD"]);
+    expect(emptyAppend.details.snapshot.tasks[1].todos).toEqual([{ ...creation("Code"), status: "pending" }]);
 
     const transition = await run(tools.get("todo_transition")!, {
       transitions: [{ task: "Build", todo: "Test", status: "in_progress" }],
@@ -176,7 +188,8 @@ describe("Todo four-tool coordinator", () => {
       snapshot: {
         tasks: [
           { name: "Build", todos: [{ ...creation("Code"), status: "pending" }, { ...creation("Test"), status: "in_progress" }] },
-          { name: "build", todos: [] },
+          { name: "build", todos: [{ ...creation("Code"), status: "pending" }] },
+          { name: "BUILD", todos: [{ ...creation("Code"), status: "pending" }] },
         ],
       },
     });
@@ -233,9 +246,15 @@ describe("Todo four-tool coordinator", () => {
       result: "error", error: { code: "invalid_request", message: "Object has an invalid shape." },
     });
 
-    expect((await run(tools.get("todo_view")!, {})).details.snapshot.tasks[0].todos.map((todo: any) => todo.status)).toEqual([
-      "pending", "pending",
-    ]);
+    const missingTask = await run(tools.get("todo_transition")!, {
+      transitions: [{ task: "Missing", todo: "One", status: "completed" }],
+    });
+    expect(missingTask.details).toEqual({
+      result: "error", error: { code: "not_found", message: "Todo transition target does not exist." },
+    });
+    expect((await run(tools.get("todo_view")!, {})).details.snapshot).toEqual({ tasks: [{
+      name: "Build", todos: [creation("One"), creation("Two")].map((todo) => ({ ...todo, status: "pending" })),
+    }] });
   });
 
   it("serializes mutations in invocation order and continues after an error result", async () => {
@@ -244,7 +263,7 @@ describe("Todo four-tool coordinator", () => {
 
     const results = await Promise.allSettled([
       run(tools.get("todo_add")!, { task: "Build", todos: [creation("Second")] }),
-      run(tools.get("todo_add")!, { task: "Missing", todos: [creation("Rejected")] }),
+      run(tools.get("todo_add")!, { task: "Build", todos: [creation("Rejected"), creation("Second")] }),
       run(tools.get("todo_add")!, { task: "Build", todos: [creation("Third")] }),
     ]);
     expect(results.map(({ status }) => status)).toEqual(["fulfilled", "fulfilled", "fulfilled"]);
@@ -253,6 +272,81 @@ describe("Todo four-tool coordinator", () => {
     }));
     const view = await run(tools.get("todo_view")!, {});
     expect(view.details.snapshot.tasks[0].todos.map((todo: any) => todo.name)).toEqual(["First", "Second", "Third"]);
+  });
+
+  it("creates then appends in the queue, publishes once per success, and recovers after a collision", async () => {
+    const { tools, ctx, widgetCalls } = setup();
+    const [created, appended, failed, recovered] = await Promise.all([
+      run(tools.get("todo_add")!, { task: "New", todos: [creation("First")] }, ctx),
+      run(tools.get("todo_add")!, { task: "New", todos: [creation("Second")] }, ctx),
+      run(tools.get("todo_add")!, { task: "New", todos: [creation("Rejected"), creation("Second")] }, ctx),
+      run(tools.get("todo_add")!, { task: "New", todos: [creation("Third")] }, ctx),
+    ]);
+    const snapshot = (names: string[]) => ({ tasks: [{ name: "New", todos: names.map((name) => ({ ...creation(name), status: "pending" })) }] });
+    expect(created.details).toEqual({ result: "add", snapshot: snapshot(["First"]) });
+    expect(appended.details).toEqual({ result: "add", snapshot: snapshot(["First", "Second"]) });
+    expect(failed.details).toEqual({ result: "error", error: { code: "duplicate", message: "Duplicate todo name." } });
+    expect(recovered.details).toEqual({ result: "add", snapshot: snapshot(["First", "Second", "Third"]) });
+    expect(widgetCalls).toHaveLength(3);
+    expect(widgetCalls.every(({ id, content }) => id === "todo" && typeof content === "function")).toBe(true);
+    created.details.snapshot.tasks[0].todos[0].description = "Changed returned snapshot.";
+    expect(appended.details.snapshot).toEqual(snapshot(["First", "Second"]));
+    expect((await run(tools.get("todo_view")!, {}, ctx)).details).toEqual({ result: "view", snapshot: snapshot(["First", "Second", "Third"]) });
+    expect(widgetCalls).toHaveLength(3);
+  });
+
+  it.each(["Build", "Missing"])("returns strict non-payload add errors without publishing for %s", async (task) => {
+    const { tools, ctx, widgetCalls } = setup();
+    await run(tools.get("todo_set")!, { tasks: [{ name: "Build", todos: [creation("Existing")] }] }, ctx);
+    const before = (await run(tools.get("todo_view")!, {}, ctx)).details.snapshot;
+    for (const [params, code, message] of [
+      [{ task, todos: [creation("Private"), creation("Private")] }, "duplicate", "Duplicate todo name."],
+      [{ task, todos: [] }, "invalid_request", "todos must be a non-empty array."],
+      [{ task, todos: [{ ...creation("Private"), status: "pending" }] }, "invalid_request", "Object has an invalid shape."],
+      [{ task, todos: [creation("Private")], extra: "Secret" }, "invalid_request", "Object has an invalid shape."],
+      [{ task, todos: [{ name: "Private", description: " Secret" }] }, "invalid_request", "Todo text must be trimmed and non-empty."],
+    ] as const) {
+      const failed = await run(tools.get("todo_add")!, params, ctx);
+      expect(failed.details).toEqual({ result: "error", error: { code, message } });
+      expect(JSON.parse(failed.content[0].text)).toEqual(failed.details);
+      expect((await run(tools.get("todo_view")!, {}, ctx)).details.snapshot).toEqual(before);
+      expect(widgetCalls).toHaveLength(1);
+    }
+  });
+
+  it("replays a Host-recorded add creation checkpoint and appends while failed adds remain ineligible", async () => {
+    const { tools, handlers, ctx, widgetCalls } = setup();
+    const sessionManager = SessionManager.inMemory();
+    const appendMessage = vi.spyOn(sessionManager, "appendMessage");
+    const notify = vi.fn();
+    const hostCtx = { ...ctx, sessionManager, ui: { ...ctx.ui, notify } };
+    const prior = { name: "Build", todos: TODO_STATUSES.map((status) => ({ ...creation(status), status })) };
+    sessionManager.appendMessage({ role: "toolResult", toolCallId: "seed", toolName: "todo_set", isError: false,
+      content: [], details: { result: "set", snapshot: { tasks: [prior] } }, timestamp: Date.now() });
+    await handlers.get("session_tree")?.({}, hostCtx);
+    appendMessage.mockClear();
+    const created = await run(tools.get("todo_add")!, { task: "New", todos: [creation("First")] }, hostCtx);
+    expect(created.details).toEqual({ result: "add", snapshot: { tasks: [prior, { name: "New", todos: [{ ...creation("First"), status: "pending" }] }] } });
+    expect(appendMessage).not.toHaveBeenCalled();
+    sessionManager.appendMessage({ role: "toolResult", toolCallId: "created", toolName: "todo_add", isError: false,
+      content: created.content, details: created.details, timestamp: Date.now() });
+    const failed = await run(tools.get("todo_add")!, { task: "New", todos: [creation("Rejected"), creation("First")] }, hostCtx);
+    const invalid = await run(tools.get("todo_add")!, { task: "Missing", todos: [] }, hostCtx);
+    expect(failed.details.result).toBe("error");
+    expect(invalid.details.result).toBe("error");
+    expect(appendMessage).toHaveBeenCalledOnce();
+    expect(widgetCalls).toHaveLength(2);
+    for (const result of [failed, invalid]) sessionManager.appendMessage({ role: "toolResult", toolCallId: "failed", toolName: "todo_add", isError: false,
+      content: result.content, details: result.details, timestamp: Date.now() });
+    const restored = setup();
+    await restored.handlers.get("session_tree")?.({}, hostCtx);
+    expect(notify).toHaveBeenCalledTimes(2);
+    expect((await run(restored.tools.get("todo_view")!, {}, hostCtx)).details.snapshot).toEqual(created.details.snapshot);
+    const appended = await run(restored.tools.get("todo_add")!, { task: "New", todos: [creation("Second")] }, hostCtx);
+    expect(appended.details).toEqual({ result: "add", snapshot: { tasks: [prior, {
+      name: "New", todos: [creation("First"), creation("Second")].map((todo) => ({ ...todo, status: "pending" })),
+    }] } });
+    expect(appendMessage).toHaveBeenCalledTimes(3);
   });
 
   it("restores one shared coordinator state for every handler", async () => {
@@ -315,15 +409,18 @@ describe("Todo four-tool coordinator", () => {
     await run(tools.get("todo_transition")!, {
       transitions: [{ task: "Build", todo: "Code", status: "completed" }],
     }, ctx);
+    await run(tools.get("todo_add")!, { task: "New", todos: [creation("Created")] }, ctx);
+    expect(widgetCalls).toHaveLength(4);
+    const before = (await run(tools.get("todo_view")!, {}, ctx)).details.snapshot;
     const published = widgetCalls.length;
-    await run(tools.get("todo_view")!, {}, ctx);
-    await run(tools.get("todo_add")!, { task: "Missing", todos: [creation("Rejected")] }, ctx);
+    await run(tools.get("todo_add")!, { task: "Build", todos: [creation("Rejected"), creation("Test")] }, ctx);
+    await run(tools.get("todo_add")!, { task: "Missing", todos: [] }, ctx);
     await run(tools.get("todo_transition")!, {
       transitions: [{ task: "Build", todo: "Code", status: "in_progress" }],
       workingOn: "Code description",
     }, ctx);
     expect(widgetCalls).toHaveLength(published);
-    expect(published).toBe(3);
+    expect((await run(tools.get("todo_view")!, {}, ctx)).details.snapshot).toEqual(before);
   });
 
   it("keeps committed success when widget rendering and notification fail", async () => {
@@ -390,6 +487,19 @@ describe("native renderCall identity", () => {
     tools.get("todo_view")!.renderCall({}, { fg: (color: string, text: string) => { colors.push(color); return text; } }, { isPartial: true });
     expect(colors).toContain("toolTitle");
     expect(colors).toContain("muted");
+  });
+
+  it("counts a created task only when the exact task is missing and retains incomplete-argument summaries", async () => {
+    const { tools } = setup();
+    const add = tools.get("todo_add")!;
+    const summary = (args: unknown) => add.renderCall(args, {}, {}).render(120)[1]?.trimEnd();
+    expect(summary({ task: "Build", todos: [creation("First"), creation("Second")] })).toBe("1 task · 2 todos");
+    await run(tools.get("todo_set")!, { tasks: [{ name: "Build", todos: [creation("Code")] }, { name: "Empty", todos: [] }] });
+    expect(summary({ task: "Build", todos: [creation("Test")] })).toBe("2 tasks · 2 todos");
+    expect(summary({ task: "Empty", todos: [creation("Test")] })).toBe("2 tasks · 2 todos");
+    expect(summary({ task: "BUILD", todos: [creation("Test")] })).toBe("3 tasks · 2 todos");
+    expect(summary({ todos: [creation("Test")] })).toBe("2 tasks · 2 todos");
+    expect(summary({ task: "Missing" })).toBe("2 tasks · 1 todo");
   });
 
   it("returns zero-padding identity Text for all four tools and call flags", async () => {
@@ -490,8 +600,8 @@ describe("native renderResult content", () => {
         }
       }
     }
-    const error = await run(tools.get("todo_add")!, { task: "Missing", todos: [creation("Rejected")] });
-    expect(tools.get("todo_add")!.renderResult(error, {}, themes, {}).render(80).join("\n").replace(/\s+/g, "")).toContain("Todotaskdoesnotexist.");
+    const error = await run(tools.get("todo_add")!, { task: "Build", todos: [creation("Rejected"), creation("Test")] });
+    expect(tools.get("todo_add")!.renderResult(error, {}, themes, {}).render(80).join("\n").replace(/\s+/g, "")).toContain("Duplicatetodoname.");
   });
 });
 });

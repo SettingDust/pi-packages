@@ -36,17 +36,16 @@ export function applyTodoAdd(state: TodoState, request: TodoAddRequest): TodoSta
   assertTodoState(state);
   const parsed = parseTodoAddRequest(request);
   const target = state.tasks.find((task) => task.name === parsed.task);
-  if (!target) throw new Error("Todo task does not exist.");
-
-  const todoNames = new Set(target.todos.map((todo) => todo.name));
+  const todoNames = new Set(target?.todos.map((todo) => todo.name));
   for (const todo of parsed.todos) {
     if (todoNames.has(todo.name)) throw new Error("Duplicate todo name.");
     todoNames.add(todo.name);
   }
 
-  return canonicalState(state.tasks.map((task) => task.name !== parsed.task
-    ? task
-    : { ...task, todos: [...task.todos, ...parsed.todos.map((todo) => ({ ...todo, status: "pending" as const }))] }));
+  const todos = parsed.todos.map((todo) => ({ ...todo, status: "pending" as const }));
+  return canonicalState(target
+    ? state.tasks.map((task) => task.name !== parsed.task ? task : { ...task, todos: [...task.todos, ...todos] })
+    : [...state.tasks, { name: parsed.task, todos }]);
 }
 
 export function applyTodoTransition(state: TodoState, request: TodoTransitionRequest): TodoState {

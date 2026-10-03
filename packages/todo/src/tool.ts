@@ -151,12 +151,15 @@ function renderCallContent(
 }
 
 function pendingSummary(args: unknown, state: TodoState): string {
-  const input = args as { tasks?: unknown[]; todos?: unknown[] };
+  const input = args as { tasks?: unknown[]; task?: unknown; todos?: unknown[] };
   if (Array.isArray(input.tasks)) {
     const count = input.tasks.reduce<number>((total, task) => total + (task && typeof task === "object" && Array.isArray((task as { todos?: unknown }).todos) ? (task as { todos: unknown[] }).todos.length : 0), 0);
     return formatTodoSize(input.tasks.length, count);
   }
-  if (Array.isArray(input.todos)) return formatTodoSize(state.tasks.length, todoTasks(state).length + input.todos.length);
+  if (Array.isArray(input.todos)) {
+    const createsTask = typeof input.task === "string" && !state.tasks.some((task) => task.name === input.task);
+    return formatTodoSize(state.tasks.length + (createsTask ? 1 : 0), todoTasks(state).length + input.todos.length);
+  }
   return formatTodoSize(state.tasks.length, todoTasks(state).length);
 }
 
@@ -263,7 +266,7 @@ export function registerTodoTools(pi: ExtensionAPI): void {
   };
   const getSettings = (): Readonly<TodoSettings> => settings;
   registerHandler(pi, coordinator, "set", "Replace the complete Todo state.", TodoSetParamsSchema, (params, ctx) => coordinator.set(params, ctx, settings), getSettings, markInteraction);
-  registerHandler(pi, coordinator, "add", "Append pending todos to an existing task.", TodoAddParamsSchema, (params, ctx) => coordinator.add(params, ctx, settings), getSettings, markInteraction);
+  registerHandler(pi, coordinator, "add", "Append pending todos to an exact, case-sensitive task, or create it at the end if missing.", TodoAddParamsSchema, (params, ctx) => coordinator.add(params, ctx, settings), getSettings, markInteraction);
   registerHandler(pi, coordinator, "transition", "Change Todo statuses by exact task and todo name.", TodoTransitionParamsSchema, (params, ctx) => coordinator.transition(params, ctx, settings), getSettings, markInteraction);
   registerHandler(pi, coordinator, "view", "Return the complete Todo snapshot without mutation.", TodoViewParamsSchema, (params) => coordinator.view(params), getSettings, markInteraction);
 }
