@@ -25,7 +25,7 @@ const candidates: CandidateEntry[] = [
   { provider: "alpha", modelId: "model.1", thinking: "medium", reasoning: 2, impact: 2 },
   { provider: "alpha", modelId: "model.1", thinking: "off", reasoning: 3, impact: 3 },
 ];
-const atomic = { path: "atomic", basis: ["Bounded."], verification: ["Focused test."] } as const;
+const standalone = { path: "standalone", basis: ["Bounded."], verification: ["Focused test."] } as const;
 const authority = {
   work: "docs/works/admission/work.md",
   plan: "docs/works/admission/plan-slice.md",
@@ -74,7 +74,7 @@ function handoff(overrides: Partial<Handoff> = {}): Handoff {
 }
 
 function request(candidate: Handoff = handoff(), extra: Record<string, unknown> = {}) {
-  return { handoff: candidate, admission: atomic, reasoning: 1, impact: 1, ...extra };
+  return { handoff: candidate, admission: standalone, reasoning: 1, impact: 1, ...extra };
 }
 
 function planned(): Handoff {
@@ -283,6 +283,49 @@ describe("admission preservation", () => {
       subjectBuilder: async (...args) => { observations++; return buildPlannedSubject(...args); },
     })).toMatchObject({ status: "blocked", code: "invalid_reference" });
     expect(observations).toBe(0);
+  });
+
+  test("selects standalone directly without planned subject or authority checks", async () => {
+    registryReads = 0;
+    let observations = 0;
+    const result = await resolveDelegation(request(handoff({
+      context: [{ inline: "Standalone input.", purpose: "Current readable context." }],
+    })), {
+      ...options,
+      subjectBuilder: async () => { observations++; throw new Error("planned subject must not run"); },
+    });
+    expect(result).toMatchObject({ status: "resolved", model: "alpha/model.1", thinking: "medium" });
+    expect(observations).toBe(0);
+    expect(registryReads).toBe(1);
+  });
+
+  test("keeps actual standalone reference errors before planned or Registry work", async () => {
+    registryReads = 0;
+    let observations = 0;
+    expect(await resolveDelegation(request(handoff({ context: [{ ref: "missing.md", purpose: "Required." }] })), {
+      ...options,
+      subjectBuilder: async () => { observations++; throw new Error("planned subject must not run"); },
+    })).toMatchObject({ status: "blocked", code: "invalid_reference" });
+    expect(observations).toBe(0);
+    expect(registryReads).toBe(0);
+  });
+
+  test.each([
+    ["missing basis", { path: "standalone", verification: ["Check."] }, "invalid_admission"],
+    ["empty basis", { path: "standalone", basis: [], verification: ["Check."] }, "invalid_atomic_basis"],
+    ["whitespace basis", { path: "standalone", basis: ["  \t"], verification: ["Check."] }, "invalid_atomic_basis"],
+    ["non-array verification", { path: "standalone", basis: ["Bounded."], verification: "Check." }, "invalid_atomic_basis"],
+    ["non-string entry", { path: "standalone", basis: ["Bounded."], verification: [42] }, "invalid_atomic_basis"],
+    ["unknown authority field", { path: "standalone", basis: ["Bounded."], verification: ["Check."], authority }, "invalid_admission"],
+    ["workflow receipt", { path: "standalone", basis: ["Bounded."], verification: ["Check."], receipt: "opaque" }, "invalid_admission"],
+    ["output selector", { path: "standalone", basis: ["Bounded."], verification: ["Check."], outputSelector: "model" }, "invalid_admission"],
+    ["old atomic path", { path: "atomic", basis: ["Bounded."], verification: ["Check."] }, "invalid_admission"],
+    ["old preparation path", { path: "preparation", basis: ["Bounded."], verification: ["Check."] }, "invalid_admission"],
+    ["malformed object", null, "invalid_admission"],
+  ])("rejects standalone shape %s without Registry work", async (_name, admission, code) => {
+    registryReads = 0;
+    expect(await resolveDelegation(request(handoff(), { admission }), { ...options, subjectBuilder: async () => { throw new Error("planned subject must not run"); } })).toMatchObject({ status: "blocked", code });
+    expect(registryReads).toBe(0);
   });
 
   test("rejects tasks as a planned waves alias and requires exact authority fields before Registry access", async () => {

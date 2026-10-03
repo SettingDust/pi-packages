@@ -67,8 +67,12 @@ function expectClosedResolverSchema(schema: unknown): void {
     .toEqual([["purpose", "ref"], ["inline", "purpose"]]);
   const admissionSchemas = root.admission.anyOf as unknown[];
   expect(admissionSchemas).toHaveLength(2);
-  const atomic = admissionSchemas.find((candidate: any) => candidate.properties?.path?.const === "atomic");
-  expect(Object.keys(expectClosedObject(atomic)).sort()).toEqual(["basis", "path", "verification"]);
+  const standalone = admissionSchemas.find((candidate: any) => candidate.properties?.path?.const === "standalone");
+  const standaloneProperties = expectClosedObject(standalone);
+  expect(standaloneProperties.basis.items).toMatchObject({ minLength: 1, pattern: "\\S" });
+  expect(standaloneProperties.verification.items).toMatchObject({ minLength: 1, pattern: "\\S" });
+  expect(admissionSchemas.some((candidate: any) => candidate.properties?.path?.const === "atomic")).toBeFalse();
+  expect(admissionSchemas.some((candidate: any) => candidate.properties?.path?.const === "preparation")).toBeFalse();
   const planned = admissionSchemas.find((candidate: any) => candidate.properties?.path?.const === "planned");
   expect(planned).toBeDefined();
   const plannedProperties = expectClosedObject(planned);
@@ -104,7 +108,7 @@ describe("Pi Harness Extension", () => {
 
     const args = {
       handoff: { objective: "Restore historical rendering.", primarySkill: "implement", context: Array.from({ length: 12 }, (_, index) => ({ inline: `ARG_DETAIL_${index}`, purpose: "fixture" })) },
-      admission: { path: "atomic", basis: ["fixture"], verification: ["fixture"] },
+      admission: { path: "standalone", basis: ["fixture"], verification: ["fixture"] },
       reasoning: 1,
       impact: 1,
       delegate: { name: "fixture", params: {} },
@@ -174,7 +178,7 @@ describe("Pi Harness Extension", () => {
         context: Array.from({ length: 105 }, (_, index) => ({ inline: `context-${index}`, purpose: "Original context" })),
         constraints: ["constraint-tail"], deliverables: ["deliverable-tail"],
       },
-      admission: { path: "atomic", basis: ["basis-tail"], verification: ["verification-tail"] },
+      admission: { path: "standalone", basis: ["basis-tail"], verification: ["verification-tail"] },
       reasoning: 2, impact: 3, delegate: { name: `delegate${unsafe}`, params: { label: "startup-tail" } },
     };
     const originalArgs = JSON.stringify(args);
@@ -319,6 +323,24 @@ describe("Pi Harness Extension", () => {
     expect(first.systemPrompt).not.toContain("The Resolver validates the Handoff and selects a candidate; it does not launch a Handler.");
     expect(first.systemPrompt).toContain("without local selection, fallback, substitution, rewrite, or another Registry read");
     for (const phrase of [
+      "Apply the loaded strategy's complete-effect classification before selecting domain Skills, constructing a Handoff, requesting capability, or choosing admission",
+      "Use standalone only for authorized work outside a selected executable Work/Plan/Waves tuple",
+      "Use planned for graph-bound work and for work requiring tuple prerequisites, gates, readiness, conflict, or implementation-scope confirmation",
+      "missing required implementation prerequisites block and cannot be relabeled standalone",
+      "Size, complexity, file count, Skill name, and tuple availability alone do not select a path",
+      "Preparation is an effect category under standalone, not a third path",
+      "put future output targets in ordinary text or inline context, keep actual refs readable",
+      "exclude production code, configuration, dependencies, lockfiles, LLM instructions, installation, reload, deployment, Git writes, and prepared-plan execution",
+      "Loading Skills, accepted authority, path/readiness text, a Handoff, successful Resolver admission, or a completed preparation Result grants neither permission nor implementation confirmation",
+      "If one bundle contains multiple independently valuable outcomes, block before work and split them into one predicate per Handoff",
+      "The Router retains semantic authorization and confirmation judgment",
+      "For authorized non-tuple work supply standalone basis and focused verification",
+      "Resolver performs only closed structural, readable-reference, planned tuple/current-byte, and protected-binding checks",
+      "it does not classify effects, infer permission, choose an alternate tool, fabricate a tuple, or fallback",
+      "When a preparation Result or accepted authority is complete, project it truthfully but require a later substantive implementation disclosure and explicit current-user confirmation",
+      "do not execute a prepared plan or release its dependencies automatically",
+    ]) expect(first.systemPrompt).toContain(phrase);
+    for (const phrase of [
       "First decide only whether new project-domain delegation is needed",
       "find delegation-strategy by name in the current model-visible Skill catalog below",
       "use read at its listed location to load the full body",
@@ -428,7 +450,25 @@ describe("Pi Harness Extension", () => {
     ]) expect(phases[1]).toContain(phrase); // S14-S19: narrow exceptions do not bypass authorization.
     expect(phases[1]).not.toContain("reconfirm on substantive authority or Plan drift");
     expect(phases[1]).not.toContain("Complete applicable planned Work/Plan/Tasks, disclose the exact selected Plan");
+    for (const phrase of [
+      "For authorized non-tuple work supply standalone basis and focused verification",
+      "Use exactly two closed admission paths: standalone with basis and verification for authorized non-tuple work, and planned with the exact Work/Plan/Waves authority tuple for graph-bound work",
+      "Choose between these paths from the complete effects, applicable authorization, and whether graph-bound tuple prerequisites, gates, readiness, conflicts, or implementation-scope confirmation are actually required",
+      "Do not send path \"atomic\" or path \"preparation\"",
+      "If the effective runtime lacks standalone, report a pre-launch admission block without fallback or a fabricated tuple",
+      "when those graph-bound conditions are required, supply only the exact planned Work/Plan/Waves selectors",
+      "Labels such as coordination-heavy, architectural, security, migration, durable, or otherwise material alone do not force planned or select a path",
+      "Resolver performs only closed structural, readable-reference, planned tuple/current-byte, and protected-binding checks",
+      "it does not classify effects, infer permission, choose an alternate tool, fabricate a tuple, or fallback",
+    ]) expect(phases[2]).toContain(phrase);
+    expect(phases[2]).not.toContain("for graph-bound, coordination-heavy, architectural, security, migration, durable, or otherwise material work supply only the exact planned Work/Plan/Waves selectors");
+    for (const phrase of [
+      "When a preparation Result or accepted authority is complete, project it truthfully",
+      "require a later substantive implementation disclosure and explicit current-user confirmation before any planned implementation",
+      "do not execute a prepared plan or release its dependencies automatically",
+    ]) expect(phases[3]).toContain(phrase);
     expect(phases[0].indexOf("settle intended outcomes")).toBeLessThan(phases[0].indexOf("express new behavior verifiably"));
+    expect(phases[0].indexOf("Apply the loaded strategy's complete-effect classification")).toBeLessThan(phases[0].indexOf("first disclose in an ordinary message"));
     expect(phases[0].indexOf("first disclose in an ordinary message")).toBeLessThan(phases[0].indexOf("Obtain explicit current-user confirmation"));
     expect(phases[0].indexOf("Obtain explicit current-user confirmation")).toBeLessThan(phases[0].indexOf("identify each independently observable user-requested result"));
     expect(phases[0].indexOf("identify each independently observable user-requested result")).toBeLessThan(phases[0].indexOf("Each planned Waves item has exactly one Handler"));
@@ -436,7 +476,7 @@ describe("Pi Harness Extension", () => {
     for (const phrase of [
       "select one domain primary Skill and optional companion Skills for this Handoff only",
       "then assign the least sufficient finite non-negative reasoning and impact requirements from the concrete work before calling resolve_delegation",
-      "For bounded behavior-neutral work supply atomic basis and focused verification",
+      "For authorized non-tuple work supply standalone basis and focused verification",
       "supply only the exact planned Work/Plan/Waves selectors",
       "Keep Handoff fields limited to objective, primarySkill, optional companionSkills, context, constraints, and deliverables; keep Handoff and admission shapes closed",
       "Do not issue a second launch after its response",
@@ -507,7 +547,7 @@ describe("Pi Harness Extension", () => {
     const rawReturn = { result: { content: [{ type: "text", text: "opaque" }], details: { subagentId: "task", generation: 1, status: "running" } }, isError: false };
     const delegate = { name: "subagent_spawn", params: { label: "Inspect", taskSlug: "inspect-implementation" } };
     const toolContext = { ...context(modelRegistry), tools: [{ name: "subagent_spawn" }], executeTool: async (name: string, args: unknown) => { calls.push({ name, args }); return rawReturn; } };
-    const invocation = await resolver.execute("call-1", { handoff: { objective: "Inspect implementation.", primarySkill: "implement", context: [{ inline: "Supplied context.", purpose: "Boundary." }] }, admission: { path: "atomic", basis: ["Bounded."], verification: ["Check result."] }, reasoning: 1, impact: 2, delegate }, undefined, undefined, toolContext);
+    const invocation = await resolver.execute("call-1", { handoff: { objective: "Inspect implementation.", primarySkill: "implement", context: [{ inline: "Supplied context.", purpose: "Boundary." }] }, admission: { path: "standalone", basis: ["Bounded."], verification: ["Check result."] }, reasoning: 1, impact: 2, delegate }, undefined, undefined, toolContext);
     expect(invocation.details.resolution).toMatchObject({ status: "resolved", model: "test/reasoning/model", thinking: "medium" });
     expect(invocation.details).not.toHaveProperty("taskSlug");
     expect(registryReads).toBe(1);
@@ -519,7 +559,7 @@ describe("Pi Harness Extension", () => {
 
     for (const isError of [true, false]) {
       rawReturn.isError = isError;
-      const captured = await resolver.execute("raw-return", { handoff: { objective: "Check raw evidence.", primarySkill: "implement", context: [] }, admission: { path: "atomic", basis: ["Bounded."], verification: ["Check."] }, reasoning: 1, impact: 1, delegate }, undefined, undefined, toolContext);
+      const captured = await resolver.execute("raw-return", { handoff: { objective: "Check raw evidence.", primarySkill: "implement", context: [] }, admission: { path: "standalone", basis: ["Bounded."], verification: ["Check."] }, reasoning: 1, impact: 1, delegate }, undefined, undefined, toolContext);
       expect(captured.details.resolution.status).toBe("resolved");
       expect(captured.details.launch.rawReturn).toBe(rawReturn);
       expect(Object.keys(captured.details.launch)).toEqual(["tool", "rawReturn"]);
@@ -538,7 +578,7 @@ describe("Pi Harness Extension", () => {
     }
     for (const rawError of [new Error("Bridge failure"), { code: "transport_failure" }, undefined]) {
       let failedCalls = 0;
-      const thrown = await resolver.execute("raw-error", { handoff: { objective: "Check error evidence.", primarySkill: "implement", context: [] }, admission: { path: "atomic", basis: ["Bounded."], verification: ["Check."] }, reasoning: 1, impact: 1, delegate }, undefined, undefined, {
+      const thrown = await resolver.execute("raw-error", { handoff: { objective: "Check error evidence.", primarySkill: "implement", context: [] }, admission: { path: "standalone", basis: ["Bounded."], verification: ["Check."] }, reasoning: 1, impact: 1, delegate }, undefined, undefined, {
         ...toolContext, executeTool: async () => { failedCalls++; throw rawError; },
       } as ExtensionContext);
       expect(failedCalls).toBe(1);
@@ -583,12 +623,12 @@ describe("Pi Harness Extension", () => {
 
     candidates = { status: "ready", candidates: [{ provider: "missing", modelId: "model", thinking: "medium", reasoning: 1, impact: 1 }] };
     await before!(event([skill("implement")]), context(modelRegistry));
-    const unavailable = await tools.get("resolve_delegation")!.execute("call-2", { handoff: { objective: "Inspect.", primarySkill: "implement", context: [] }, admission: { path: "atomic", basis: ["Bounded."], verification: ["Check."] }, reasoning: 1, impact: 1, delegate }, undefined, undefined, toolContext);
+    const unavailable = await tools.get("resolve_delegation")!.execute("call-2", { handoff: { objective: "Inspect.", primarySkill: "implement", context: [] }, admission: { path: "standalone", basis: ["Bounded."], verification: ["Check."] }, reasoning: 1, impact: 1, delegate }, undefined, undefined, toolContext);
     expect(unavailable.details.resolution).toMatchObject({ status: "blocked", code: "unavailable_candidate" });
 
     candidates = { status: "ready", candidates: [{ provider: "test", modelId: "reasoning/model", thinking: "medium", reasoning: 1, impact: 1 }] };
     await before!(event([skill("implement")]), context(modelRegistry));
-    const insufficient = await tools.get("resolve_delegation")!.execute("call-3", { handoff: { objective: "Inspect.", primarySkill: "implement", context: [] }, admission: { path: "atomic", basis: ["Bounded."], verification: ["Check."] }, reasoning: 2, impact: 2, delegate }, undefined, undefined, toolContext);
+    const insufficient = await tools.get("resolve_delegation")!.execute("call-3", { handoff: { objective: "Inspect.", primarySkill: "implement", context: [] }, admission: { path: "standalone", basis: ["Bounded."], verification: ["Check."] }, reasoning: 2, impact: 2, delegate }, undefined, undefined, toolContext);
     expect(insufficient.details.resolution).toMatchObject({ status: "blocked", code: "no_qualified_candidate" });
 
     candidates = { status: "blocked", code: "invalid_configuration", message: "bad harness settings" };

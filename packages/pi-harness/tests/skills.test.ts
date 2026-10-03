@@ -113,6 +113,28 @@ describe("built-in Skill library", () => {
     expect(body).toContain("Require implementation checks and resolve unexplained implementation drift only when implementation is the delegated outcome");
   });
 
+  test("delegation strategy owns admission and preparation boundaries", () => {
+    const { body } = readSkill("delegation-strategy");
+    for (const phrase of [
+      "Classify each outcome by its complete intended effects and applicable authorization",
+      "Use `standalone` for authorized work that is not bound to a selected executable Work/Plan/Waves tuple",
+      "Use `planned` for graph-bound work or work whose required implementation prerequisites, gates, readiness, conflicts, or scope confirmation belong to a selected Work/Plan/Waves tuple",
+      "Missing required implementation prerequisites are a block; never relabel that work `standalone`",
+      "Size, complexity, file count, Skill name, and tuple availability alone never select a path",
+      "Treat preparation as an effect category under `standalone`, not a third admission path",
+      "Future output targets belong in ordinary Handoff text or inline context and are not actual refs",
+      "Preparation excludes production code, configuration, dependencies, lockfiles, LLM instructions, installation, reload, deployment, Git writes, and execution of the prepared plan",
+      "Loading this Skill or a domain Skill, accepted authority, a path/readiness claim, a Handoff, successful Resolver admission, or a completed preparation Result grants neither permission nor implementation confirmation",
+      "If the bundle contains more than one independently valuable outcome for one Handler, block before project work and split it at the Router",
+      "If this Skill is missing, hidden, unreadable, incomplete, or conflicts with standing instructions, block new delegation rather than substituting a remembered method, an inline fallback, or another Handler",
+      "The Resolver remains structural and binding-only",
+      "It does not classify effects, infer permission, choose an alternate tool, fabricate a planned tuple, use an old `atomic` or `preparation` path, fallback, interpret Handler Results, or advance work",
+      "If the effective runtime lacks `standalone`, report the pre-launch admission block without fallback or fabricated tuple",
+    ]) expect(body).toContain(phrase);
+    expect(body.indexOf("Classify each outcome")).toBeLessThan(body.indexOf("choose the domain primary Skill"));
+    expect(body.indexOf("Treat preparation as an effect category")).toBeLessThan(body.indexOf("choose the domain primary Skill"));
+  });
+
   test("package metadata exposes the Skill directory", () => {
     const manifest = JSON.parse(readFileSync(join(root, "package.json"), "utf8"));
     expect(manifest.files).toContain("skills");

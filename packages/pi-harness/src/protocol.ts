@@ -40,8 +40,8 @@ export interface Handoff {
   deliverables?: string[];
 }
 
-export interface AtomicAdmission {
-  path: "atomic";
+export interface StandaloneAdmission {
+  path: "standalone";
   basis: string[];
   verification: string[];
 }
@@ -51,7 +51,7 @@ export interface PlannedAdmission {
   authority: AuthoritySelectors;
 }
 
-export type AdmissionInput = AtomicAdmission | PlannedAdmission;
+export type AdmissionInput = StandaloneAdmission | PlannedAdmission;
 
 export interface ResolverInput {
   handoff: Handoff;
@@ -180,10 +180,10 @@ export async function dispatchDelegation(
   }
   const { delegate, ...request } = input;
   if (!isRecord(delegate) || !exactKeys(delegate, ["name", "params"]) || !nonEmptyString(delegate.name)
-    || !isRecord(delegate.params) || ![Object.prototype, null].includes(Object.getPrototypeOf(delegate.params))) {
+    || !isRecord(delegate.params) || ![Object.prototype, null].includes(Object.getPrototypeOf(delegate.params as object))) {
     return { resolution: blocked("invalid_delegate", "delegate requires only a registered name and plain params object") };
   }
-  if (["agent", "prompt", "model", "thinking"].some((key) => Object.hasOwn(delegate.params, key))) {
+  if (["agent", "prompt", "model", "thinking"].some((key) => Object.hasOwn(delegate.params as object, key))) {
     return { resolution: blocked("invalid_delegate", "delegate.params must not supply protected agent, prompt, model, or thinking bindings") };
   }
   const tool = delegate.name;
@@ -233,7 +233,7 @@ export async function resolveDelegation(input: unknown, options: ResolveOptions)
   if (!requestResult.ok) return blocked(requestResult.code, requestResult.message);
   const candidateResult = validateCandidateCapabilities(candidateShape.candidates);
   if (!candidateResult.ok) return blocked(candidateResult.code, candidateResult.message);
-  if (admissionResult.value.path === "atomic") return selectCandidate(normalizedHandoff, requestResult, candidateResult.candidates, options.modelRegistry);
+  if (admissionResult.value.path === "standalone") return selectCandidate(normalizedHandoff, requestResult, candidateResult.candidates, options.modelRegistry);
   const subjectBuilder = options.subjectBuilder ?? buildPlannedSubject;
   let authorityPaths: AuthoritySelectors;
   try {
@@ -310,20 +310,25 @@ function validateAdmission(value: unknown):
   | { ok: false; code: BlockCode; message: string } {
   if (!isRecord(value)) return { ok: false, code: "invalid_admission", message: "Admission is required and must be an object" };
   if (hasForbiddenAdmissionField(value)) return { ok: false, code: "invalid_admission", message: "Admission must not contain receipt, digest, reviewer, or workflow fields" };
-  if (value.path === "atomic") {
-    if (!exactKeys(value, ["path", "basis", "verification"])) return { ok: false, code: "invalid_admission", message: "Atomic admission has unsupported fields" };
+  if (value.path === "standalone") {
+    if (!exactKeys(value, ["path", "basis", "verification"])) return { ok: false, code: "invalid_admission", message: "Standalone admission has unsupported fields" };
     if (!stringArray(value.basis) || !stringArray(value.verification) || value.basis.length === 0 || value.verification.length === 0) {
-      return { ok: false, code: "invalid_atomic_basis", message: "Atomic admission requires bounded basis and focused verification" };
+      return { ok: false, code: "invalid_atomic_basis", message: "Standalone admission requires bounded basis and focused verification" };
     }
-    return { ok: true, value: { path: "atomic", basis: [...value.basis], verification: [...value.verification] } };
+    return { ok: true, value: { path: "standalone", basis: [...value.basis], verification: [...value.verification] } };
   }
   if (value.path === "planned") {
-    if (!exactKeys(value, ["path", "authority"]) || !isRecord(value.authority) || hasForbiddenAdmissionField(value.authority) || !exactKeys(value.authority, ["work", "plan", "waves"]) || ![value.authority.work, value.authority.plan, value.authority.waves].every(nonEmptyString)) {
+    const authority = value.authority;
+    if (!exactKeys(value, ["path", "authority"]) || !isRecord(authority) || hasForbiddenAdmissionField(authority) || !exactKeys(authority, ["work", "plan", "waves"])) {
       return { ok: false, code: "invalid_admission", message: "Planned admission must contain only work, plan, and waves path selectors" };
     }
-    return { ok: true, value: { path: "planned", authority: { work: value.authority.work, plan: value.authority.plan, waves: value.authority.waves } } };
+    const { work, plan, waves } = authority;
+    if (!nonEmptyString(work) || !nonEmptyString(plan) || !nonEmptyString(waves)) {
+      return { ok: false, code: "invalid_admission", message: "Planned admission must contain only work, plan, and waves path selectors" };
+    }
+    return { ok: true, value: { path: "planned", authority: { work, plan, waves } } };
   }
-  return { ok: false, code: "invalid_admission", message: "Admission path must be atomic or planned" };
+  return { ok: false, code: "invalid_admission", message: "Admission path must be standalone or planned" };
 }
 
 function hasForbiddenAdmissionField(value: Record<string, unknown>): boolean {
@@ -398,13 +403,15 @@ async function readablePath(cwd: string, ref: string): Promise<string> {
 }
 
 function validateContext(value: unknown): { ok: true; value: ContextItem } | { ok: false } {
-  if (!isRecord(value) || !nonEmptyString(value.purpose)) return { ok: false };
-  const hasRef = nonEmptyString(value.ref);
-  const hasInline = nonEmptyString(value.inline);
-  if (hasRef === hasInline) return { ok: false };
-  if (hasRef && !exactKeys(value, ["ref", "purpose"])) return { ok: false };
-  if (hasInline && !exactKeys(value, ["inline", "purpose"])) return { ok: false };
-  return hasRef ? { ok: true, value: { ref: value.ref, purpose: value.purpose } } : { ok: true, value: { inline: value.inline, purpose: value.purpose } };
+  if (!isRecord(value)) return { ok: false };
+  const purpose = nonEmptyString(value.purpose) ? value.purpose : undefined;
+  if (purpose === undefined) return { ok: false };
+  const ref = nonEmptyString(value.ref) ? value.ref : undefined;
+  const inline = nonEmptyString(value.inline) ? value.inline : undefined;
+  if ((ref !== undefined) === (inline !== undefined)) return { ok: false };
+  if (ref !== undefined && !exactKeys(value, ["ref", "purpose"])) return { ok: false };
+  if (inline !== undefined && !exactKeys(value, ["inline", "purpose"])) return { ok: false };
+  return ref !== undefined ? { ok: true, value: { ref, purpose } } : { ok: true, value: { inline: inline!, purpose } };
 }
 
 function stringArray(value: unknown): value is string[] {
@@ -423,7 +430,7 @@ function isArtifacts(value: unknown): value is ResultArtifact[] {
   return Array.isArray(value) && value.every((item) => isRecord(item) && nonEmptyString(item.ref) && nonEmptyString(item.purpose));
 }
 
-function isRecord(value: unknown): value is Record<string, any> {
+function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 

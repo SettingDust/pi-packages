@@ -4,7 +4,7 @@ import { dispatchDelegation } from "../src/protocol.js";
 
 const input = {
   handoff: { objective: "Check dispatch", primarySkill: "implement", context: [] },
-  admission: { path: "atomic", basis: ["Bounded"], verification: ["Test"] },
+  admission: { path: "standalone", basis: ["Bounded"], verification: ["Test"] },
   reasoning: 1, impact: 1,
   delegate: { name: "subagent_spawn", params: { label: "Check", taskSlug: "check-dispatch" } },
 };
@@ -28,6 +28,7 @@ test.each([
   { handoff: { ...input.handoff, context: [{ ref: "missing-authority-for-dispatch.md", purpose: "Required" }] } },
   { handoff: { ...input.handoff, extra: true } },
   { admission: undefined },
+  ...["atomic", "preparation"].map(path => ({ admission: { path, basis: ["Bounded"], verification: ["Test"] } })),
   { reasoning: -1 },
 ])("pre-launch rejection has no evidence: %p", async override => {
   let calls = 0;

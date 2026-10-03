@@ -146,7 +146,7 @@ describe("Harness candidate settings storage", () => {
 
     expect(await resolveDelegation({
       handoff: { objective: "Verify settings.", primarySkill: "test", companionSkills: [], context: [] },
-      admission: { path: "atomic", basis: ["Bounded."], verification: ["Test."] },
+      admission: { path: "standalone", basis: ["Bounded."], verification: ["Test."] },
       reasoning: 0,
       impact: 0,
     }, {
