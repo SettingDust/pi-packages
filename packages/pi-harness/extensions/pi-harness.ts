@@ -22,6 +22,8 @@ export default function activateHarness(
   loadCandidates: CandidateLoader = loadHarnessCandidates,
   configure: ConfigRunner = runHarnessConfig,
 ): void {
+  pi.registerTool({ ...createResolverTool([], loadCandidates), defaultActive: false });
+
   pi.registerCommand("harness", {
     description: "Configure Pi Harness Candidates",
     handler: async (args, ctx) => {

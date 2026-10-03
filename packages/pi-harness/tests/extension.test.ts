@@ -13,6 +13,7 @@ type BeforeHandler = (event: BeforeAgentStartEvent, ctx: ExtensionContext) => un
 type RegisteredTool = {
   name: string;
   description?: string;
+  defaultActive?: boolean;
   parameters: any;
   renderCall?: (args: any, theme: any, context: any) => { render(width: number): string[] };
   renderResult?: (result: any, options: { expanded: boolean; isPartial: boolean }, theme: any, context: any) => { render(width: number): string[] };
@@ -79,6 +80,80 @@ function expectClosedResolverSchema(schema: unknown): void {
 }
 
 describe("Pi Harness Extension", () => {
+  test("registers historical renderers before eligibility and keeps them separate from activation", async () => {
+    let before: BeforeHandler | undefined;
+    let active = ["read"];
+    const tools = new Map<string, RegisteredTool>();
+    const pi = {
+      on(name: string, handler: BeforeHandler) { if (name === "before_agent_start") before = handler; },
+      registerCommand() {},
+      registerTool(tool: RegisteredTool) { tools.set(tool.name, tool); },
+      getActiveTools: () => [...active],
+      setActiveTools(names: string[]) { active = [...names]; },
+    } as unknown as ExtensionAPI;
+    const loadCandidates = (_cwd: string, _trusted: boolean): HarnessCandidates => ({
+      status: "ready",
+      candidates: [{ provider: "test", modelId: "model", thinking: "off", reasoning: 1, impact: 1 }],
+    });
+    activateHarness(pi, loadCandidates, async () => {});
+
+    const cold = tools.get("resolve_delegation");
+    expect(cold).toBeDefined();
+    expect(cold!.defaultActive).toBeFalse();
+    expect(active).toEqual(["read"]);
+
+    const args = {
+      handoff: { objective: "Restore historical rendering.", primarySkill: "implement", context: Array.from({ length: 12 }, (_, index) => ({ inline: `ARG_DETAIL_${index}`, purpose: "fixture" })) },
+      admission: { path: "atomic", basis: ["fixture"], verification: ["fixture"] },
+      reasoning: 1,
+      impact: 1,
+      delegate: { name: "fixture", params: {} },
+    };
+    const result = {
+      content: [{ type: "text", text: Array.from({ length: 30 }, (_, index) => `RAW_LINE_${index}`).join("\n") }],
+      details: { resolution: { status: "resolved", model: "test/model", thinking: "off", prompt: "fixture" }, launch: { tool: "fixture", rawReturn: { opaque: true } } },
+    };
+    const restoredArgs = JSON.parse(JSON.stringify(args));
+    const restoredResult = JSON.parse(JSON.stringify(result));
+    const theme = { fg: (_color: string, text: string) => text, bold: (text: string) => text };
+    const compactCall = cold!.renderCall!(restoredArgs, theme, { expanded: false }).render(100);
+    const expandedCall = cold!.renderCall!(restoredArgs, theme, { expanded: true }).render(100);
+    expect(compactCall).toHaveLength(3);
+    expect(compactCall.join("\n")).not.toContain("ARG_DETAIL_11");
+    expect(expandedCall.join("\n")).toContain("ARG_DETAIL_11");
+    const compactResult = cold!.renderResult!(restoredResult, { expanded: false, isPartial: false }, theme, {}).render(100);
+    const expandedResult = cold!.renderResult!(restoredResult, { expanded: true, isPartial: false }, theme, {}).render(100);
+    expect(compactResult).toHaveLength(3);
+    expect(compactResult.join("\n")).toContain("raw return captured");
+    expect(expandedResult.join("\n")).toContain("RAW_LINE_29");
+
+    const oldRenderer = cold!;
+    await before!(event([skill("implement")]), context({ getAvailable: () => [] }));
+    expect(active).toEqual(["read", "resolve_delegation"]);
+    expect(tools.get("resolve_delegation")).not.toBe(oldRenderer);
+    expect(oldRenderer.renderCall!(restoredArgs, theme, { expanded: false }).render(100)).toHaveLength(3);
+
+    await before!(event([skill("implement")], "Handler fixture"), context({ getAvailable: () => [] }));
+    expect(active).toEqual(["read"]);
+    expect(oldRenderer.renderResult!(restoredResult, { expanded: false, isPartial: false }, theme, {}).render(100)).toHaveLength(3);
+
+    let freshBefore: BeforeHandler | undefined;
+    let freshActive = ["read"];
+    let freshTool: RegisteredTool | undefined;
+    const freshPi = {
+      on(name: string, handler: BeforeHandler) { if (name === "before_agent_start") freshBefore = handler; },
+      registerCommand() {},
+      registerTool(tool: RegisteredTool) { freshTool = tool; },
+      getActiveTools: () => [...freshActive],
+      setActiveTools(names: string[]) { freshActive = [...names]; },
+    } as unknown as ExtensionAPI;
+    activateHarness(freshPi, loadCandidates, async () => {});
+    expect(freshTool).toBeDefined();
+    expect(freshTool!.defaultActive).toBeFalse();
+    expect(freshActive).toEqual(["read"]);
+    expect(freshBefore).toBeDefined();
+  });
+
   test("renders bounded resolver summaries and full safe details without interpreting backend evidence", async () => {
     let before: BeforeHandler | undefined;
     let resolver: RegisteredTool | undefined;
@@ -552,7 +627,7 @@ describe("Pi Harness Extension", () => {
     activateHarness(pi, loadCandidates, async () => {});
     await before!(event([skill("implement")]), ctx);
     expect(active).toEqual(["read", "resolve_delegation"]);
-    expect(registered).toBe(1);
+    expect(registered).toBe(2);
     global = field === "unknown" ? { harness: { candidates: {}, unknown: true } } : { harness: { [field]: {} } };
 
     const result = await tools.get("resolve_delegation")!.execute("drift", {
@@ -565,10 +640,10 @@ describe("Pi Harness Extension", () => {
     expect(result.details.resolution).toMatchObject({ status: "blocked", code });
     expect(result.details).not.toHaveProperty("launch");
     expect(registryReads).toBe(0);
-    expect(registered).toBe(1);
+    expect(registered).toBe(2);
     expect(active).toEqual(["read", "resolve_delegation"]);
   });
-  test("blocks duplicate raw default settings before Registry access or Resolver registration", async () => {
+  test("blocks duplicate raw default settings before Registry access or Resolver activation", async () => {
     const root = mkdtempSync(join(tmpdir(), "pi-harness-extension-"));
     const cwd = join(root, "project");
     const agentDir = join(root, "agent");
@@ -582,10 +657,11 @@ describe("Pi Harness Extension", () => {
       let active = ["read"];
       let registrations = 0;
       let registryReads = 0;
+      let resolver: RegisteredTool | undefined;
       const pi = {
         on(name: string, handler: BeforeHandler) { if (name === "before_agent_start") before = handler; },
         registerCommand() {},
-        registerTool() { registrations++; },
+        registerTool(tool: RegisteredTool) { registrations++; resolver = tool; },
         getActiveTools: () => [...active],
         setActiveTools(names: string[]) { active = [...names]; },
       } as unknown as ExtensionAPI;
@@ -594,7 +670,8 @@ describe("Pi Harness Extension", () => {
       expectSingleCallPrompt((result as { systemPrompt: string }).systemPrompt);
       expect(result).toMatchObject({ systemPrompt: expect.stringContaining("Pi settings could not be read") });
       expect(active).toEqual(["read"]);
-      expect(registrations).toBe(0);
+      expect(registrations).toBe(1);
+      expect(resolver?.defaultActive).toBeFalse();
       expect(registryReads).toBe(0);
     } finally {
       if (originalAgentDir === undefined) delete process.env.PI_CODING_AGENT_DIR;
@@ -607,16 +684,18 @@ describe("Pi Harness Extension", () => {
     let before: BeforeHandler | undefined;
     let active = ["read", "resolve_delegation"];
     let registered = 0;
+    let firstResolver: RegisteredTool | undefined;
     const pi = {
       on(name: string, handler: BeforeHandler) { if (name === "before_agent_start") before = handler; },
-      registerCommand() {}, registerTool() { registered++; },
+      registerCommand() {}, registerTool(tool: RegisteredTool) { registered++; firstResolver ??= tool; },
       getActiveTools: () => [...active], setActiveTools(names: string[]) { active = [...names]; },
     } as unknown as ExtensionAPI;
     let candidates: HarnessCandidates = { status: "ready", candidates: [] };
     activateHarness(pi, () => candidates, async () => {});
     const prompt = await before!(event([skill("research")]), context({ getAvailable: () => [] })) as { systemPrompt: string };
     expect(active).toEqual(["read"]);
-    expect(registered).toBe(0);
+    expect(registered).toBe(1);
+    expect(firstResolver?.defaultActive).toBeFalse();
     expect(prompt.systemPrompt).toContain("No candidate is configured");
     expectSingleCallPrompt(prompt.systemPrompt);
     expect(prompt.systemPrompt).toContain("If absent, hidden, unreadable, incomplete, or conflicting, block new delegation");
@@ -626,7 +705,7 @@ describe("Pi Harness Extension", () => {
     const noVisibleSkills = await before!(event([skill("hidden", true)]), context({ getAvailable: () => [] })) as { systemPrompt: string };
     expectSingleCallPrompt(noVisibleSkills.systemPrompt);
     expect(active).toEqual(["read"]);
-    expect(registered).toBe(0);
+    expect(registered).toBe(1);
     const hidden = await before!(event([skill("delegation-strategy", true), skill("implement")]), context({ getAvailable: () => [] })) as { systemPrompt: string };
     expect(hidden.systemPrompt).not.toContain("<name>delegation-strategy</name>");
     expectSingleCallPrompt(hidden.systemPrompt);
