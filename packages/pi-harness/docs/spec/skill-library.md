@@ -48,7 +48,9 @@ Research modes apply `research-source-grounded` whenever material claims depend 
 
 - `diagnose`: reproduce a failure, isolate variables, establish root cause, and identify the smallest evidence-backed correction and regression check.
 
-`diagnose` may use research, implementation, and review Skills according to whether the Handoff requests diagnosis only or a verified repair.
+A `diagnose` Handoff must stop at reproduction, root-cause attribution, and correction/regression-check guidance; it must not apply the correction, even when the repair is already known. Research and review methods may support that diagnosis outcome. Applying its correction requires a separate, authorized `implement-change` Handoff. Loading `diagnose` as a companion preserves its diagnosis-only method boundary and grants no repair permission.
+
+Under the [generic single-result delegation contract](router-delegation.md#11-generic-single-result-delegation-contract), an authorized implementation Handoff may perform reproduction, root-cause analysis, and regression verification as internal methods serving its one repair predicate; it does not require a separate diagnosis Result first. A bundle requesting independently valuable diagnosis and implementation outcomes must be blocked before either is performed. A Handoff does not establish authorization; missing required permission or a material change to authority or authorized scope must stop the affected execution until the applicable [authority and authorization requirements](router-delegation.md#12-collaborative-authority-and-layered-delivery) are satisfied.
 
 ### Design
 

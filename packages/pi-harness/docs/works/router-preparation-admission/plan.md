@@ -1,7 +1,7 @@
 # Plan: Router Standalone/Planned Admission and Skill-Owned Preparation
 
 - [Work](work.md) | [Waves](waves.md)
-- Scope ready for substantive Router disclosure; explicit current-user implementation confirmation is pending. No implementation has started.
+- Source/instruction implementation and bounded independent review are complete. [Work current status](work.md#current-delivery-status) owns the adopted Results, source/evidence gate status, historical locators, and unverified live boundary. The requirements and preparation-time disclosure language below retain the original Plan; they are not a current unstarted or confirmation-pending report.
 
 ## Outcome and authority
 
@@ -40,7 +40,7 @@ After both implementation Results, a read-only Handler independently inspects th
 
 `PREP-RUNTIME` and `PREP-COORDINATION` are separate results because their runtime/schema and instruction contracts have independently observable checks, but they are serialized: coordination consumes the latest runtime/schema and shared extension/test bytes. The renderer-fix writer has ended; the compact-renderer parent is commit `8b5c7956e58b3596e411c93742abdf6a653c05d5`, and the current cold-start renderer repair is signed commit `883996b5ff2e5c231197dc8c6fc9033278fe691b`, verified with `git show`. Preserve the render-only changes. Before `PREP-RUNTIME` acquires extension/test files, check for newly conflicting writers and use the latest bytes. Any other conflicting writer must be handled the same way. This is explicit shared-file ownership, not an automatic scheduler and not a formal loaded-provenance prerequisite.
 
-`PREP-VERIFY` depends on both implementation Results and is read-only. No step runs now. All later work remains inside the confirmed scope; material changes to outcome, behavior, ownership, architecture, dependency, risk, or verification require the Spec's C6 disclosure and reconfirmation rule.
+`PREP-VERIFY` depends on both implementation Results and is read-only. At preparation time no step ran; subsequent delivery and adoption are recorded in [Work current status](work.md#current-delivery-status). All later work remains inside the confirmed scope; material changes to outcome, behavior, ownership, architecture, dependency, risk, or verification require the Spec's C6 disclosure and reconfirmation rule.
 
 ## P1-P11 verification map
 
@@ -79,4 +79,4 @@ All three gates in [Waves](waves.md) are required. A `completed` review Result d
 - Static checks cannot prove user permission, confirmation, classification, obedience, real backend overlap, full Result retrieval/correlation, dependency release, or live bootstrap.
 - Exclude authority edits, other Skills/Agents, `src/admission.ts` changes without direct evidence, historical Tasks migration, manifests/lockfiles, package/Todo work, backend selection, schedulers/retries/lifecycle, installation/reload/deployment, live launch, staging, commit, and merge.
 
-The Router must disclose this Plan's outcome, changes, owners, sequencing, P1-P11 evidence boundary, risks, and exclusions and obtain explicit current-user confirmation before implementation. The present preparation Handoff does not provide that confirmation.
+Historical preparation-time disclosure requirement: the Router must disclose this Plan's outcome, changes, owners, sequencing, P1-P11 evidence boundary, risks, and exclusions and obtain explicit current-user confirmation before implementation. The preparation Handoff did not provide that confirmation; subsequent adopted delivery is recorded in [Work current status](work.md#current-delivery-status).

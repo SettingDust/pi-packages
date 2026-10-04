@@ -2,7 +2,7 @@
 
 - [Work](work.md) | [Plan](plan.md)
 
-This is the sole executable graph for the bounded source-and-instruction implementation described by [Plan](plan.md). IDs are stable and retained from the predecessor graph because the three-result decomposition remains coherent. This preparation executes no item; every item Result and gate remains unsatisfied. Display order, status text, document readiness, and Resolver admission do not create dependencies or confirmation.
+This is the sole executable graph for the bounded source-and-instruction implementation described by [Plan](plan.md). IDs are stable and retained from the predecessor graph because the three-result decomposition remains coherent. The original preparation executed no item; its then-unsatisfied Result/gate snapshot is superseded by the adopted delivery status in [Work current status](work.md#current-delivery-status). Graph and gate definitions below are unchanged, and end-to-end live acceptance remains unverified. Display order, status text, document readiness, and Resolver admission do not create dependencies or confirmation.
 
 ## Explicit graph
 

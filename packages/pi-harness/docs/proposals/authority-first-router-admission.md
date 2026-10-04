@@ -2,7 +2,7 @@
 
 - Status: non-authoritative decision history; high-level decision recorded in accepted ADR-0007
 - Date: 2026-08-19
-- Authority: non-authoritative proposal; the accepted high-level decision is recorded in [ADR-0007](../adr/0007-authority-first-router-admission.md), while the candidate implementation contract remains [Draft Amendment A](../spec/router-delegation.md#amendment-extension-a-authority-first-admission-draft) of the Router Delegation Specification
+- Authority: non-authoritative proposal; the historical Draft Amendment A candidate is superseded by [ADR-0007](../adr/0007-authority-first-router-admission.md) and the current [Handoff and admission input contract](../spec/router-delegation.md#2-handoff-and-admission-input) of the Router Delegation Specification
 
 ## Problem
 

@@ -1,9 +1,11 @@
 # ADR-0002: Use Structured Resolver Input and YAML Handoff/Result Messages
 
-- Status: accepted
+- Status: accepted historical baseline; Model Role selection and schema availability superseded by ADR-0009; structured Handoff and YAML Result decisions remain current
 - Date: 2026-08-17
 
 ## Context
+
+The Model Role wording below records the historical baseline. Its selection and schema-availability requirements are superseded as defined in [#42 Partial Supersession](#42-partial-supersession).
 
 Free-text task forwarding copies unnecessary context, weakens validation, and lets workflow instructions drift. The Router also needs Pi to constrain its choice to Skills and Model Roles currently available in the session.
 
@@ -24,4 +26,12 @@ Handlers return YAML Results with `status`, `summary`, and Markdown `report`; `a
 
 ## Consequences
 
-Schema validation happens before delegation and references preserve token savings. The Router receives stable, normalized Result information but remains solely responsible for deciding what happens next. Dynamic schemas must be refreshed when Skills or Model Role configuration changes.
+Schema validation happens before delegation and references preserve token savings. The Router receives stable, normalized Result information but remains solely responsible for deciding what happens next. Dynamic schemas must be refreshed when Skills change. The historical requirement to refresh Model Role enums on Role configuration changes is superseded below.
+
+## #42 Partial Supersession
+
+Accepted [ADR-0009](0009-provider-model-thinking-capability-selection.md) supersedes the Model Role selection and schema-availability portion of this ADR. The historical requirements for configured Model Roles, a dynamic `modelRole` enum, and Role-configuration-driven schema refresh are no longer current implementation obligations. Legacy `roles`/`modelRole` fields are rejected under ADR-0009 rather than retained as a compatibility interface.
+
+The current Resolver root carries non-negative integer `reasoning` and `impact` requests, and the Resolver selects a configured provider/model/thinking candidate under ADR-0009. Schema generation does not read the Registry, filter candidates by availability, or attest their availability; candidate availability and thinking support use the single resolve-time Registry snapshot defined there.
+
+The structured Resolver input, dynamic Skill enums, YAML Handoff shape and reference handling, primary/companion Skill uniqueness, and four-state YAML Result contract remain current. The Handoff continues to exclude model routing metadata and now also excludes capability requirements. Router ownership of workflow decisions and the prohibition on workflow-controlling Result fields remain current. This partial supersession preserves the original date and historical rationale; it does not establish live Pi or backend verification.
