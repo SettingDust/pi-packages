@@ -2,19 +2,21 @@ import { Check } from "typebox/value";
 import { describe, expect, it } from "vitest";
 import {
   TodoAddParamsSchema,
+  TodoRemoveParamsSchema,
   TodoSetParamsSchema,
   TodoTransitionParamsSchema,
   TodoViewParamsSchema,
 } from "../src/schema.js";
 import {
   parseTodoAddRequest,
+  parseTodoRemoveRequest,
   parseTodoSetRequest,
   parseTodoTransitionRequest,
   parseTodoViewRequest,
 } from "../src/state.js";
 
 describe("Todo request schemas", () => {
-  it("accepts exactly the four provider request shapes", () => {
+  it("accepts exactly the five provider request shapes", () => {
     expect(Check(TodoSetParamsSchema, { tasks: [] })).toBe(true);
     expect(Check(TodoSetParamsSchema, {
       tasks: [{ name: "Build", todos: [{ name: "Implement", description: "Implement the protocol." }] }],
@@ -26,6 +28,8 @@ describe("Todo request schemas", () => {
     expect(Check(TodoTransitionParamsSchema, {
       transitions: [{ task: "Build", todo: "Implement", status: "in_progress" }],
     })).toBe(true);
+    expect(Check(TodoRemoveParamsSchema, { removals: [{ task: "Build", todo: "Implement" }, { task: "Empty" }] })).toBe(true);
+    expect(Check(TodoViewParamsSchema, {})).toBe(true);
   });
 
   it("rejects cross-tool fields, creation statuses, and invalid array minima", () => {
@@ -70,6 +74,44 @@ describe("Todo request schemas", () => {
     ]) {
       expect(Check(TodoAddParamsSchema, invalid)).toBe(true);
       expect(() => parseTodoAddRequest(invalid)).toThrow();
+    }
+  });
+
+  it("keeps removal selections disjoint and strict with runtime text and overlap checks", () => {
+    const valid = { removals: [{ task: "Build", todo: "Test" }, { task: "Empty" }] };
+    expect(TodoRemoveParamsSchema.required).toEqual(["removals"]);
+    expect(Object.keys(TodoRemoveParamsSchema.properties)).toEqual(["removals"]);
+    expect(TodoRemoveParamsSchema.properties.removals).toMatchObject({
+      minItems: 1,
+      items: { oneOf: [
+        { type: "object", required: ["task", "todo"], properties: { task: { type: "string" }, todo: { type: "string" } }, additionalProperties: false },
+        { type: "object", required: ["task"], properties: { task: { type: "string" } }, additionalProperties: false },
+      ] },
+    });
+    expect(Check(TodoRemoveParamsSchema, valid)).toBe(true);
+    expect(parseTodoRemoveRequest(valid)).toEqual(valid);
+    for (const invalid of [
+      null, [], {}, { ...valid, force: true }, { ...valid, status: "completed" },
+      ...[null, {}, "Build", []].map((removals) => ({ removals })),
+      ...[null, [], {}, { todo: "Test" }, { task: "Build", todo: null }, { task: "Build", todo: undefined },
+        { task: null }, { task: 42 }, { task: "Build", todo: 42 },
+        { task: "Build", force: true }, { task: "Build", status: "completed" }, { task: "Build", todo: "Test", extra: true },
+      ].map((item) => ({ removals: [valid.removals[0], item] })),
+    ]) {
+      expect(Check(TodoRemoveParamsSchema, invalid), JSON.stringify(invalid)).toBe(false);
+      expect(() => parseTodoRemoveRequest(invalid)).toThrow();
+    }
+    for (const invalid of [
+      ...["", " ", " Build", "Build "].flatMap((text) => [
+        { removals: [{ task: text }] }, { removals: [{ task: "Build", todo: text }] },
+      ]),
+      { removals: [{ task: "Build", todo: "Test" }, { task: "Build", todo: "Test" }] },
+      { removals: [{ task: "Build" }, { task: "Build" }] },
+      { removals: [{ task: "Build" }, { task: "Build", todo: "Test" }] },
+      { removals: [{ task: "Build", todo: "Test" }, { task: "Build" }] },
+    ]) {
+      expect(Check(TodoRemoveParamsSchema, invalid)).toBe(true);
+      expect(() => parseTodoRemoveRequest(invalid)).toThrow();
     }
   });
 

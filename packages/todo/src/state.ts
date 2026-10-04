@@ -3,6 +3,8 @@ import {
   type Todo,
   type TodoAddRequest,
   type TodoCreation,
+  type TodoRemoval,
+  type TodoRemoveRequest,
   type TodoSetRequest,
   type TodoState,
   type TodoStatus,
@@ -70,6 +72,25 @@ export function applyTodoTransition(state: TodoState, request: TodoTransitionReq
   })));
 }
 
+export function applyTodoRemove(state: TodoState, request: TodoRemoveRequest): TodoState {
+  assertTodoState(state);
+  const parsed = parseTodoRemoveRequest(request);
+  for (const removal of parsed.removals) {
+    const task = state.tasks.find((candidate) => candidate.name === removal.task);
+    if (!task) throw new Error("Todo removal task does not exist.");
+    if (removal.todo !== undefined && !task.todos.some((todo) => todo.name === removal.todo)) {
+      throw new Error("Todo removal todo does not exist.");
+    }
+  }
+
+  const groups = new Set(parsed.removals.filter((removal) => removal.todo === undefined).map((removal) => removal.task));
+  const todos = new Set(parsed.removals.filter((removal) => removal.todo !== undefined).map((removal) => transitionKey(removal.task, removal.todo!)));
+  return canonicalState(state.tasks.filter((task) => !groups.has(task.name)).map((task) => ({
+    ...task,
+    todos: task.todos.filter((todo) => !todos.has(transitionKey(task.name, todo.name))),
+  })));
+}
+
 export function parseTodoSetRequest(value: unknown): TodoSetRequest {
   const input = exactObject(value, ["tasks"]);
   if (!Array.isArray(input.tasks)) throw new Error("tasks must be an array.");
@@ -94,6 +115,31 @@ export function parseTodoTransitionRequest(value: unknown): TodoTransitionReques
   const transitions = input.transitions.map(parseTodoTransition);
   assertUnique(transitions.map((transition) => transitionKey(transition.task, transition.todo)), "Duplicate transition target.");
   return { transitions };
+}
+
+export function parseTodoRemoveRequest(value: unknown): TodoRemoveRequest {
+  const input = exactObject(value, ["removals"]);
+  if (!Array.isArray(input.removals) || input.removals.length === 0) {
+    throw new Error("removals must be a non-empty array.");
+  }
+  const removals = input.removals.map(parseTodoRemoval);
+  const groups = new Set<string>();
+  const tasks = new Set<string>();
+  const todos = new Set<string>();
+  for (const removal of removals) {
+    if (groups.has(removal.task) || (removal.todo === undefined && tasks.has(removal.task))) {
+      throw new Error("Duplicate removal selection.");
+    }
+    if (removal.todo === undefined) {
+      groups.add(removal.task);
+    } else {
+      const key = transitionKey(removal.task, removal.todo);
+      if (todos.has(key)) throw new Error("Duplicate removal selection.");
+      todos.add(key);
+    }
+    tasks.add(removal.task);
+  }
+  return { removals };
 }
 
 export function parseTodoViewRequest(value: unknown): TodoViewRequest {
@@ -155,6 +201,12 @@ function parseTodoTransition(value: unknown): TodoTransition {
   const input = exactObject(value, ["task", "todo", "status"]);
   if (!isTodoStatus(input.status)) throw new Error("Invalid todo status.");
   return { task: todoString(input.task), todo: todoString(input.todo), status: input.status };
+}
+
+function parseTodoRemoval(value: unknown): TodoRemoval {
+  const input = exactObject(value, ["task"], ["todo"]);
+  const task = todoString(input.task);
+  return "todo" in input ? { task, todo: todoString(input.todo) } : { task };
 }
 
 function assertTaskShape(tasks: readonly TodoTask[]): void {

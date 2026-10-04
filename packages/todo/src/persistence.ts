@@ -1,14 +1,16 @@
 import { cloneTodoState, createTodoState, isTodoState } from "./state.js";
-import { isTodoStatus, TODO_RESULTS, type TodoState } from "./types.js";
+import { isTodoStatus, type TodoState } from "./types.js";
 
 const TODO_TOOL_RESULTS = {
   todo_set: "set",
   todo_add: "add",
   todo_transition: "transition",
+  todo_remove: "remove",
   todo_view: "view",
 } as const;
 export const TODO_TOOL_NAMES = Object.keys(TODO_TOOL_RESULTS) as (keyof typeof TODO_TOOL_RESULTS)[];
 const LEGACY_TODO_TOOL_NAME = "todo";
+const LEGACY_TODO_ACTIONS = ["set", "add", "transition", "view"] as const;
 
 type BranchContext = {
   sessionManager: {
@@ -100,7 +102,7 @@ function parseCheckpoint(result: ToolResult): TodoState {
 
   if (result.toolName === LEGACY_TODO_TOOL_NAME) {
     const details = exactObject(result.details, ["action", "state"]);
-    if (!TODO_RESULTS.includes(details.action as never)) throw new Error("Invalid legacy action.");
+    if (!LEGACY_TODO_ACTIONS.includes(details.action as never)) throw new Error("Invalid legacy action.");
     return parseLegacyState(details.state);
   }
 

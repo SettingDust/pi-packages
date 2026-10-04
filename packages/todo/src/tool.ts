@@ -16,6 +16,7 @@ import { renderTodoLine } from "./widget-layout.js";
 import type { TodoStatus } from "./types.js";
 import {
   TodoAddParamsSchema,
+  TodoRemoveParamsSchema,
   TodoSetParamsSchema,
   TodoTransitionParamsSchema,
   TodoViewParamsSchema,
@@ -23,16 +24,16 @@ import {
 import { DEFAULT_TODO_SETTINGS, loadTodoSettings, type TodoSettings } from "./settings.js";
 import {
   applyTodoAdd,
+  applyTodoRemove,
   applyTodoSet,
   applyTodoTransition,
   cloneTodoState,
   createTodoState,
   parseTodoViewRequest,
 } from "./state.js";
-import type { TodoState } from "./types.js";
+import type { TodoResult, TodoState } from "./types.js";
 import { createTodoWidgetLifecycle, enterTodoWidget, resetTodoWidgetLifecycle, updateTodoWidget } from "./widget.js";
 
-type TodoResult = "set" | "add" | "transition" | "view";
 type TodoSuccess = { result: TodoResult; snapshot: TodoState };
 type TodoFailure = { result: "error"; error: { code: string; message: string } };
 type TodoResponse = TodoSuccess | TodoFailure;
@@ -72,6 +73,10 @@ class TodoCoordinator {
 
   transition(request: unknown, ctx: ExtensionContext, settings: TodoSettings): Promise<TodoSuccess> {
     return this.run(() => this.commit("transition", applyTodoTransition(this.state, request as never), ctx, settings));
+  }
+
+  remove(request: unknown, ctx: ExtensionContext, settings: TodoSettings): Promise<TodoSuccess> {
+    return this.run(() => this.commit("remove", applyTodoRemove(this.state, request as never), ctx, settings));
   }
 
   view(request: unknown): Promise<TodoSuccess> {
@@ -117,11 +122,12 @@ function renderCallContent(
   const coloredTitle = theme.fg ? theme.fg("toolTitle", title) : title;
   const summary = pendingSummary(args, state);
   const lines = [coloredTitle, partial && theme.fg ? theme.fg("muted", summary) : summary];
-  const input = args as {
+  const input = (args ?? {}) as {
     tasks?: readonly { name?: string; todos?: readonly { name?: string; description?: string }[] }[];
     task?: string;
     todos?: readonly { name?: string; description?: string }[];
     transitions?: readonly { task?: string; todo?: string; status?: TodoStatus }[];
+    removals?: readonly { task?: string; todo?: string }[];
   };
 
   if (action === "set" && Array.isArray(input.tasks)) {
@@ -145,13 +151,18 @@ function renderCallContent(
       const task = typeof transition.task === "string" ? `${transition.task}: ` : "";
       lines.push(`${task}${renderTodoLine({ name: transition.todo, description: "", status: transition.status }, theme, fallbackGlyphs)}`);
     }
+  } else if (action === "remove" && Array.isArray(input.removals)) {
+    for (const removal of input.removals) {
+      if (typeof removal?.task !== "string" || ("todo" in removal && typeof removal.todo !== "string")) continue;
+      lines.push(typeof removal.todo === "string" ? `  ${removal.task}: ${removal.todo}` : `  ${removal.task} (entire task)`);
+    }
   }
 
   return lines.join("\n");
 }
 
 function pendingSummary(args: unknown, state: TodoState): string {
-  const input = args as { tasks?: unknown[]; task?: unknown; todos?: unknown[] };
+  const input = (args ?? {}) as { tasks?: unknown[]; task?: unknown; todos?: unknown[] };
   if (Array.isArray(input.tasks)) {
     const count = input.tasks.reduce<number>((total, task) => total + (task && typeof task === "object" && Array.isArray((task as { todos?: unknown }).todos) ? (task as { todos: unknown[] }).todos.length : 0), 0);
     return formatTodoSize(input.tasks.length, count);
@@ -268,5 +279,6 @@ export function registerTodoTools(pi: ExtensionAPI): void {
   registerHandler(pi, coordinator, "set", "Replace the complete Todo state.", TodoSetParamsSchema, (params, ctx) => coordinator.set(params, ctx, settings), getSettings, markInteraction);
   registerHandler(pi, coordinator, "add", "Append pending todos to an exact, case-sensitive task, or create it at the end if missing.", TodoAddParamsSchema, (params, ctx) => coordinator.add(params, ctx, settings), getSettings, markInteraction);
   registerHandler(pi, coordinator, "transition", "Change Todo statuses by exact task and todo name.", TodoTransitionParamsSchema, (params, ctx) => coordinator.transition(params, ctx, settings), getSettings, markInteraction);
+  registerHandler(pi, coordinator, "remove", "Atomically remove exact, case-sensitive todos ({task,todo}) or entire task groups ({task}) in one non-empty disjoint batch. All statuses are removable; caller owns cleanup eligibility and target stability. Missing, duplicate, overlapping, or invalid selections fail the whole batch. Local removal retains empty groups; success returns the complete snapshot.", TodoRemoveParamsSchema, (params, ctx) => coordinator.remove(params, ctx, settings), getSettings, markInteraction);
   registerHandler(pi, coordinator, "view", "Return the complete Todo snapshot without mutation.", TodoViewParamsSchema, (params) => coordinator.view(params), getSettings, markInteraction);
 }

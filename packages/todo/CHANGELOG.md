@@ -5,7 +5,11 @@ All notable changes to `@settingdust/pi-todo` will be documented in this file.
 ## [Unreleased]
 ### Changed
 
-- Replace the phased Todo API with `todo_set`, `todo_add`, `todo_transition`, and `todo_view` over canonical `tasks[].todos[]` state.
+- Replace the phased Todo API with `todo_set`, `todo_add`, `todo_transition`, `todo_remove`, and `todo_view` over canonical `tasks[].todos[]` state.
+- Add strict explicit `todo_remove { removals }` for a nonempty disjoint batch of exact case-sensitive `{ task, todo }` or whole-group `{ task }` selections in any status, without `force` or status changes. Invalid, missing, duplicate, or overlapping selections fail atomically; success returns the complete remaining snapshot, preserves every survivor's fields/status/order, and retains locally emptied groups without automatic pruning.
+- Keep cleanup eligibility and target stability caller-owned. One queued mutation is atomic; separate read–qualify–delete calls are not a transaction and names cannot identify a same-name recreation.
+- Extend only canonical checkpoints with `todo_remove`/`remove`, strict complete `{ result, snapshot }` details and boolean `isError: false`; preserve the legacy `todo` action allowlist of `set`, `add`, `transition`, and `view`. Older readers may skip removal checkpoints and revive earlier deleted records; lossless downgrade is not promised, and execute return is not Host append acknowledgement.
+- Verify post-removal visibility policies, native complete-snapshot rendering and widget refresh/lifecycle in source tests; this does not certify current installed Host activation or live acceptance.
 - Make creation pending by default and reserve lifecycle status changes for strict `todo_transition { transitions }`.
 - Remove the obsolete `workingOn` request, state, result, restore, formatter, reminder, renderer, and widget projections; multiple in-progress todos remain independently represented.
 - Reject request-level `workingOn` as unknown input, with no old-client compatibility parsing, dual-read, dual-write, or migration window.

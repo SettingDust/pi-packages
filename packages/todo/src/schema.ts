@@ -1,6 +1,6 @@
 import { StringEnum } from "@earendil-works/pi-ai";
 import { Type } from "typebox";
-import { TODO_STATUSES } from "./types.js";
+import { TODO_STATUSES, type TodoRemoval } from "./types.js";
 
 export const TodoCreationSchema = Type.Object({
   name: Type.String(),
@@ -29,6 +29,17 @@ export const TodoTransitionSchema = Type.Object({
 
 export const TodoTransitionParamsSchema = Type.Object({
   transitions: Type.Array(TodoTransitionSchema, { minItems: 1 }),
+}, { additionalProperties: false });
+
+export const TodoRemovalSchema = Type.Unsafe<TodoRemoval>({
+  oneOf: [
+    Type.Object({ task: Type.String(), todo: Type.String() }, { additionalProperties: false }),
+    Type.Object({ task: Type.String() }, { additionalProperties: false }),
+  ],
+});
+
+export const TodoRemoveParamsSchema = Type.Object({
+  removals: Type.Array(TodoRemovalSchema, { minItems: 1 }),
 }, { additionalProperties: false });
 
 export const TodoViewParamsSchema = Type.Object({}, { additionalProperties: false });

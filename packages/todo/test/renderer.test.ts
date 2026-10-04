@@ -1,6 +1,7 @@
 import { visibleWidth } from "@earendil-works/pi-tui";
 import { describe, expect, it } from "vitest";
 import { renderResult } from "../src/renderer.js";
+import { applyTodoRemove } from "../src/state.js";
 import type { TodoState } from "../src/types.js";
 import { todo } from "./helpers.js";
 
@@ -76,6 +77,35 @@ describe("todo renderer", () => {
     expect(narrow.every((line) => visibleWidth(line) <= 12)).toBe(true);
     expect(line(renderResult({ details: { snapshot: { tasks: [] } } }, { expanded: false }, plainTheme))).toBe("0 tasks · 0 todos");
     expect(line(renderResult({ details: { snapshot: { tasks: [] } } }, { expanded: true }, plainTheme))).toBe("No todos.");
+  });
+
+  it("renders the complete post-removal snapshot, not selected or removed records", () => {
+    const before: TodoState = { tasks: [
+      { name: "Removed group", todos: [todo("Removed group todo")] },
+      { name: "Mixed", todos: [
+        todo("Removed active", "in_progress"), todo("Keep pending"),
+        todo("Keep active", "in_progress"), todo("Keep done", "completed"), todo("Keep cancelled", "cancelled"),
+      ] },
+      { name: "Locally empty", todos: [todo("Removed last")] },
+      { name: "Already empty", todos: [] },
+      { name: "Unselected", todos: [todo("Unselected todo")] },
+    ] };
+    const snapshot = applyTodoRemove(before, { removals: [
+      { task: "Removed group" }, { task: "Mixed", todo: "Removed active" },
+      { task: "Locally empty", todo: "Removed last" },
+    ] });
+    const result = { details: { result: "remove", snapshot } };
+    expect(line(renderResult(result, {}, plainTheme))).toBe("4 tasks · 5 todos");
+    const expanded = renderResult(result, { expanded: true }, plainTheme, { fallbackGlyphs: true }).render(120).join("\n");
+    for (const text of ["1. Mixed · 2/4", "2. Locally empty · 0/0", "3. Already empty · 0/0", "4. Unselected · 0/1",
+      "○ Keep pending", "◔ Keep active", "✓ Keep done", "× Keep cancelled", "Unselected todo"]) {
+      expect(expanded).toContain(text);
+    }
+    expect(expanded).not.toMatch(/Removed/);
+    expect(renderResult(result, { expanded: true }, plainTheme).render(12).every((row) => visibleWidth(row) <= 12)).toBe(true);
+    const empty = applyTodoRemove(snapshot, { removals: snapshot.tasks.map(({ name }) => ({ task: name })) });
+    expect(line(renderResult({ details: { snapshot: empty } }, {}, plainTheme))).toBe("0 tasks · 0 todos");
+    expect(line(renderResult({ details: { snapshot: empty } }, { expanded: true }, plainTheme))).toBe("No todos.");
   });
 
   it("falls back on falsey snapshots only", () => {

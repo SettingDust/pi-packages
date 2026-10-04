@@ -5,7 +5,7 @@ export function isTodoStatus(value: unknown): value is TodoStatus {
   return typeof value === "string" && (TODO_STATUSES as readonly string[]).includes(value);
 }
 
-export const TODO_RESULTS = ["set", "add", "transition", "view"] as const;
+export const TODO_RESULTS = ["set", "add", "transition", "remove", "view"] as const;
 export type TodoResult = typeof TODO_RESULTS[number];
 
 export type Todo = {
@@ -52,6 +52,14 @@ export type TodoTransition = {
 
 export type TodoTransitionRequest = {
   readonly transitions: readonly TodoTransition[];
+};
+
+export type TodoRemoval =
+  | { readonly task: string; readonly todo: string }
+  | { readonly task: string; readonly todo?: never };
+
+export type TodoRemoveRequest = {
+  readonly removals: readonly TodoRemoval[];
 };
 
 export type TodoViewRequest = Record<never, never>;

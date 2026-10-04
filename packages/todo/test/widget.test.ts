@@ -3,6 +3,7 @@ import { visibleWidth } from "@earendil-works/pi-tui";
 import { afterEach, test, vi } from "vitest";
 
 import type { TodoState } from "../src/types.js";
+import { applyTodoRemove } from "../src/state.js";
 import { TodoWidgetComponent } from "../src/widget-component.js";
 import { createTodoWidgetLifecycle, enterTodoWidget, resetTodoWidgetLifecycle, updateTodoWidget } from "../src/widget.js";
 import { renderTodoWidgetDetailLines, renderTodoWidgetLines } from "../src/widget-layout.js";
@@ -504,6 +505,79 @@ test("refresh retains expansion by task name, prunes removed tasks and resets on
   updateTodoWidget(ctx, state, { fallbackGlyphs: true }, lifecycle);
   assert.deepEqual(mounted!.render(80), [...renderTodoWidgetLines(state, undefined, 80, { fallbackGlyphs: true }), ""]);
   assert.equal(listeners.size, 0);
+});
+
+test("removal refresh preserves exact-name expansion, complete rows and reachable selection/details", () => {
+  const lifecycle = createTodoWidgetLifecycle();
+  const listeners = new Set<(data: string) => { consume?: boolean } | undefined>();
+  let mounted: TodoWidgetComponent | undefined;
+  const terminal = { rows: 40 };
+  const theme = { bg: (_color: string, text: string) => `[selected]${text}` } as never;
+  const ui = {
+    onTerminalInput: (listener: (data: string) => { consume?: boolean } | undefined) => {
+      listeners.add(listener);
+      return () => { listeners.delete(listener); };
+    },
+    setWidget: (_id: string, factory: ((tui: never, theme: never) => TodoWidgetComponent) | undefined) => {
+      mounted?.dispose();
+      mounted = factory?.({ terminal, requestRender: vi.fn() } as never, theme);
+    },
+  };
+  const ctx = { mode: "tui", hasUI: true, ui } as never;
+  const before: TodoState = { tasks: [
+    { name: "Gone", todos: [todo("Gone todo", "in_progress")] },
+    { name: "Keep", todos: [todo("Removed representative", "in_progress"),
+      todo("Survivor", "pending", `${"long detail ".repeat(60)}FINAL-END`),
+      todo("Done", "completed"), todo("Cancelled", "cancelled")] },
+    { name: "keep", todos: [todo("Case-sensitive pending")] },
+    { name: "Locally empty", todos: [todo("Removed last")] },
+    { name: "Already empty", todos: [] },
+  ] };
+  const original = structuredClone(before);
+  updateTodoWidget(ctx, before, { fallbackGlyphs: true }, lifecycle);
+  enterTodoWidget(ctx, {}, lifecycle);
+  const stale = [...listeners][0]!;
+  stale("\x1b[C");
+  stale("\x1b[B");
+  stale("\x1b[C");
+  assert.deepEqual(mounted!.expandedTasks(), new Set(["Gone", "Keep"]));
+  const snapshot = applyTodoRemove(before, { removals: [
+    { task: "Gone" }, { task: "Keep", todo: "Removed representative" }, { task: "Locally empty", todo: "Removed last" },
+  ] });
+  updateTodoWidget(ctx, snapshot, { fallbackGlyphs: true }, lifecycle);
+  assert.equal(listeners.size, 0);
+  assert.deepEqual(mounted!.expandedTasks(), new Set(["Keep"]));
+  assert.equal(mounted!.render(80)[0], "Todos  4 tasks · ◔ 0 · ○ 2 · ✓ 1 · × 1");
+  enterTodoWidget(ctx, {}, lifecycle);
+  const input = [...listeners][0]!;
+  assert.equal(stale("\x1b[B"), undefined, "retired listener stays inert even after reentry");
+  assert.match(mounted!.render(80)[1]!, /^\[selected\]▾ Keep/);
+  terminal.rows = 20;
+  const reached = new Set<string>();
+  for (let page = 0; page < 100; page++) {
+    const rows = mounted!.render(20);
+    assert.ok(rows.length <= 8);
+    assert.ok(rows.every((row) => visibleWidth(row.replace("[selected]", "")) <= 20));
+    rows.forEach((row) => reached.add(row));
+    input("\x1b[6~");
+  }
+  assert.match([...reached].join("\n"), /FINAL-END/);
+  assert.doesNotMatch([...reached].join("\n"), /Gone|Removed/);
+  input("\x1b[B");
+  assert.match(mounted!.render(80).join("\n"), /\[selected\]▸ ○ keep/);
+  input("\x1b[B");
+  assert.match(mounted!.render(80).join("\n"), /\[selected\]▸ Locally empty/);
+  input("\x1b[C");
+  assert.match(mounted!.render(80).join("\n"), /\[selected\]▾ Locally empty/);
+  input("\x1b[B");
+  assert.match(mounted!.render(80).join("\n"), /\[selected\]▸ Already empty/);
+  input("\x1b[A"); input("\x1b[A"); input("\x1b[A"); input("\x1b[D");
+  assert.match(mounted!.render(80).join("\n"), /○ Keep › Survivor/);
+  assert.doesNotMatch(mounted!.render(80).join("\n"), /Gone|Removed|long detail/);
+  assert.deepEqual(before, original);
+  resetTodoWidgetLifecycle(ctx, lifecycle);
+  assert.equal(listeners.size, 0);
+  assert.equal(input("\x1b[B"), undefined);
 });
 
 test("terminal grace period, hide, disposal, short terminal and failures leave no listener", () => {
