@@ -1,10 +1,15 @@
-import { describe, expect, test } from "bun:test";
+import { afterEach, describe, expect, spyOn, test } from "bun:test";
+import * as childProcess from "node:child_process";
+import * as fs from "node:fs";
+import * as fsPromises from "node:fs/promises";
 import { spawnSync } from "node:child_process";
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
+import type { ImageContent } from "@earendil-works/pi-ai";
 import { createHerdrClient } from "@settingdust/pi-herdr";
 import activateSubagents, { AgentRegistry, SubagentRuntime, createHerdrTransport, createSubagentTools, paneChildExtensionPath, validateExplicitSpawnModel, type CompletionNotification, type HerdrTransport, type SubagentTask } from "../src/index.js";
+import { resultPublisher } from "../src/result-publication.js";
 
 function fakeTransport(paneExists: boolean | (() => boolean) = true) {
   const calls: unknown[] = [];
@@ -27,13 +32,1231 @@ function handlerRegistry(body = "Handler"): AgentRegistry {
 
 const childToolExclusions = "subagent_spawn,subagent_resume,subagent_inspect,subagent_join,subagent_steer,subagent_cancel,subagent_remove";
 
-async function waitFor(predicate: () => boolean, timeout = 2500): Promise<void> {
+// Windows settlement can serialize several real PowerShell ACL checks.
+async function waitFor(predicate: () => boolean, timeout = process.platform === "win32" ? 20_000 : 5000): Promise<void> {
   const deadline = Date.now() + timeout;
   while (!predicate()) {
     if (Date.now() >= deadline) throw new Error("Timed out waiting for runtime settlement");
     await Bun.sleep(20);
   }
 }
+
+describe("Result settlement integrity", () => {
+  for (const images of [undefined, [{ type: "image" as const, data: "AQ==", mimeType: "image/png" }]]) {
+    test(`concurrent remove failure and success isolate same-ID reuse (${images ? "image" : "text"})`, async () => {
+      const root = mkdtempSync(join(tmpdir(), "subagents-remove-reuse-"));
+      const { transport } = fakeTransport();
+      const closes: string[] = [];
+      const notifications: CompletionNotification[] = [];
+      let created = 0;
+      transport.createTab = async () => ({ tabId: `tab-${++created}`, paneId: `pane-${created}` });
+      transport.closeTab = async id => { closes.push(id); return "closed"; };
+      const runtime = new SubagentRuntime(transport, handlerRegistry(), root, value => { notifications.push(value); });
+      const firstEntered = Promise.withResolvers<void>();
+      const secondEntered = Promise.withResolvers<void>();
+      const firstGate = Promise.withResolvers<void>();
+      const secondGate = Promise.withResolvers<void>();
+      let writing: ReturnType<typeof spyOn> | undefined;
+      let removals: Promise<unknown>[] = [];
+      try {
+        const old = await runtime.spawn({ agent: "handler", cwd: root, prompt: "old", label: "old", taskSlug: "task", images });
+        const oldOwner = runtime["get"]("task");
+        const oldMonitor = runtime["monitors"].get("task:1")!;
+        const manifest = join(dirname(old.resultPath), "task.json");
+        const write = fsPromises.writeFile;
+        let writes = 0;
+        writing = spyOn(fsPromises, "writeFile").mockImplementation((async (...args: Parameters<typeof fsPromises.writeFile>) => {
+          if (String(args[0]).startsWith(`${manifest}.`)) {
+            const attempt = ++writes;
+            if (attempt === 1) { firstEntered.resolve(); await firstGate.promise; throw new Error("remove A write fault"); }
+            if (attempt === 2) { secondEntered.resolve(); await secondGate.promise; }
+          }
+          return write(...args);
+        }) as typeof fsPromises.writeFile);
+        const a = runtime.remove("task").catch(error => error);
+        removals.push(a);
+        await firstEntered.promise;
+        const b = runtime.remove("task");
+        removals.push(b);
+        await Bun.sleep(0); // Drain B's admission microtasks while A still owns the paused write.
+        firstGate.resolve();
+        expect((await a).message).toBe("remove A write fault");
+        await secondEntered.promise;
+        secondGate.resolve();
+        await b;
+        expect(oldMonitor.signal.aborted).toBeTrue();
+        expect(runtime.listTasks()).toEqual([]);
+        expect(runtime["monitors"].size).toBe(0);
+        expect(runtime["removals"].size).toBe(0);
+        expect(existsSync(dirname(old.resultPath))).toBeFalse();
+        const current = await runtime.spawn({ agent: "handler", cwd: root, prompt: "new", label: "new", taskSlug: "task", images });
+        expect(current).toMatchObject({ subagentId: "task", generation: 1, tabId: "tab-2", status: "running" });
+        expect(runtime["get"]("task")).not.toBe(oldOwner);
+        const newMonitor = runtime["monitors"].get("task:1")!;
+        runtime["startMonitor"](oldOwner);
+        runtime["stopMonitor"](oldOwner);
+        expect(runtime["monitors"].get("task:1")).toBe(newMonitor);
+        expect(newMonitor.signal.aborted).toBeFalse();
+        const payload = join(dirname(current.resultPath), "image-input-1", "envelope.json");
+        if (images) expect(JSON.parse(readFileSync(payload, "utf8"))).toMatchObject({ subagentId: "task", generation: 1, images });
+        const bytes = JSON.stringify({ subagentId: "task", generation: 1, status: "completed", result: "NEW_OWNER_RESULT" });
+        await resultPublisher(current.resultPath).publish(bytes);
+        // Let the real monitor reveal which task object consumes this reused path.
+        await waitFor(() => notifications.length === 1 && runtime["settlements"].size === 0);
+        expect(runtime.inspect("task")).toMatchObject({ status: "completed", result: "NEW_OWNER_RESULT", label: "new", tabId: "tab-2" });
+        expect(JSON.parse(readFileSync(manifest, "utf8"))).toMatchObject({ generation: 1, status: "completed", label: "new", tabId: "tab-2" });
+        expect(oldOwner.status).toBe("running");
+        expect(readFileSync(current.resultPath, "utf8")).toBe(bytes);
+        expect(closes).toEqual(["tab-1", "tab-2"]);
+        expect(notifications).toEqual([{ subagentId: "task", generation: 1, status: "completed", label: "new" }]);
+        expect(runtime["monitors"].size).toBe(0);
+        if (images) expect(existsSync(dirname(payload))).toBeFalse();
+      } finally {
+        firstGate.resolve(); secondGate.resolve(); await Promise.allSettled(removals);
+        writing?.mockRestore(); runtime.stop(); rmSync(root, { recursive: true, force: true });
+      }
+    }, 30_000);
+
+    test(`delayed remove manifest cannot commit over resumed generation (${images ? "image" : "text"})`, async () => {
+      const root = mkdtempSync(join(tmpdir(), "subagents-remove-commit-"));
+      const { transport } = fakeTransport();
+      const closes: string[] = [];
+      const notifications: CompletionNotification[] = [];
+      let created = 0;
+      transport.createTab = async () => ({ tabId: `tab-${++created}`, paneId: `pane-${created}` });
+      transport.closeTab = async id => { closes.push(id); return "closed"; };
+      const runtime = new SubagentRuntime(transport, handlerRegistry(), root, value => { notifications.push(value); });
+      const entered = Promise.withResolvers<void>();
+      const gate = Promise.withResolvers<void>();
+      let writing: ReturnType<typeof spyOn> | undefined;
+      let removal: Promise<unknown> | undefined;
+      try {
+        const first = await runtime.spawn({ agent: "handler", cwd: root, prompt: "g1", label: "offline", taskSlug: "task", images });
+        await runtime.cancel("task");
+        const resultBytes = readFileSync(first.resultPath);
+        const manifest = join(dirname(first.resultPath), "task.json");
+        const write = fsPromises.writeFile;
+        let held = false;
+        writing = spyOn(fsPromises, "writeFile").mockImplementation((async (...args: Parameters<typeof fsPromises.writeFile>) => {
+          await write(...args);
+          if (!held && String(args[0]).startsWith(`${manifest}.`) && JSON.parse(String(args[1])).generation === 1) {
+            held = true; entered.resolve(); await gate.promise;
+          }
+        }) as typeof fsPromises.writeFile);
+        removal = runtime.remove("task").catch(error => error);
+        await entered.promise;
+        const second = await runtime.resume("task", "g2", images);
+        const owner = runtime["get"]("task");
+        const monitor = runtime["monitors"].get("task:2")!;
+        const manifestBytes = readFileSync(manifest);
+        const payload = join(dirname(second.resultPath), "image-input-2", "envelope.json");
+        const imageBytes = images ? readFileSync(payload) : undefined;
+        expect(JSON.parse(manifestBytes.toString())).toMatchObject({ generation: 2, status: "running", tabId: "tab-2" });
+        gate.resolve();
+        expect((await removal as Error).message).toBe("Subagent generation is no longer current");
+        expect(readFileSync(manifest)).toEqual(manifestBytes);
+        expect(runtime["get"]("task")).toBe(owner);
+        expect(runtime.inspect("task")).toMatchObject({ generation: 2, status: "running", tabId: "tab-2" });
+        expect(runtime["monitors"].get("task:2")).toBe(monitor);
+        expect(monitor.signal.aborted).toBeFalse();
+        expect(runtime["monitors"].has("task:1")).toBeFalse();
+        expect(readFileSync(first.resultPath)).toEqual(resultBytes);
+        if (imageBytes) expect(readFileSync(payload)).toEqual(imageBytes);
+        expect(readdirSync(dirname(manifest)).filter(name => name.startsWith("task.json.") && name.endsWith(".tmp"))).toEqual([]);
+        notifications.length = 0;
+        await runtime.recover(root);
+        expect(monitor.signal.aborted).toBeTrue();
+        expect(runtime["get"]("task")).not.toBe(owner);
+        expect(runtime.inspect("task")).toMatchObject({ generation: 2, status: "running", tabId: "tab-2" });
+        expect(JSON.parse(readFileSync(manifest, "utf8"))).toMatchObject({ generation: 2, status: "running", tabId: "tab-2" });
+        expect(runtime["monitors"].size).toBe(1);
+        expect(runtime["monitors"].has("task:2")).toBeTrue();
+        expect(readFileSync(first.resultPath)).toEqual(resultBytes);
+        expect(closes).toEqual(["tab-1"]);
+        expect(created).toBe(2);
+        expect(notifications).toEqual([]);
+        if (imageBytes) expect(readFileSync(payload)).toEqual(imageBytes);
+        const bytes = JSON.stringify({ subagentId: "task", generation: 2, status: "completed", result: "G2_AFTER_RECOVERY" });
+        await resultPublisher(second.resultPath).publish(bytes);
+        await waitFor(() => runtime.inspect("task").status === "completed" && notifications.length === 1 && runtime["settlements"].size === 0);
+        expect(JSON.parse(readFileSync(manifest, "utf8"))).toMatchObject({ generation: 2, status: "completed", tabId: "tab-2" });
+        expect(notifications).toEqual([{ subagentId: "task", generation: 2, status: "completed", label: "offline" }]);
+        expect(closes).toEqual(["tab-1", "tab-2"]);
+        expect(runtime["monitors"].size).toBe(0);
+        if (images) expect(existsSync(dirname(payload))).toBeFalse();
+      } finally {
+        gate.resolve(); await removal; writing?.mockRestore(); runtime.stop(); rmSync(root, { recursive: true, force: true });
+      }
+    }, 30_000);
+
+    test(`delayed remove cleanup outcome cannot commit over resumed generation (${images ? "image" : "text"})`, async () => {
+      const root = mkdtempSync(join(tmpdir(), "subagents-remove-cleanup-outcome-"));
+      const { transport } = fakeTransport();
+      const closes: string[] = [];
+      const notifications: CompletionNotification[] = [];
+      let created = 0;
+      let failFirstClose = true;
+      transport.createTab = async () => ({ tabId: `tab-${++created}`, paneId: `pane-${created}` });
+      transport.closeTab = async id => { closes.push(id); if (failFirstClose) throw new Error("initial close fault"); return "closed"; };
+      const runtime = new SubagentRuntime(transport, handlerRegistry(), root, value => { notifications.push(value); });
+      const releaseOutcome = Promise.withResolvers<void>();
+      const admissionGate = Promise.withResolvers<void>();
+      let admissionSpy: ReturnType<typeof spyOn> | undefined;
+      let renameSpy: ReturnType<typeof spyOn> | undefined;
+      let writeSpy: ReturnType<typeof spyOn> | undefined;
+      let resume: Promise<SubagentTask> | undefined;
+      let removal: Promise<unknown> | undefined;
+      let outcomeTemporary: string | undefined;
+      let outcomeRenames = 0;
+      try {
+        const first = await runtime.spawn({ agent: "handler", cwd: root, prompt: "g1", label: "cleanup outcome", taskSlug: "task", images });
+        await runtime.cancel(first.subagentId);
+        expect(runtime.inspect(first.subagentId).surfaceCleanups).toMatchObject([{ status: "failed" }]);
+        notifications.length = 0;
+        failFirstClose = false;
+        const manifest = join(dirname(first.resultPath), "task.json");
+        const resultBytes = readFileSync(first.resultPath);
+        const originalRename = fs.renameSync;
+        let resumeQueued = false;
+        renameSpy = spyOn(fs, "renameSync").mockImplementation((from, to) => {
+          if (String(from) === outcomeTemporary) outcomeRenames++;
+          originalRename(from, to);
+          if (!resumeQueued && String(to) === manifest) {
+            const record = JSON.parse(readFileSync(manifest, "utf8"));
+            if (record.generation === 1 && record.surfaceCleanups?.[0]?.status === "pending") {
+              resumeQueued = true;
+              // Hold resume after its real shared-operation snapshot, before admission.
+              // The cleanup registers later; its actual temporary write must precede g2.
+              const wait = runtime["awaitTaskOperations"].bind(runtime);
+              admissionSpy = spyOn(runtime as any, "awaitTaskOperations").mockImplementation(async (task: SubagentTask, signal?: AbortSignal) => {
+                await wait(task, signal);
+                await admissionGate.promise;
+              });
+              queueMicrotask(() => {
+                resume = runtime.resume(first.subagentId, "g2", images);
+                void resume.catch(() => {});
+              });
+            }
+          }
+        });
+        const write = fsPromises.writeFile;
+        let held = false;
+        let failRetries = false;
+        writeSpy = spyOn(fsPromises, "writeFile").mockImplementation((async (...args: Parameters<typeof fsPromises.writeFile>) => {
+          if (!String(args[0]).startsWith(`${manifest}.`)) return write(...args);
+          const outcomeRecord = JSON.parse(String(args[1]));
+          const outcome = outcomeRecord.surfaceCleanups?.some((value: any) => value.generation === 1 && value.status === "closed");
+          if (outcome && !held) {
+            held = true;
+            await write(...args);
+            outcomeTemporary = String(args[0]);
+            await releaseOutcome.promise;
+            return;
+          }
+          if (outcome && failRetries) throw new Error("cleanup outcome write fault");
+          return write(...args);
+        }) as typeof fsPromises.writeFile);
+
+        removal = runtime.remove(first.subagentId).catch(error => error);
+        await waitFor(() => resume !== undefined && outcomeTemporary !== undefined);
+        admissionGate.resolve();
+        const second = await resume!;
+        admissionSpy?.mockRestore();
+        expect(existsSync(outcomeTemporary!)).toBeTrue();
+        const owner = runtime["get"](first.subagentId);
+        const monitor = runtime["monitors"].get(`${first.subagentId}:2`)!;
+        const before = readFileSync(manifest);
+        const payload = join(dirname(second.resultPath), "image-input-2", "envelope.json");
+        const imageBytes = images ? readFileSync(payload) : undefined;
+        expect(JSON.parse(before.toString())).toMatchObject({ generation: 2, status: "running", tabId: "tab-2", surfaceCleanups: [{ generation: 1, status: "closed" }] });
+
+        failRetries = true;
+        releaseOutcome.resolve();
+        expect((await removal as Error).message).toBe("Subagent generation is no longer current");
+        expect(outcomeRenames).toBe(0);
+        expect(existsSync(outcomeTemporary!)).toBeFalse();
+        expect(readFileSync(manifest)).toEqual(before);
+        expect(runtime["cleanupOutcomes"].get(`${first.subagentId}:1`)).toMatchObject({ record: { status: "closed", tabId: "tab-1" } });
+        expect(runtime["get"](first.subagentId)).toBe(owner);
+        expect(runtime["monitors"].get(`${first.subagentId}:2`)).toBe(monitor);
+        expect(monitor.signal.aborted).toBeFalse();
+        expect(readFileSync(first.resultPath)).toEqual(resultBytes);
+        if (imageBytes) expect(readFileSync(payload)).toEqual(imageBytes);
+        expect(closes).toEqual(["tab-1", "tab-1"]);
+
+        for (const retry of [() => runtime.recover(root), () => runtime.remove(first.subagentId)]) {
+          await expect(retry()).rejects.toThrow("cleanup outcome write fault");
+          expect(runtime["get"](first.subagentId)).toBe(owner);
+          expect(runtime["monitors"].get(`${first.subagentId}:2`)).toBe(monitor);
+          expect(monitor.signal.aborted).toBeFalse();
+          expect(readFileSync(manifest)).toEqual(before);
+          expect(closes).toEqual(["tab-1", "tab-1"]);
+          expect(notifications).toEqual([]);
+        }
+        failRetries = false;
+        await runtime.recover(root);
+        expect(runtime.inspect(first.subagentId)).toMatchObject({ generation: 2, status: "running", tabId: "tab-2", surfaceCleanups: [{ generation: 1, status: "closed", tabId: "tab-1" }] });
+        expect(runtime["monitors"].size).toBe(1);
+        expect(runtime["monitors"].has(`${first.subagentId}:2`)).toBeTrue();
+        expect(closes).toEqual(["tab-1", "tab-1"]);
+        if (imageBytes) expect(readFileSync(payload)).toEqual(imageBytes);
+        expect(readFileSync(first.resultPath)).toEqual(resultBytes);
+        expect(notifications).toEqual([]);
+
+        const bytes = JSON.stringify({ subagentId: first.subagentId, generation: 2, status: "completed", result: "G2_AFTER_RECOVERY" });
+        await resultPublisher(second.resultPath).publish(bytes);
+        await waitFor(() => runtime.inspect(first.subagentId).status === "completed" && notifications.length === 1 && runtime["settlements"].size === 0);
+        expect(readFileSync(second.resultPath, "utf8")).toBe(bytes);
+        expect(JSON.parse(readFileSync(manifest, "utf8"))).toMatchObject({ generation: 2, status: "completed", tabId: "tab-2", surfaceCleanups: [{ generation: 1, status: "closed" }, { generation: 2, status: "closed", tabId: "tab-2" }] });
+        expect(closes).toEqual(["tab-1", "tab-1", "tab-2"]);
+        expect(notifications).toEqual([{ subagentId: first.subagentId, generation: 2, status: "completed", label: "cleanup outcome" }]);
+        expect(runtime["monitors"].size).toBe(0);
+        expect(runtime["cleanupOutcomes"].size).toBe(0);
+        if (imageBytes) expect(existsSync(dirname(payload))).toBeFalse();
+      } finally {
+        admissionGate.resolve(); releaseOutcome.resolve();
+        await resume?.catch(() => {});
+        await removal;
+        admissionSpy?.mockRestore(); renameSpy?.mockRestore(); writeSpy?.mockRestore(); runtime.stop(); rmSync(root, { recursive: true, force: true });
+      }
+    }, 30_000);
+  }
+  for (const images of [undefined, [{ type: "image" as const, data: "AQ==", mimeType: "image/png" }]]) {
+    test(`rejected remove keeps the retained running generation monitored (${images ? "image" : "text"})`, async () => {
+      const root = mkdtempSync(join(tmpdir(), "subagents-remove-monitor-"));
+      const { transport } = fakeTransport();
+      const closes: string[] = [];
+      const notifications: CompletionNotification[] = [];
+      let created = 0;
+      let closeFails = true;
+      transport.createTab = async () => ({ tabId: `tab-${++created}`, paneId: `pane-${created}` });
+      transport.closeTab = async id => { closes.push(id); if (closeFails) throw new Error("initial close fault"); return "closed"; };
+      const runtime = new SubagentRuntime(transport, handlerRegistry(), root, value => { notifications.push(value); });
+      let writing: ReturnType<typeof spyOn> | undefined;
+      try {
+        const first = await runtime.spawn({ agent: "handler", cwd: root, prompt: "offline", label: "offline", taskSlug: "task", images });
+        await runtime.cancel("task");
+        const second = await runtime.resume("task", "g2", images);
+        closes.length = 0; notifications.length = 0; closeFails = false;
+        const manifest = join(dirname(second.resultPath), "task.json");
+        const disk = () => JSON.parse(readFileSync(manifest, "utf8"));
+        const firstBytes = readFileSync(first.resultPath);
+        const payload = join(dirname(second.resultPath), "image-input-2", "envelope.json");
+        const imageBytes = images ? readFileSync(payload) : undefined;
+        const write = fsPromises.writeFile;
+        let blocked = true;
+        let writes = 0;
+        writing = spyOn(fsPromises, "writeFile").mockImplementation((async (...args: Parameters<typeof fsPromises.writeFile>) => {
+          if (String(args[0]).startsWith(`${manifest}.`)
+            && JSON.parse(String(args[1])).surfaceCleanups?.some((c: any) => c.generation === 1 && c.status === "closed")) {
+            writes++;
+            if (blocked) throw new Error("prior cleanup outcome write fault");
+          }
+          return write(...args);
+        }) as typeof fsPromises.writeFile);
+        await expect(runtime.recover(root)).rejects.toThrow("prior cleanup outcome write fault");
+        const owned = runtime["get"]("task");
+        const monitor = runtime["monitors"].get("task:2");
+        expect(monitor).toBeDefined();
+        for (let attempt = 0; attempt < 2; attempt++) {
+          const before = writes;
+          await expect(runtime.remove("task")).rejects.toThrow("prior cleanup outcome write fault");
+          expect(writes).toBe(before + 1);
+          expect(runtime["get"]("task")).toBe(owned);
+          expect(runtime["monitors"].get("task:2")).toBe(monitor);
+          expect(monitor!.signal.aborted).toBeFalse();
+          expect(runtime.inspect("task")).toMatchObject({ generation: 2, status: "running", tabId: "tab-2" });
+          expect(disk()).toMatchObject({ generation: 2, status: "running", surfaceCleanups: [{ generation: 1, status: "pending" }] });
+          expect(closes).toEqual(["tab-1"]);
+          expect(notifications).toEqual([]);
+          expect(readFileSync(first.resultPath)).toEqual(firstBytes);
+          expect(existsSync(second.resultPath)).toBeFalse();
+          if (imageBytes) expect(readFileSync(payload)).toEqual(imageBytes);
+        }
+        blocked = false;
+        const bytes = JSON.stringify({ subagentId: "task", generation: 2, status: "completed", result: "LATER_RESULT" });
+        await resultPublisher(second.resultPath).publish(bytes);
+        // No join/recover/cancel call may rescue a monitor lost by rejected removal.
+        await waitFor(() => runtime.inspect("task").status === "completed" && disk().status === "completed"
+          && notifications.length === 1 && runtime["settlements"].size === 0);
+        expect(runtime.inspect("task")).toMatchObject({ generation: 2, status: "completed", result: "LATER_RESULT" });
+        expect(disk()).toMatchObject({ generation: 2, status: "completed", surfaceCleanups: [{ generation: 1, status: "closed" }, { generation: 2, status: "closed" }] });
+        expect(readFileSync(first.resultPath)).toEqual(firstBytes);
+        expect(readFileSync(second.resultPath, "utf8")).toBe(bytes);
+        expect(closes).toEqual(["tab-1", "tab-2"]);
+        expect(notifications).toEqual([{ subagentId: "task", generation: 2, status: "completed", label: "offline" }]);
+        expect(runtime["monitors"].size).toBe(0);
+        expect(runtime["cleanupOutcomes"].size).toBe(0);
+        if (images) expect(existsSync(dirname(payload))).toBeFalse();
+      } finally { writing?.mockRestore(); runtime.stop(); rmSync(root, { recursive: true, force: true }); }
+    }, 30_000);
+
+    for (const stage of ["manifest", "prior-close", "outcome", "active-close", "image", "session", "artifacts"] as const) {
+      if (stage === "image" && !images) continue;
+      test(`rejected remove restores monitoring after ${stage} failure (${images ? "image" : "text"})`, async () => {
+        const root = mkdtempSync(join(tmpdir(), "subagents-remove-failure-"));
+        const { transport } = fakeTransport();
+        const notifications: CompletionNotification[] = [];
+        const closes: string[] = [];
+        let created = 0;
+        let initialFailure = stage === "prior-close" || stage === "outcome";
+        let blocked = false;
+        transport.createTab = async () => ({ tabId: `tab-${++created}`, paneId: `pane-${created}` });
+        transport.closeTab = async id => {
+          closes.push(id);
+          if (initialFailure || (blocked && (stage === "prior-close" || stage === "active-close"))) throw new Error("remove close fault");
+          return "closed";
+        };
+        const runtime = new SubagentRuntime(transport, handlerRegistry(), root, value => { notifications.push(value); });
+        let writing: ReturnType<typeof spyOn> | undefined;
+        let deletion: ReturnType<typeof spyOn> | undefined;
+        const warnings = spyOn(console, "warn").mockImplementation(() => {});
+        try {
+          let task = await runtime.spawn({ agent: "handler", cwd: root, prompt: "offline", label: "offline", taskSlug: "task", images });
+          if (initialFailure) { await runtime.cancel("task"); task = await runtime.resume("task", "next", images); }
+          initialFailure = false; closes.length = 0; notifications.length = 0;
+          writeFileSync(task.sessionFile, "retained session");
+          const owned = runtime["get"]("task");
+          const manifest = join(dirname(task.resultPath), "task.json");
+          const disk = () => JSON.parse(readFileSync(manifest, "utf8"));
+          const payload = join(dirname(task.resultPath), `image-input-${task.generation}`, "envelope.json");
+          const write = fsPromises.writeFile;
+          let faults = 0;
+          let paused: number | undefined;
+          writing = spyOn(fsPromises, "writeFile").mockImplementation((async (...args: Parameters<typeof fsPromises.writeFile>) => {
+            if (blocked && String(args[0]).startsWith(`${manifest}.`)
+              && (stage === "manifest" || (stage === "outcome" && JSON.parse(String(args[1])).surfaceCleanups?.some((c: any) => c.generation === 1 && c.status === "closed")))) {
+              faults++; paused = runtime["monitors"].size; throw new Error("remove write fault");
+            }
+            return write(...args);
+          }) as typeof fsPromises.writeFile);
+          const remove = fs.rmSync;
+          deletion = spyOn(fs, "rmSync").mockImplementation((path, options) => {
+            const target = stage === "image" ? payload : stage === "session" ? task.sessionFile : stage === "artifacts" ? dirname(task.resultPath) : undefined;
+            if (blocked && String(path) === target) { faults++; paused = runtime["monitors"].size; throw new Error("remove deletion fault"); }
+            return remove(path, options);
+          });
+          blocked = true;
+          await expect(runtime.remove("task")).rejects.toThrow(stage === "prior-close" ? "surface_cleanup_failed" : stage === "active-close" ? "remove close fault"
+            : stage === "image" ? "Image input failed at cleanup" : stage === "session" || stage === "artifacts" ? "remove deletion fault" : "remove write fault");
+          if (stage !== "prior-close" && stage !== "active-close") { expect(faults).toBe(1); expect(paused).toBe(0); }
+          expect(runtime["get"]("task")).toBe(owned);
+          expect(runtime["monitors"].has(`task:${task.generation}`)).toBeTrue();
+          expect(runtime["monitors"].size).toBe(1);
+          expect(runtime.inspect("task")).toMatchObject({ generation: task.generation, status: "running" });
+          expect(disk()).toMatchObject({ generation: task.generation, status: "running" });
+          expect(existsSync(task.sessionFile)).toBe(stage !== "artifacts");
+          expect(existsSync(task.resultPath)).toBeFalse();
+          expect(notifications).toEqual([]);
+          if (stage === "image") expect(existsSync(payload)).toBeTrue();
+          blocked = false;
+          const bytes = JSON.stringify({ subagentId: "task", generation: task.generation, status: "completed", result: "AFTER_REMOVE_FAILURE" });
+          await resultPublisher(task.resultPath).publish(bytes);
+          await waitFor(() => runtime.inspect("task").status === "completed" && disk().status === "completed"
+            && notifications.length === 1 && runtime["settlements"].size === 0);
+          expect(runtime["monitors"].size).toBe(0);
+          expect(readFileSync(task.resultPath, "utf8")).toBe(bytes);
+          expect(notifications).toEqual([{ subagentId: "task", generation: task.generation, status: "completed", label: "offline" }]);
+          // A close attempted by removal may have succeeded or thrown before the later settlement.
+          expect(closes.filter(id => id === task.tabId)).toHaveLength(stage === "manifest" || stage === "prior-close" || stage === "outcome" ? 1 : 2);
+          expect(runtime["cleanupOutcomes"].size).toBe(0);
+          if (images) expect(existsSync(dirname(payload))).toBeFalse();
+        } finally { writing?.mockRestore(); deletion?.mockRestore(); warnings.mockRestore(); runtime.stop(); rmSync(root, { recursive: true, force: true }); }
+      }, 30_000);
+    }
+
+    test(`prior cleanup outcome survives running recovery and scope waits (${images ? "image" : "text"})`, async () => {
+      const root = mkdtempSync(join(tmpdir(), "subagents-prior-outcome-"));
+      const parent = join(root, "parent.jsonl");
+      const otherParent = join(root, "other.jsonl");
+      const { transport } = fakeTransport();
+      const closes: string[] = [];
+      const notifications: CompletionNotification[] = [];
+      let created = 0;
+      let closeFails = true;
+      transport.createTab = async () => ({ tabId: `tab-${++created}`, paneId: `pane-${created}` });
+      transport.closeTab = async id => { closes.push(id); if (closeFails) throw new Error("initial close fault"); return "closed"; };
+      const runtime = new SubagentRuntime(transport, handlerRegistry(), undefined, value => { notifications.push(value); });
+      let writing: ReturnType<typeof spyOn> | undefined;
+      let release: (() => void) | undefined;
+      try {
+        const first = await runtime.spawn({ agent: "handler", cwd: root, prompt: "offline", label: "offline", taskSlug: "task", parentSessionFile: parent, images });
+        await runtime.cancel("task");
+        expect(runtime.inspect("task").surfaceCleanups).toMatchObject([{ generation: 1, status: "failed" }]);
+        const second = await runtime.resume("task", "g2", images);
+        runtime.stop(); closes.length = 0; notifications.length = 0; closeFails = false;
+        const manifest = join(dirname(first.resultPath), "task.json");
+        const disk = () => JSON.parse(readFileSync(manifest, "utf8"));
+        const bytes = readFileSync(first.resultPath);
+        const payload = join(dirname(second.resultPath), "image-input-2", "envelope.json");
+        const imageBytes = images ? readFileSync(payload) : undefined;
+        const write = fsPromises.writeFile;
+        let blocked = true;
+        let writes = 0;
+        let hold = false;
+        const entered = Promise.withResolvers<void>();
+        const gate = Promise.withResolvers<void>();
+        release = gate.resolve;
+        writing = spyOn(fsPromises, "writeFile").mockImplementation((async (...args: Parameters<typeof fsPromises.writeFile>) => {
+          if (String(args[0]).startsWith(`${manifest}.`)
+            && JSON.parse(String(args[1])).surfaceCleanups?.some((c: any) => c.generation === 1 && c.status === "closed")) {
+            writes++;
+            if (hold) { entered.resolve(); await gate.promise; }
+            if (blocked) throw new Error("prior cleanup outcome write fault");
+          }
+          return write(...args);
+        }) as typeof fsPromises.writeFile);
+        await expect(runtime.recover(root, parent)).rejects.toThrow("prior cleanup outcome write fault");
+        const owned = runtime["get"]("task");
+        const scope = runtime["activeTasksDir"];
+        expect(disk()).toMatchObject({ generation: 2, status: "running", surfaceCleanups: [{ generation: 1, status: "pending" }] });
+        expect(runtime.inspect("task")).toMatchObject({ generation: 2, status: "running", surfaceCleanups: [{ generation: 1, status: "closed" }] });
+        expect(closes).toEqual(["tab-1"]);
+        // No rebuild, scope switch, generation change or current-generation effect on persistent failure.
+        for (const act of [() => runtime.recover(root, parent), () => runtime.recover(root, otherParent),
+          () => runtime.join("task"), () => runtime.resume("task", "no"), () => runtime.remove("task"), () => runtime.cancel("task")]) {
+          const before = writes;
+          await expect(act()).rejects.toThrow("prior cleanup outcome write fault");
+          expect(writes).toBe(before + 1);
+          expect(runtime["get"]("task")).toBe(owned);
+          expect(runtime["activeTasksDir"]).toBe(scope);
+          expect(runtime.inspect("task")).toMatchObject({ generation: 2, status: "running" });
+          expect(closes).toEqual(["tab-1"]);
+          expect(notifications).toEqual([]);
+          expect(readFileSync(first.resultPath)).toEqual(bytes);
+          expect(existsSync(second.resultPath)).toBeFalse();
+        }
+        // Concurrent same/different-scope recoveries wait for the retained outcome, then all reject.
+        hold = true;
+        const before = writes;
+        const recoveries = [runtime.recover(root, parent), runtime.recover(root, parent), runtime.recover(root, otherParent)];
+        const outcomes = Promise.allSettled(recoveries);
+        await entered.promise;
+        expect(writes).toBe(before + 1);
+        expect(runtime["get"]("task")).toBe(owned);
+        gate.resolve(); hold = false;
+        expect((await outcomes).map(value => value.status)).toEqual(["rejected", "rejected", "rejected"]);
+        expect(writes).toBe(before + 1);
+        blocked = false;
+        await Promise.all([runtime.recover(root, parent), runtime.recover(root, parent)]);
+        expect(runtime["get"]("task")).not.toBe(owned);
+        expect(disk()).toMatchObject({ generation: 2, status: "running", surfaceCleanups: [{ generation: 1, status: "closed" }] });
+        expect(runtime.inspect("task")).toMatchObject({ generation: 2, status: "running", tabId: "tab-2" });
+        expect(closes).toEqual(["tab-1"]);
+        expect(notifications).toEqual([]);
+        expect(created).toBe(2);
+        expect(readFileSync(first.resultPath)).toEqual(bytes);
+        if (imageBytes) expect(readFileSync(payload)).toEqual(imageBytes);
+        expect(runtime["cleanups"].size).toBe(0);
+        await runtime.recover(root, otherParent);
+        expect(runtime.listTasks()).toEqual([]);
+        await runtime.recover(root, parent);
+        expect(closes).toEqual(["tab-1"]);
+      } finally { release?.(); writing?.mockRestore(); runtime.stop(); rmSync(root, { recursive: true, force: true }); }
+    }, 30_000);
+  }
+  for (const images of [undefined, [{ type: "image" as const, data: "AQ==", mimeType: "image/png" }]])
+  for (const boundary of ["stopped-before", "shutdown", "recovery", "scope", "generation", "success"] as const) {
+    test(`remove monitor restoration respects ${boundary} ownership (${images ? "image" : "text"})`, async () => {
+      const root = mkdtempSync(join(tmpdir(), "subagents-remove-ownership-"));
+      const parent = join(root, "parent.jsonl");
+      const { transport } = fakeTransport();
+      let created = 0;
+      transport.createTab = async () => ({ tabId: `tab-${++created}`, paneId: `pane-${created}` });
+      const notifications: CompletionNotification[] = [];
+      const runtime = new SubagentRuntime(transport, handlerRegistry(), undefined, value => { notifications.push(value); });
+      const entered = Promise.withResolvers<void>();
+      const gate = Promise.withResolvers<void>();
+      let writing: ReturnType<typeof spyOn> | undefined;
+      try {
+        const task = await runtime.spawn({ agent: "handler", cwd: root, prompt: "offline", label: "offline", taskSlug: "task", images, parentSessionFile: parent });
+        const old = runtime["get"]("task");
+        const manifest = join(dirname(task.resultPath), "task.json");
+        const write = fsPromises.writeFile;
+        let held = false;
+        writing = spyOn(fsPromises, "writeFile").mockImplementation((async (...args: Parameters<typeof fsPromises.writeFile>) => {
+          if (!held && String(args[0]).startsWith(`${manifest}.`)) {
+            held = true; entered.resolve(); await gate.promise;
+            if (boundary !== "success") throw new Error("delayed removal write fault");
+          }
+          return write(...args);
+        }) as typeof fsPromises.writeFile);
+        if (boundary === "stopped-before") runtime.stop();
+        const removal = runtime.remove("task").then(() => undefined, error => error);
+        await entered.promise;
+        expect(runtime["monitors"].size).toBe(0);
+        if (boundary === "shutdown") runtime.stop();
+        if (boundary === "recovery") await runtime.recover(root, parent);
+        if (boundary === "scope") await runtime.recover(root, join(root, "other.jsonl"));
+        if (boundary === "generation") { await runtime.cancel("task"); await runtime.resume("task", "g2", images); }
+        const paired = boundary === "success" ? runtime.remove("task") : undefined;
+        const current = runtime["tasks"].get("task");
+        const monitor = current ? runtime["monitors"].get(`task:${current.generation}`) : undefined;
+        gate.resolve();
+        const failure = await removal;
+        await paired;
+        expect(runtime["removals"].size).toBe(0);
+        if (boundary === "success") {
+          expect(failure).toBeUndefined();
+          expect(runtime.listTasks()).toEqual([]);
+          expect(runtime["monitors"].size).toBe(0);
+          expect(existsSync(dirname(task.resultPath))).toBeFalse();
+        } else if (boundary === "scope") {
+          expect(failure.message).toBe("delayed removal write fault");
+          expect(runtime.listTasks()).toEqual([]);
+          expect(runtime["monitors"].size).toBe(0);
+          expect(runtime["activeTasksDir"]).toBe(join(root, "other", "tasks"));
+          expect(JSON.parse(readFileSync(manifest, "utf8"))).toMatchObject({ generation: 1, status: "running" });
+          runtime["startMonitor"](old);
+          expect(runtime["monitors"].size).toBe(0);
+        } else {
+          expect(failure.message).toBe("delayed removal write fault");
+          expect(runtime["get"]("task")).toBe(current!);
+          expect(existsSync(manifest)).toBeTrue();
+          if (boundary === "shutdown" || boundary === "stopped-before") {
+            expect(runtime["monitors"].size).toBe(0);
+            await resultPublisher(task.resultPath).publish(JSON.stringify({ subagentId: "task", generation: 1, status: "completed", result: "AFTER_STOP" }));
+            await Bun.sleep(600);
+            expect(runtime.inspect("task").status).toBe("running");
+            expect(JSON.parse(readFileSync(manifest, "utf8")).status).toBe("running");
+            expect(notifications).toEqual([]);
+          } else {
+            expect(current).not.toBe(old);
+            expect(runtime["monitors"].size).toBe(1);
+            expect(runtime["monitors"].get(`task:${current!.generation}`)).toBe(monitor);
+            expect(monitor!.signal.aborted).toBeFalse();
+            if (boundary === "generation") expect(runtime["monitors"].has("task:1")).toBeFalse();
+            notifications.length = 0;
+            await resultPublisher(current!.resultPath).publish(JSON.stringify({ subagentId: "task", generation: current!.generation, status: "completed", result: "CURRENT_RESULT" }));
+            await waitFor(() => runtime.inspect("task").status === "completed" && notifications.length === 1 && runtime["settlements"].size === 0);
+            expect(JSON.parse(readFileSync(manifest, "utf8"))).toMatchObject({ generation: current!.generation, status: "completed" });
+            expect(notifications).toEqual([{ subagentId: "task", generation: current!.generation, status: "completed", label: "offline" }]);
+          }
+        }
+      } finally { gate.resolve(); writing?.mockRestore(); runtime.stop(); rmSync(root, { recursive: true, force: true }); }
+    }, 30_000);
+  }
+
+  for (const outcome of ["closed", "failed"] as const) {
+    test(`multiple prior cleanup outcomes coalesce bounded retries (${outcome})`, async () => {
+      const root = mkdtempSync(join(tmpdir(), "subagents-multiple-outcomes-"));
+      const { transport } = fakeTransport();
+      const closes: string[] = [];
+      let created = 0;
+      let initial = true;
+      transport.createTab = async () => ({ tabId: `tab-${++created}`, paneId: `pane-${created}` });
+      transport.closeTab = async id => {
+        closes.push(id);
+        if (initial || (id === "tab-2" && outcome === "failed")) throw new Error("real close failure");
+        return "closed";
+      };
+      const notifications: CompletionNotification[] = [];
+      const runtime = new SubagentRuntime(transport, handlerRegistry(), root, value => { notifications.push(value); });
+      let writing: ReturnType<typeof spyOn> | undefined;
+      const gate = Promise.withResolvers<void>();
+      try {
+        const first = await runtime.spawn({ agent: "handler", cwd: root, prompt: "one", label: "offline", taskSlug: "task" });
+        await runtime.cancel("task");
+        const second = await runtime.resume("task", "two");
+        await runtime.cancel("task");
+        await runtime.resume("task", "three");
+        runtime.stop(); initial = false; closes.length = 0; notifications.length = 0;
+        const bytes = [first, second].map(task => readFileSync(task.resultPath));
+        const manifest = join(dirname(first.resultPath), "task.json");
+        const disk = () => JSON.parse(readFileSync(manifest, "utf8"));
+        const write = fsPromises.writeFile;
+        let blocked = true;
+        let hold = false;
+        let writes = 0;
+        const entered = Promise.withResolvers<void>();
+        writing = spyOn(fsPromises, "writeFile").mockImplementation((async (...args: Parameters<typeof fsPromises.writeFile>) => {
+          if (String(args[0]).startsWith(`${manifest}.`)
+            && JSON.parse(String(args[1])).surfaceCleanups?.some((c: any) => c.generation === 2 && c.status === outcome)) {
+            writes++;
+            if (hold) { entered.resolve(); await gate.promise; }
+            if (blocked) throw new Error("second outcome write fault");
+          }
+          return write(...args);
+        }) as typeof fsPromises.writeFile);
+        await expect(runtime.recover(root)).rejects.toThrow("second outcome write fault");
+        expect(closes).toEqual(["tab-1", "tab-2"]);
+        expect(disk().surfaceCleanups).toMatchObject([{ generation: 1, status: "closed" }, { generation: 2, status: "pending" }]);
+        const owned = runtime["get"]("task");
+        hold = true;
+        const joining = runtime.join("task");
+        const joined = joining.catch(error => error);
+        await entered.promise;
+        const resume = runtime.resume("task", "no").catch(error => error);
+        const remove = runtime.remove("task").catch(error => error);
+        const controller = new AbortController();
+        const aborted = runtime.join("task", 3, controller.signal);
+        controller.abort();
+        await expect(aborted).rejects.toMatchObject({ name: "AbortError" });
+        expect(writes).toBe(2);
+        expect(closes).toEqual(["tab-1", "tab-2"]);
+        gate.resolve(); hold = false;
+        for (const error of await Promise.all([joined, resume, remove])) expect(error.message).toBe("second outcome write fault");
+        expect(writes).toBe(2);
+        expect(runtime["get"]("task")).toBe(owned);
+        blocked = false;
+        // A bounded resume writes retained evidence before its ordinary active-task rejection.
+        await expect(runtime.resume("task", "no")).rejects.toThrow("Cannot resume an active subagent");
+        expect(disk().surfaceCleanups).toMatchObject([{ generation: 1, status: "closed" }, { generation: 2, status: outcome }]);
+        expect(runtime["cleanupOutcomes"].size).toBe(0);
+        expect(closes).toEqual(["tab-1", "tab-2"]);
+        await runtime.recover(root);
+        expect(closes).toEqual(outcome === "failed" ? ["tab-1", "tab-2", "tab-2"] : ["tab-1", "tab-2"]);
+        expect(runtime.inspect("task")).toMatchObject({ generation: 3, status: "running", tabId: "tab-3" });
+        expect(notifications).toEqual([]);
+        expect([first, second].map(task => readFileSync(task.resultPath))).toEqual(bytes);
+      } finally { gate.resolve(); writing?.mockRestore(); runtime.stop(); rmSync(root, { recursive: true, force: true }); }
+    });
+  }
+
+  for (const images of [false, true]) for (const order of ["child-first", "cancel-first"] as const) {
+    test(`cancel retries a temporarily unreadable first Result without join (${images ? "image" : "text"}, ${order})`, async () => {
+      const root = mkdtempSync(join(tmpdir(), "subagents-cancel-result-retry-"));
+      const { transport, calls } = fakeTransport();
+      const notifications: CompletionNotification[] = [];
+      const runtime = new SubagentRuntime(transport, handlerRegistry(), root, value => { notifications.push(value); });
+      let deletion: ReturnType<typeof spyOn> | undefined;
+      let opening: ReturnType<typeof spyOn> | undefined;
+      let release: (() => void) | undefined;
+      try {
+        const task = await runtime.spawn({ agent: "handler", cwd: root, prompt: "offline", label: "offline", taskSlug: "task",
+          ...(images ? { images: [{ type: "image", data: "AQ==", mimeType: "image/png" }] } : {}),
+        });
+        calls.length = 0;
+        const manifest = join(dirname(task.resultPath), "task.json");
+        const bytes = JSON.stringify({ subagentId: "task", generation: 1, status: "completed", result: "FIRST_RESULT" });
+        let cancelling: Promise<SubagentTask> | undefined;
+        let parentTemporary = "";
+        if (order === "cancel-first") {
+          const open = fsPromises.open;
+          let entered!: () => void;
+          const atOpen = new Promise<void>(resolve => { entered = resolve; });
+          const gate = new Promise<void>(resolve => { release = resolve; });
+          let held = false;
+          opening = spyOn(fsPromises, "open").mockImplementation((async (...args: Parameters<typeof fsPromises.open>) => {
+            if (!held && String(args[0]).startsWith(`${task.resultPath}.`)) { held = true; parentTemporary = String(args[0]); entered(); await gate; }
+            return open(...args);
+          }) as typeof fsPromises.open);
+          cancelling = runtime.cancel("task");
+          await atOpen;
+          expect(runtime.inspect("task").status).toBe("running");
+        }
+        const unlink = fs.unlinkSync;
+        let refused = 0;
+        deletion = spyOn(fs, "unlinkSync").mockImplementation(path => {
+          if (String(path).startsWith(`${task.resultPath}.`) && String(path).endsWith(".tmp") && String(path) !== parentTemporary) {
+            refused++; throw new Error("PRIVATE injected unlink fault");
+          }
+          return unlink(path);
+        });
+        await resultPublisher(task.resultPath).publish(bytes);
+        const temporary = join(dirname(task.resultPath), readdirSync(dirname(task.resultPath)).find(name => name.startsWith("result-1.json.") && name.endsWith(".tmp"))!);
+        if (order === "cancel-first") {
+          release!(); release = undefined;
+          await expect(cancelling!).rejects.toThrow(/storage/i);
+        } else {
+          await expect(Promise.all([runtime.cancel("task"), runtime.cancel("task")])).rejects.toThrow("Image input failed at storage.");
+        }
+        expect(readFileSync(task.resultPath, "utf8")).toBe(bytes);
+        expect(fs.lstatSync(task.resultPath).nlink).toBe(2);
+        expect(runtime.inspect("task")).toMatchObject({ status: "running", result: undefined });
+        expect(JSON.parse(readFileSync(manifest, "utf8")).status).toBe("running");
+        expect(calls.filter(value => (value as any).op === "closeTab")).toHaveLength(0);
+        expect(notifications).toEqual([]);
+        const initialRefused = refused;
+        await waitFor(() => refused > initialRefused); // Observe a real monitor retry while the unlink fault remains active.
+        expect(refused).toBeGreaterThan(initialRefused);
+        expect(runtime.inspect("task").status).toBe("running");
+        expect(runtime["monitors"].size).toBe(1);
+        expect(JSON.parse(readFileSync(manifest, "utf8")).status).toBe("running");
+        expect(calls.filter(value => (value as any).op === "closeTab")).toHaveLength(0);
+        expect(notifications).toEqual([]);
+        deletion.mockRestore(); deletion = undefined;
+        await waitFor(() => runtime.inspect("task").status === "completed" && notifications.length === 1);
+        expect(JSON.parse(readFileSync(manifest, "utf8")).status).toBe("completed");
+        expect(readFileSync(task.resultPath, "utf8")).toBe(bytes);
+        expect(fs.lstatSync(task.resultPath).nlink).toBe(1);
+        expect(runtime["monitors"].size).toBe(0);
+        expect(existsSync(temporary)).toBeFalse();
+        expect(readdirSync(dirname(task.resultPath)).filter(name => name.startsWith("result-1.json.") && name.endsWith(".tmp"))).toEqual([]);
+        if (images) expect(existsSync(join(dirname(task.resultPath), "image-input-1"))).toBeFalse();
+        expect(calls.filter(value => (value as any).op === "closeTab")).toHaveLength(1);
+        expect(notifications).toEqual([{ subagentId: "task", generation: 1, status: "completed", label: "offline" }]);
+        await runtime.cancel("task");
+        await runtime.join("task");
+        expect(calls.filter(value => (value as any).op === "closeTab")).toHaveLength(1);
+        expect(notifications).toHaveLength(1);
+      } finally {
+        release?.(); opening?.mockRestore(); deletion?.mockRestore(); runtime.stop(); rmSync(root, { recursive: true, force: true });
+      }
+    }, 30_000);
+  }
+
+  for (const images of [false, true]) {
+    test(`cancel publication failure retains first later Result and its monitor (${images ? "image" : "text"})`, async () => {
+      const root = mkdtempSync(join(tmpdir(), "subagents-cancel-publish-retry-"));
+      const { transport, calls } = fakeTransport();
+      const notifications: CompletionNotification[] = [];
+      const runtime = new SubagentRuntime(transport, handlerRegistry(), root, value => { notifications.push(value); });
+      let opening: ReturnType<typeof spyOn> | undefined;
+      let deletion: ReturnType<typeof spyOn> | undefined;
+      try {
+        const task = await runtime.spawn({ agent: "handler", cwd: root, prompt: "offline", label: "offline", taskSlug: "task",
+          ...(images ? { images: [{ type: "image", data: "AQ==", mimeType: "image/png" }] } : {}),
+        });
+        calls.length = 0;
+        const manifest = join(dirname(task.resultPath), "task.json");
+        const open = fsPromises.open;
+        let faulted = false;
+        opening = spyOn(fsPromises, "open").mockImplementation((async (...args: Parameters<typeof fsPromises.open>) => {
+          if (!faulted && String(args[0]).startsWith(`${task.resultPath}.`)) { faulted = true; throw new Error("PRIVATE cancel publication fault"); }
+          return open(...args);
+        }) as typeof fsPromises.open);
+        await expect(runtime.cancel("task")).rejects.toThrow("PRIVATE cancel publication fault");
+        expect(faulted).toBeTrue();
+        expect(existsSync(task.resultPath)).toBeFalse();
+        expect(runtime.inspect("task").status).toBe("running");
+        expect(JSON.parse(readFileSync(manifest, "utf8")).status).toBe("running");
+        expect(runtime["pendingSettlements"].size).toBe(1);
+        expect(runtime["monitors"].size).toBe(1);
+        expect(calls.filter(value => (value as any).op === "closeTab")).toHaveLength(0);
+        expect(notifications).toEqual([]);
+        opening.mockRestore(); opening = undefined;
+        const unlink = fs.unlinkSync;
+        deletion = spyOn(fs, "unlinkSync").mockImplementation(path => {
+          if (String(path).startsWith(`${task.resultPath}.`) && String(path).endsWith(".tmp")) throw new Error("PRIVATE unlink fault");
+          return unlink(path);
+        });
+        const bytes = JSON.stringify({ subagentId: "task", generation: 1, status: "completed", result: "FIRST_RESULT" });
+        await resultPublisher(task.resultPath).publish(bytes);
+        await Bun.sleep(600);
+        expect(runtime.inspect("task").status).toBe("running");
+        expect(JSON.parse(readFileSync(manifest, "utf8")).status).toBe("running");
+        expect(notifications).toEqual([]);
+        deletion.mockRestore(); deletion = undefined;
+        await waitFor(() => runtime.inspect("task").status === "completed" && notifications.length === 1);
+        expect(readFileSync(task.resultPath, "utf8")).toBe(bytes);
+        expect(JSON.parse(readFileSync(manifest, "utf8")).status).toBe("completed");
+        expect(calls.filter(value => (value as any).op === "closeTab")).toHaveLength(1);
+        expect(notifications).toHaveLength(1);
+        await runtime.cancel("task");
+        expect(calls.filter(value => (value as any).op === "closeTab")).toHaveLength(1);
+      } finally { opening?.mockRestore(); deletion?.mockRestore(); runtime.stop(); rmSync(root, { recursive: true, force: true }); }
+    }, 30_000);
+  }
+
+  for (const first of ["child", "cancel"] as const) {
+    test(`cancel keeps running observation and retries after manifest write failure (${first} Result first)`, async () => {
+      const root = mkdtempSync(join(tmpdir(), "subagents-cancel-persist-retry-"));
+      const { transport, calls } = fakeTransport();
+      const notifications: CompletionNotification[] = [];
+      const runtime = new SubagentRuntime(transport, handlerRegistry(), root, value => { notifications.push(value); });
+      let writing: ReturnType<typeof spyOn> | undefined;
+      try {
+        const task = await runtime.spawn({ agent: "handler", cwd: root, prompt: "offline", label: "offline", taskSlug: "task" });
+        calls.length = 0;
+        const manifest = join(dirname(task.resultPath), "task.json");
+        if (first === "child") await resultPublisher(task.resultPath).publish(JSON.stringify({ subagentId: "task", generation: 1, status: "completed", result: "FIRST_RESULT" }));
+        const write = fsPromises.writeFile;
+        let failed = false;
+        writing = spyOn(fsPromises, "writeFile").mockImplementation((async (...args: Parameters<typeof fsPromises.writeFile>) => {
+          if (!failed && String(args[0]).startsWith(`${manifest}.`)) { failed = true; throw new Error("PRIVATE manifest write fault"); }
+          return write(...args);
+        }) as typeof fsPromises.writeFile);
+        await expect(runtime.cancel("task")).rejects.toThrow("PRIVATE manifest write fault");
+        expect(failed).toBeTrue();
+        expect(runtime.inspect("task")).toMatchObject({ status: "running", result: undefined });
+        expect(JSON.parse(readFileSync(manifest, "utf8")).status).toBe("running");
+        expect(calls.filter(value => (value as any).op === "closeTab")).toHaveLength(0);
+        expect(notifications).toEqual([]);
+        expect(runtime["pendingSettlements"].size).toBe(1);
+        writing.mockRestore(); writing = undefined;
+        await waitFor(() => runtime.inspect("task").status === (first === "child" ? "completed" : "cancelled") && notifications.length === 1);
+        expect(JSON.parse(readFileSync(manifest, "utf8")).status).toBe(first === "child" ? "completed" : "cancelled");
+        expect(JSON.parse(readFileSync(task.resultPath, "utf8")).status).toBe(first === "child" ? "completed" : "cancelled");
+        expect(calls.filter(value => (value as any).op === "closeTab")).toHaveLength(1);
+        expect(notifications).toHaveLength(1);
+        await runtime.cancel("task");
+        expect(notifications).toHaveLength(1);
+      } finally { writing?.mockRestore(); runtime.stop(); rmSync(root, { recursive: true, force: true }); }
+    }, 30_000);
+  }
+
+  for (const images of [false, true]) for (const order of ["child-first", "cancel-first"] as const) {
+    test(`post-close outcome write failure keeps terminal intent and retries without reclose (${images ? "image" : "text"}, ${order})`, async () => {
+      const root = mkdtempSync(join(tmpdir(), "subagents-post-close-retry-"));
+      const { transport, calls } = fakeTransport();
+      const notifications: CompletionNotification[] = [];
+      const runtime = new SubagentRuntime(transport, handlerRegistry(), root, value => { notifications.push(value); });
+      let writing: ReturnType<typeof spyOn> | undefined;
+      try {
+        const task = await runtime.spawn({ agent: "handler", cwd: root, prompt: "offline", label: "offline", taskSlug: "task",
+          ...(images ? { images: [{ type: "image", data: "AQ==", mimeType: "image/png" }] } : {}),
+        });
+        calls.length = 0;
+        const manifest = join(dirname(task.resultPath), "task.json");
+        const firstResult = JSON.stringify({ subagentId: "task", generation: 1, status: "completed", result: "FIRST_RESULT" });
+        if (order === "child-first") await resultPublisher(task.resultPath).publish(firstResult);
+        const write = fsPromises.writeFile;
+        let writes = 0;
+        let blocked = true;
+        writing = spyOn(fsPromises, "writeFile").mockImplementation((async (...args: Parameters<typeof fsPromises.writeFile>) => {
+          if (String(args[0]).startsWith(`${manifest}.`) && ++writes >= 2 && blocked) throw new Error("PRIVATE cleanup-outcome manifest write fault");
+          return write(...args);
+        }) as typeof fsPromises.writeFile);
+        await expect(runtime.cancel("task")).rejects.toThrow("PRIVATE cleanup-outcome manifest write fault");
+        const bytes = readFileSync(task.resultPath, "utf8");
+        expect(bytes).toBe(order === "child-first" ? firstResult : JSON.stringify({ subagentId: "task", generation: 1, status: "cancelled" }));
+        const status = order === "child-first" ? "completed" : "cancelled";
+        expect(writes).toBe(2);
+        expect(JSON.parse(readFileSync(manifest, "utf8"))).toMatchObject({ status, surfaceCleanups: [{ generation: 1, status: "pending", tabId: "tab-1" }] });
+        expect(runtime.inspect("task")).toMatchObject({ status, surfaceCleanups: [{ generation: 1, status: "closed", tabId: "tab-1" }] });
+        expect(runtime["monitors"].size).toBe(0);
+        expect(runtime["pendingSettlements"].size).toBe(1);
+        expect(calls.filter(value => (value as any).op === "closeTab")).toHaveLength(1);
+        expect(notifications).toEqual([]);
+        await expect(runtime.join("task")).rejects.toThrow("PRIVATE cleanup-outcome manifest write fault");
+        expect(writes).toBe(3);
+        await Bun.sleep(550); // No running monitor may re-close or quietly complete a failed outcome write.
+        expect(calls.filter(value => (value as any).op === "closeTab")).toHaveLength(1);
+        expect(writes).toBe(3);
+        expect(runtime["monitors"].size).toBe(0);
+        expect(notifications).toEqual([]);
+        blocked = false;
+        const settled = await runtime.join("task");
+        expect(settled).toMatchObject({ status, surfaceCleanups: [{ generation: 1, status: "closed" }] });
+        expect(JSON.parse(readFileSync(manifest, "utf8"))).toMatchObject({ status, surfaceCleanups: [{ generation: 1, status: "closed" }] });
+        expect(runtime["pendingSettlements"].size).toBe(0);
+        if (images) expect(existsSync(join(dirname(task.resultPath), "image-input-1"))).toBeFalse();
+        expect(readFileSync(task.resultPath, "utf8")).toBe(bytes);
+        expect(notifications).toEqual([{ subagentId: "task", generation: 1, status, label: "offline" }]);
+        await runtime.cancel("task");
+        await runtime.join("task");
+        expect(calls.filter(value => (value as any).op === "closeTab")).toHaveLength(1);
+        expect(notifications).toHaveLength(1);
+        expect(readFileSync(task.resultPath, "utf8")).toBe(bytes);
+      } finally { writing?.mockRestore(); runtime.stop(); rmSync(root, { recursive: true, force: true }); }
+    }, 30_000);
+  }
+
+  for (const stage of ["before-close", "after-close", "before-notify"] as const) {
+    test(`late Result with ${stage} persistence failure retains its stage across retries and notification failure`, async () => {
+      const root = mkdtempSync(join(tmpdir(), "subagents-late-result-retry-"));
+      const { transport, calls } = fakeTransport(false);
+      const notifications: CompletionNotification[] = [];
+      let notifyAttempts = 0;
+      const runtime = new SubagentRuntime(transport, handlerRegistry(), root, value => {
+        notifyAttempts++;
+        if (notifyAttempts === 1) throw new Error("offline notification failure");
+        notifications.push(value);
+      });
+      let writing: ReturnType<typeof spyOn> | undefined;
+      try {
+        const task = await runtime.spawn({ agent: "handler", cwd: root, prompt: "offline", label: "offline", taskSlug: "task" });
+        calls.length = 0;
+        const manifest = join(dirname(task.resultPath), "task.json");
+        const disk = () => JSON.parse(readFileSync(manifest, "utf8"));
+        const bytes = JSON.stringify({ subagentId: "task", generation: 1, status: "completed", result: "LATE_FIRST_RESULT" });
+        const close = transport.closeTab;
+        const durableAtClose: unknown[] = [];
+        transport.closeTab = async id => {
+          durableAtClose.push(disk());
+          if (stage !== "before-close") await resultPublisher(task.resultPath).publish(bytes);
+          return close(id);
+        };
+        const write = fsPromises.writeFile;
+        let writes = 0;
+        let blocked = true;
+        const failingWrite = stage === "before-notify" ? 3 : 2;
+        writing = spyOn(fsPromises, "writeFile").mockImplementation((async (...args: Parameters<typeof fsPromises.writeFile>) => {
+          if (!String(args[0]).startsWith(`${manifest}.`)) return write(...args);
+          const attempt = ++writes;
+          if (attempt >= failingWrite && blocked) throw new Error("PRIVATE late-Result persistence fault");
+          await write(...args);
+          if (attempt === 1 && stage === "before-close") await resultPublisher(task.resultPath).publish(bytes);
+        }) as typeof fsPromises.writeFile);
+        // Let the real running monitor discover pane_closed, then fail after durable intent.
+        await waitFor(() => runtime["pendingSettlements"].size === 1 && runtime["settlements"].size === 0);
+        const cleanupStatus = stage === "before-close" ? "pending" : "closed";
+        expect(writes).toBe(failingWrite);
+        expect(disk()).toMatchObject({ status: "failed", error: "pane_closed", surfaceCleanups: [{ status: stage === "before-notify" ? "closed" : "pending" }] });
+        expect(runtime.inspect("task")).toMatchObject({ status: stage === "after-close" ? "failed" : "completed", surfaceCleanups: [{ status: cleanupStatus }] });
+        expect(runtime["monitors"].size).toBe(0);
+        expect(notifyAttempts).toBe(0);
+        for (let retry = 1; retry <= 2; retry++) {
+          await expect(runtime.join("task")).rejects.toThrow("PRIVATE late-Result persistence fault");
+          expect(writes).toBe(failingWrite + retry);
+          expect(runtime.inspect("task")).toMatchObject({ status: "completed", result: "LATE_FIRST_RESULT", error: undefined, surfaceCleanups: [{ status: cleanupStatus }] });
+          expect(runtime["monitors"].size).toBe(0);
+          expect(notifyAttempts).toBe(0);
+          expect(calls.filter(value => (value as any).op === "closeTab")).toHaveLength(stage === "before-close" ? 0 : 1);
+        }
+        blocked = false;
+        expect(await runtime.join("task")).toMatchObject({ status: "completed", result: "LATE_FIRST_RESULT", surfaceCleanups: [{ status: "closed" }] });
+        expect(disk()).toMatchObject({ status: "completed", surfaceCleanups: [{ status: "closed" }] });
+        expect(durableAtClose).toMatchObject([{ status: stage === "before-close" ? "completed" : "failed", surfaceCleanups: [{ status: "pending" }] }]);
+        expect(notifyAttempts).toBe(1);
+        expect(notifications).toEqual([]); // Notifier failure never rolls back terminal state or close evidence.
+        await runtime.recover(root);
+        expect(notifications).toEqual([{ subagentId: "task", generation: 1, status: "completed", label: "offline" }]);
+        await runtime.cancel("task");
+        await runtime.join("task");
+        expect(notifyAttempts).toBe(2);
+        expect(calls.filter(value => (value as any).op === "closeTab")).toHaveLength(1);
+        expect(runtime["pendingSettlements"].size).toBe(0);
+        expect(readFileSync(task.resultPath, "utf8")).toBe(bytes);
+      } finally { writing?.mockRestore(); runtime.stop(); rmSync(root, { recursive: true, force: true }); }
+    }, 30_000);
+  }
+
+  test("terminal recovery retains bounded intent without starting a running monitor", async () => {
+    const root = mkdtempSync(join(tmpdir(), "subagents-terminal-recover-retry-"));
+    const { transport, calls } = fakeTransport();
+    const notifications: CompletionNotification[] = [];
+    const runtime = new SubagentRuntime(transport, handlerRegistry(), root, value => { notifications.push(value); });
+    let writing: ReturnType<typeof spyOn> | undefined;
+    try {
+      const task = await runtime.spawn({ agent: "handler", cwd: root, prompt: "offline", label: "offline", taskSlug: "task" });
+      runtime.stop(); calls.length = 0;
+      const manifest = join(dirname(task.resultPath), "task.json");
+      const record = JSON.parse(readFileSync(manifest, "utf8"));
+      record.status = "failed"; record.error = "offline failure";
+      writeFileSync(manifest, JSON.stringify(record));
+      const write = fsPromises.writeFile;
+      writing = spyOn(fsPromises, "writeFile").mockImplementation((async (...args: Parameters<typeof fsPromises.writeFile>) => {
+        if (String(args[0]).startsWith(`${manifest}.`)) throw new Error("PRIVATE terminal persistence fault");
+        return write(...args);
+      }) as typeof fsPromises.writeFile);
+      await expect(runtime.recover(root)).rejects.toThrow("PRIVATE terminal persistence fault");
+      expect(runtime.inspect("task")).toMatchObject({ status: "failed", error: "offline failure" });
+      expect(runtime["pendingSettlements"].size).toBe(1);
+      expect(runtime["monitors"].size).toBe(0);
+      expect(calls.filter(value => (value as any).op === "closeTab")).toHaveLength(0);
+      expect(notifications).toEqual([]);
+      writing.mockRestore(); writing = undefined;
+      await runtime.join("task"); // Terminal recovery has no running monitor; this bounded operation retries intent.
+      expect(runtime.inspect("task")).toMatchObject({ status: "failed", error: "offline failure" });
+      expect(calls.filter(value => (value as any).op === "closeTab")).toHaveLength(1);
+      expect(notifications).toHaveLength(1);
+    } finally { writing?.mockRestore(); runtime.stop(); rmSync(root, { recursive: true, force: true }); }
+  });
+
+  for (const operation of ["join", "recover"] as const) {
+    for (const generation of [1, 2]) {
+      test(`parent ${operation} takes over child publication after two cleanup failures and exit in generation ${generation}`, async () => {
+        const root = mkdtempSync(join(tmpdir(), "subagents-result-takeover-"));
+        const { transport, calls } = fakeTransport();
+        const notifications: CompletionNotification[] = [];
+        let runtime = new SubagentRuntime(transport, handlerRegistry(), root, value => { notifications.push(value); });
+        let deletion: ReturnType<typeof spyOn> | undefined;
+        try {
+          let task = await runtime.spawn({ agent: "handler", cwd: root, prompt: "offline", label: "offline", taskSlug: "task" });
+          let previous: string | undefined;
+          if (generation === 2) {
+            await runtime.cancel("task"); previous = readFileSync(task.resultPath, "utf8");
+            task = await runtime.resume("task", "offline resumed");
+          }
+          runtime.stop(); calls.length = 0; notifications.length = 0;
+          const child = spawnSync(process.execPath, [join(import.meta.dir, "result-publication-worker.ts")], {
+            env: { ...process.env, PI_HERDR_SUBAGENT_RESULT_PATH: task.resultPath,
+              PI_HERDR_SUBAGENT_ID: task.subagentId, PI_HERDR_SUBAGENT_GENERATION: String(generation), PI_HERDR_SUBAGENT_IMAGE_INPUT: "" },
+            encoding: "utf8", timeout: 30_000,
+          });
+          expect(child.status).toBe(0);
+          expect(JSON.parse(child.stdout)).toEqual({ childCompletionSucceeded: true, shutdowns: 1, cleanupFailures: 2,
+            resultLinks: 2, active: false, barrier: { action: "handled" },
+            warnings: Array(2).fill("Result temporary cleanup failed for the child generation.") });
+          const bytes = readFileSync(task.resultPath);
+          const temporary = join(dirname(task.resultPath), readdirSync(dirname(task.resultPath)).find(name => name.startsWith(`result-${generation}.json.`) && name.endsWith(".tmp"))!);
+          // A restarted parent has no child-side publication registry.
+          if (operation === "recover") runtime = new SubagentRuntime(transport, handlerRegistry(), root, value => { notifications.push(value); });
+          const act = () => operation === "join" ? runtime.join("task") : runtime.recover(root);
+          const unlink = fs.unlinkSync;
+          deletion = spyOn(fs, "unlinkSync").mockImplementation(path => {
+            if (String(path) === temporary) throw new Error("PRIVATE persistent deletion failure");
+            unlink(path);
+          });
+          await expect(act()).rejects.toThrow("Image input failed at storage.");
+          expect(calls).toEqual([]); expect(notifications).toEqual([]);
+          expect(readFileSync(task.resultPath)).toEqual(bytes);
+          expect(fs.lstatSync(task.resultPath).nlink).toBe(2);
+          deletion.mockRestore(); deletion = undefined;
+          await act();
+          expect(await runtime.join("task")).toMatchObject({ status: "completed", generation, result: "FIRST_RESULT" });
+          expect(readFileSync(task.resultPath)).toEqual(bytes);
+          expect(fs.lstatSync(task.resultPath).nlink).toBe(1);
+          expect(existsSync(temporary)).toBeFalse();
+          expect(calls.filter(value => (value as any).op === "closeTab")).toHaveLength(1);
+          expect(notifications).toHaveLength(1);
+          if (previous) expect(readFileSync(join(dirname(task.resultPath), "result-1.json"), "utf8")).toBe(previous);
+          calls.length = 0;
+          await runtime.recover(root);
+          expect(calls).toEqual([]);
+          expect(readFileSync(task.resultPath)).toEqual(bytes);
+        } finally { deletion?.mockRestore(); runtime.stop(); rmSync(root, { recursive: true, force: true }); }
+      }, 60_000);
+    }
+  }
+  for (const attack of ["extra-link", "outside-link", "wrong-generation", "temporary-symlink", "foreign-handle", "result-replacement", "task-redirect", "scope-redirect"] as const) {
+    test(`parent publication takeover refuses ${attack} and preserves all Result bytes`, async () => {
+      const root = mkdtempSync(join(tmpdir(), "subagents-result-takeover-attack-"));
+      const { transport, calls } = fakeTransport();
+      const notifications: CompletionNotification[] = [];
+      const runtime = new SubagentRuntime(transport, handlerRegistry(), root, value => { notifications.push(value); });
+      let opening: ReturnType<typeof spyOn> | undefined;
+      let restore = () => {};
+      try {
+        const task = await runtime.spawn({ agent: "handler", cwd: root, prompt: "offline", label: "offline", taskSlug: "task" });
+        runtime.stop(); calls.length = 0;
+        const child = spawnSync(process.execPath, [join(import.meta.dir, "result-publication-worker.ts")], {
+          env: { ...process.env, PI_HERDR_SUBAGENT_RESULT_PATH: task.resultPath,
+            PI_HERDR_SUBAGENT_ID: task.subagentId, PI_HERDR_SUBAGENT_GENERATION: "1", PI_HERDR_SUBAGENT_IMAGE_INPUT: "" },
+          encoding: "utf8", timeout: 30_000,
+        });
+        expect(child.status).toBe(0);
+        const artifact = dirname(task.resultPath);
+        const temporary = join(artifact, readdirSync(artifact).find(name => name.startsWith("result-1.json.") && name.endsWith(".tmp"))!);
+        const bytes = readFileSync(task.resultPath);
+        const foreign = join(root, "foreign.json");
+        if (attack === "extra-link") {
+          fs.linkSync(task.resultPath, foreign); restore = () => fs.unlinkSync(foreign);
+        } else if (attack === "outside-link" || attack === "wrong-generation" || attack === "temporary-symlink") {
+          const moved = attack === "wrong-generation" ? temporary.replace("result-1.json.", "result-2.json.") : foreign;
+          fs.renameSync(temporary, moved);
+          if (attack === "temporary-symlink") fs.symlinkSync(moved, temporary, "file");
+          restore = () => { if (attack === "temporary-symlink") fs.unlinkSync(temporary); fs.renameSync(moved, temporary); };
+        } else if (attack === "foreign-handle" || attack === "result-replacement") {
+          writeFileSync(foreign, bytes);
+          const open = fs.openSync;
+          opening = spyOn(fs, "openSync").mockImplementation((path, flags, mode) => {
+            if (String(path) !== task.resultPath) return open(path, flags, mode);
+            if (attack === "foreign-handle") return open(foreign, flags, mode);
+            const file = open(path, flags, mode);
+            fs.renameSync(task.resultPath, `${task.resultPath}-held`);
+            fs.renameSync(foreign, task.resultPath);
+            restore = () => { fs.unlinkSync(task.resultPath); fs.renameSync(`${task.resultPath}-held`, task.resultPath); };
+            return file;
+          });
+        } else {
+          const target = attack === "task-redirect" ? artifact : dirname(artifact);
+          const moved = `${target}-held`;
+          fs.renameSync(target, moved);
+          fs.symlinkSync(moved, target, process.platform === "win32" ? "junction" : "dir");
+          restore = () => { rmSync(target, { force: true }); fs.renameSync(moved, target); };
+        }
+        await expect(runtime.join("task")).rejects.toThrow("Image input failed at storage.");
+        expect(calls).toEqual([]); expect(notifications).toEqual([]);
+        expect(runtime.inspect("task").status).toBe("running");
+        expect(runtime.inspect("task").result).toBeUndefined();
+        expect(readFileSync(task.resultPath)).toEqual(bytes);
+        expect(existsSync(temporary)).toBe(!["outside-link", "wrong-generation"].includes(attack));
+        opening?.mockRestore(); opening = undefined; restore(); restore = () => {};
+        expect(readFileSync(temporary)).toEqual(bytes);
+        expect(await runtime.join("task")).toMatchObject({ status: "completed", result: "FIRST_RESULT" });
+        expect(readFileSync(task.resultPath)).toEqual(bytes);
+      } finally { opening?.mockRestore(); restore(); runtime.stop(); rmSync(root, { recursive: true, force: true }); }
+    }, 30_000);
+  }
+  for (const operation of ["join", "cancel", "recover"] as const) {
+    for (const leaf of ["hardlink", "symlink", "handle"] as const) {
+      test(`${operation} refuses untrusted Result ${leaf} without capturing foreign intent`, async () => {
+        const root = mkdtempSync(join(tmpdir(), "subagents-result-leaf-"));
+        const { transport, calls } = fakeTransport();
+        const notifications: CompletionNotification[] = [];
+        const runtime = new SubagentRuntime(transport, handlerRegistry(), root, value => { notifications.push(value); });
+        let opening: ReturnType<typeof spyOn> | undefined;
+        try {
+          const task = await runtime.spawn({ agent: "handler", cwd: root, prompt: "offline", label: "offline", taskSlug: "task" });
+          runtime.stop(); calls.length = 0;
+          const foreign = join(root, "foreign.json");
+          const bytes = JSON.stringify({ subagentId: "task", generation: 1, status: "completed", result: "FOREIGN_RESULT" });
+          writeFileSync(foreign, bytes);
+          if (leaf === "hardlink") fs.linkSync(foreign, task.resultPath);
+          else if (leaf === "symlink") fs.symlinkSync(foreign, task.resultPath, "file");
+          else {
+            writeFileSync(task.resultPath, JSON.stringify({ subagentId: "task", generation: 1, status: "completed", result: "OWNED_RESULT" }));
+            const open = fs.openSync;
+            opening = spyOn(fs, "openSync").mockImplementation((path, flags, mode) => open(String(path) === task.resultPath ? foreign : path, flags, mode));
+          }
+          await expect(operation === "join" ? runtime.join("task") : operation === "cancel" ? runtime.cancel("task") : runtime.recover(root)).rejects.toThrow("Image input failed at storage.");
+          expect(runtime.listTasks().some(value => value.status === "completed")).toBeFalse();
+          if (operation !== "recover") expect(runtime.inspect("task").result).toBeUndefined();
+          expect(calls).toEqual([]);
+          expect(notifications).toEqual([]);
+          expect(readFileSync(foreign, "utf8")).toBe(bytes);
+          opening?.mockRestore(); opening = undefined;
+          fs.unlinkSync(task.resultPath);
+          if (operation !== "cancel") writeFileSync(task.resultPath, JSON.stringify({ subagentId: "task", generation: 1, status: "completed", result: "OWNED_RESULT" }));
+          if (operation === "recover") await runtime.recover(root);
+          const settled = await runtime.join("task");
+          expect(settled).toMatchObject(operation === "cancel" ? { generation: 1, status: "cancelled", result: undefined } : { generation: 1, status: "completed", result: "OWNED_RESULT" });
+          expect(calls.filter(value => (value as any).op === "closeTab")).toHaveLength(1);
+          expect(notifications).toHaveLength(1);
+        } finally { opening?.mockRestore(); runtime.stop(); rmSync(root, { recursive: true, force: true }); }
+      });
+    }
+  }
+
+  test("manifest hardlink is rejected without adopting its pane or rewriting foreign bytes", async () => {
+    const root = mkdtempSync(join(tmpdir(), "subagents-manifest-leaf-"));
+    const { transport, calls } = fakeTransport();
+    const runtime = new SubagentRuntime(transport, handlerRegistry(), root);
+    try {
+      const task = await runtime.spawn({ agent: "handler", cwd: root, prompt: "offline", label: "offline", taskSlug: "task" });
+      runtime.stop(); calls.length = 0;
+      const manifest = join(dirname(task.resultPath), "task.json");
+      const bytes = readFileSync(manifest, "utf8");
+      const foreign = join(root, "foreign-manifest.json");
+      writeFileSync(foreign, bytes); fs.unlinkSync(manifest); fs.linkSync(foreign, manifest);
+      await expect(runtime.recover(root)).rejects.toThrow("Image input failed at storage.");
+      expect(calls).toEqual([]);
+      expect(readFileSync(foreign, "utf8")).toBe(bytes);
+      fs.unlinkSync(manifest); writeFileSync(manifest, bytes);
+      await runtime.recover(root);
+      expect(runtime.inspect("task")).toMatchObject({ generation: 1, status: "running" });
+    } finally { runtime.stop(); rmSync(root, { recursive: true, force: true }); }
+  });
+
+  test("unrelated regular invalid-artifacts file cannot block valid sibling recovery", async () => {
+    const root = mkdtempSync(join(tmpdir(), "subagents-recovery-invalid-file-"));
+    const runtime = new SubagentRuntime(fakeTransport().transport, handlerRegistry(), root);
+    try {
+      await runtime.spawn({ agent: "handler", cwd: root, prompt: "offline", label: "offline", taskSlug: "task" });
+      await runtime.cancel("task"); runtime.stop();
+      const malformed = join(root, "tasks", "invalid-artifacts");
+      writeFileSync(malformed, "not a directory");
+      await runtime.recover(root);
+      expect(runtime.inspect("task")).toMatchObject({ generation: 1, status: "cancelled" });
+      expect(readFileSync(malformed, "utf8")).toBe("not a directory");
+    } finally { runtime.stop(); rmSync(root, { recursive: true, force: true }); }
+  });
+
+  test("immediate join abort observes all created promises without settlement retry", async () => {
+    const root = mkdtempSync(join(tmpdir(), "subagents-join-abort-"));
+    const runtime = new SubagentRuntime(fakeTransport().transport, handlerRegistry(), root);
+    const unhandled: unknown[] = [];
+    const listener = (error: unknown) => { unhandled.push(error); };
+    process.on("unhandledRejection", listener);
+    let retry: ReturnType<typeof spyOn> | undefined;
+    try {
+      await runtime.spawn({ agent: "handler", cwd: root, prompt: "offline", label: "offline", taskSlug: "task" });
+      runtime.stop();
+      retry = spyOn(runtime as any, "retrySettlement");
+      const controller = new AbortController();
+      const waiting = runtime.join("task", 1, controller.signal).catch(error => error.name);
+      controller.abort();
+      expect(await waiting).toBe("AbortError");
+      await Bun.sleep(20);
+      expect(unhandled).toEqual([]);
+      expect(retry).not.toHaveBeenCalled();
+      expect(runtime.inspect("task")).toMatchObject({ generation: 1, status: "running" });
+    } finally { retry?.mockRestore(); process.off("unhandledRejection", listener); runtime.stop(); rmSync(root, { recursive: true, force: true }); }
+  });
+});
 
 describe("pi-herdr-subagents runtime", () => {
   test("parses Herdr tab create identities", async () => {
@@ -2930,6 +4153,1126 @@ test("Pi 0.84.2 parser warns and leaves invalid thinking unset", async () => {
   expect(parsed.diagnostics).toContainEqual({ type: "warning", message: expect.stringContaining("Invalid thinking level") });
 });
 
+
+describe("I-VALIDATE image admission", () => {
+  const fixtures: ReturnType<typeof fixture>[] = [];
+  const png: ImageContent = {
+    type: "image", mimeType: "image/png",
+    data: "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jRZkAAAAASUVORK5CYII=",
+  };
+  const svg: ImageContent = {
+    type: "image", mimeType: "image/svg+xml",
+    data: Buffer.from('<svg xmlns="http://www.w3.org/2000/svg" width="1" height="1"/>').toString("base64"),
+  };
+  const input = { agent: "handler", cwd: "/repo", prompt: "work", label: "images", taskSlug: "task" };
+  const probeError = new Error("internal image snapshot observed");
+
+  function fixture(): {
+    calls: unknown[]; root: string; runtime: SubagentRuntime; updates: string[]; notifications: CompletionNotification[];
+  } {
+    const { calls, transport } = fakeTransport();
+    const root = mkdtempSync(join(tmpdir(), "subagents-image-admission-"));
+    const updates: string[] = [];
+    const notifications: CompletionNotification[] = [];
+    const runtime = new SubagentRuntime(transport, handlerRegistry(), root, value => { notifications.push(value); });
+    runtime.onTaskUpdate(() => { updates.push("update"); });
+    const f = { calls, root, runtime, updates, notifications };
+    fixtures.push(f);
+    return f;
+  }
+
+  afterEach(() => {
+    for (const f of fixtures.splice(0)) {
+      f.runtime.stop();
+      rmSync(f.root, { recursive: true, force: true });
+    }
+  });
+
+  async function terminal(f: ReturnType<typeof fixture>) {
+    const task = await f.runtime.spawn(input);
+    writeFileSync(task.sessionFile, "retained session bytes\n");
+    writeFileSync(task.resultPath, JSON.stringify({ subagentId: task.subagentId, generation: 1, status: "completed", result: "done" }));
+    await f.runtime.join(task.subagentId);
+    f.calls.length = 0;
+    f.updates.length = 0;
+    f.notifications.length = 0;
+    return task;
+  }
+
+  function observeSnapshot(runtime: SubagentRuntime) {
+    const snapshots: Array<ImageContent[] | undefined> = [];
+    // Observe the real launch boundary after admission/guards; fake transport is separate.
+    runtime["start"] = async input => { snapshots.push(input.images); throw probeError; };
+    return snapshots;
+  }
+
+  function invalidInputs(): unknown[] {
+    const fault = () => { throw new Error("SECRET image bytes /private/image-path"); };
+    const revoked = Proxy.revocable([], {});
+    revoked.revoke();
+    return [
+      null, false, 1, "SECRET", {}, { length: 0 }, new Uint8Array([1]), revoked.proxy,
+      new Array(1), Object.assign(new Array(2), { 0: png }), [undefined], [null], [false], [1], ["SECRET"], [[]], [{}],
+      [{ ...png, type: "text" }], [{ ...png, type: undefined }],
+      ...[undefined, null, 1, {}, "", " ", "AQ", "AR==", "TWF=", "A===", "=AAA", "AAAA=", "AA=A", "AA-_", "AQ==\n", "/private/image.png", "https://image.invalid/p.png", "data:image/png;base64,AQ=="].map(data => [{ ...png, data }]),
+      ...[undefined, null, 1, "", "image/", "image/*", "text/plain", " image/png", "image/png\n", "image/png\r", "image/png; charset=utf-8", "image/png/extra"].map(mimeType => [{ ...png, mimeType }]),
+      ...["type", "data", "mimeType"].map(field => [Object.defineProperty({ ...png }, field, { get: fault })]),
+      new Proxy([png], { get(_target, key, receiver) { if (key === "length") return fault(); return Reflect.get(_target, key, receiver); } }),
+      new Proxy([png], { get(_target, key, receiver) { if (key === "0") return fault(); return Reflect.get(_target, key, receiver); } }),
+      new Proxy([png], { getOwnPropertyDescriptor: fault }),
+      [png, { ...svg, data: "invalid" }],
+    ];
+  }
+
+  test("omitted, undefined and empty images retain runtime and tool text launches", async () => {
+    for (const toolCall of [false, true]) {
+      for (const supplied of [{}, { images: undefined }, { images: [] }]) {
+        const f = fixture();
+        const tools = createSubagentTools(f.runtime, input.cwd);
+        const task: SubagentTask = toolCall
+          ? (await (tools[0]!.execute as any)("spawn", { ...input, ...supplied })).details
+          : await f.runtime.spawn({ ...input, ...supplied });
+        expect(task).toMatchObject({ generation: 1, status: "running" });
+        expect(task).not.toHaveProperty("images");
+        writeFileSync(task.resultPath, JSON.stringify({ subagentId: task.subagentId, generation: 1, status: "completed", result: "done" }));
+        await f.runtime.join(task.subagentId);
+        const resumed: SubagentTask = toolCall
+          ? (await (tools[1]!.execute as any)("resume", { subagentId: task.subagentId, prompt: "again", ...supplied })).details
+          : await f.runtime.resume(task.subagentId, "again", supplied.images);
+        expect(resumed).toMatchObject({ generation: 2, sessionFile: task.sessionFile, status: "running" });
+        expect(resumed).not.toHaveProperty("images");
+        expect(readdirSync(dirname(resumed.resultPath)).sort()).toEqual(["launch-1.cjs", "launch-1.ps1", "launch-2.cjs", "launch-2.ps1", "result-1.json", "task.json"]);
+        const launches = f.calls.filter(call => (call as any).op === "create") as Array<{ input: { env: Record<string, string> } }>;
+        expect(launches).toHaveLength(2);
+        for (const launch of launches) expect(Object.keys(launch.input.env).sort()).toEqual(["PI_HERDR_SUBAGENT_GENERATION", "PI_HERDR_SUBAGENT_ID", "PI_HERDR_SUBAGENT_RESULT_PATH"]);
+      }
+    }
+  });
+
+  test("invalid direct and bypassed-tool spawn inputs leave the complete admission ledger unchanged", async () => {
+    const f = fixture();
+    const tool = createSubagentTools(f.runtime, input.cwd)[0]!;
+    const before = snapshotSpawnState(f.runtime, f.root);
+    for (const images of invalidInputs()) {
+      for (const call of [() => f.runtime.spawn({ ...input, images } as any), () => (tool.execute as any)("spawn", { ...input, images })]) {
+        const error = await call().catch((value: unknown) => value);
+        expect(error).toBeInstanceOf(Error);
+        expect((error as Error).message).toMatch(/^Invalid images input(?: at index \d+)?\.$/);
+        expect((error as Error).cause).toBeUndefined();
+        expect(snapshotSpawnState(f.runtime, f.root)).toEqual(before);
+        assertEmptySpawnLedger("invalid images", f.runtime, f.root, f.updates, f.notifications, f.calls);
+      }
+    }
+  });
+
+  test("invalid direct and bypassed-tool resume inputs preserve generation, manifest, session and Result bytes", async () => {
+    const f = fixture();
+    const task = await terminal(f);
+    const tool = createSubagentTools(f.runtime, input.cwd)[1]!;
+    const before = snapshotSpawnState(f.runtime, f.root);
+    for (const images of invalidInputs()) {
+      await expect(f.runtime.resume(task.subagentId, "again", images as any)).rejects.toThrow(/^Invalid images input/);
+      await expect((tool.execute as any)("resume", { subagentId: task.subagentId, prompt: "again", images })).rejects.toThrow(/^Invalid images input/);
+      expect(snapshotSpawnState(f.runtime, f.root)).toEqual(before);
+      expect(f.calls).toEqual([]);
+      expect(f.updates).toEqual([]);
+      expect(f.notifications).toEqual([]);
+    }
+  });
+
+  test("inaccessible images properties are safe and model errors precede any image access", async () => {
+    const f = fixture();
+    const task = await terminal(f);
+    const tools = createSubagentTools(f.runtime, input.cwd);
+    let reads = 0;
+    const throwing = { ...input, subagentId: task.subagentId, get images(): ImageContent[] { reads++; throw new Error("SECRET /private/image-path"); } };
+    const before = snapshotSpawnState(f.runtime, f.root);
+    await expect(f.runtime.spawn(throwing)).rejects.toThrow("Invalid images input.");
+    await expect((tools[0]!.execute as any)("spawn", throwing)).rejects.toThrow("Invalid images input.");
+    await expect((tools[1]!.execute as any)("resume", throwing)).rejects.toThrow("Invalid images input.");
+    expect(reads).toBe(3);
+    const invalidModel = Object.create(throwing);
+    invalidModel.model = "invalid";
+    invalidModel.agent = "missing";
+    invalidModel.taskSlug = "!";
+    await expect(f.runtime.spawn(invalidModel)).rejects.toMatchObject({ code: "invalid_model_reference" });
+    const result = await (tools[0]!.execute as any)("spawn", invalidModel);
+    expect(result.details.code).toBe("invalid_model_reference");
+    expect(reads).toBe(3);
+    expect(snapshotSpawnState(f.runtime, f.root)).toEqual(before);
+    expect(f.calls).toEqual([]);
+    expect(f.updates).toEqual([]);
+    expect(f.notifications).toEqual([]);
+  });
+
+  test("single and multiple spawn images reach the private seam as distinct ordered field snapshots", async () => {
+    for (const toolCall of [false, true]) {
+      for (const images of [[{ ...png }], [{ ...png }, { ...svg }]]) {
+        const f = fixture();
+        const snapshots = observeSnapshot(f.runtime);
+        const expected = structuredClone(images);
+        const registry = modelRegistry("test/model");
+        const tool = createSubagentTools(f.runtime, input.cwd)[0]!;
+        const pending = toolCall
+          ? (tool.execute as any)("spawn", { ...input, images, model: "test/model" }, undefined, undefined, { modelRegistry: registry })
+          : f.runtime.spawn({ ...input, images, model: "test/model" }, registry);
+        expect(snapshots).toEqual([expected]); // The launch receives the synchronous snapshot.
+        images[0]!.data = "caller mutation";
+        images[0]!.mimeType = "text/plain";
+        images.reverse();
+        images.push({ ...png });
+        await expect(pending).rejects.toBe(probeError);
+        expect(snapshots).toEqual([expected]);
+        expect(snapshots[0]).not.toBe(images);
+        expect(f.runtime.listTasks()).toEqual([]);
+        expect(f.calls).toEqual([]);
+      }
+    }
+  });
+
+  test("resume snapshots precede awaited operations and preserve fresh single/multiple tool inputs", async () => {
+    for (const toolCall of [false, true]) {
+      for (const images of [[{ ...svg }], [{ ...svg }, { ...png }]]) {
+        const f = fixture();
+        const task = await terminal(f);
+        const before = snapshotSpawnState(f.runtime, f.root);
+        const snapshots = observeSnapshot(f.runtime);
+        const gate = Promise.withResolvers<void>();
+        f.runtime["awaitTaskOperations"] = () => gate.promise;
+        const expected = structuredClone(images);
+        const pending = toolCall
+          ? (createSubagentTools(f.runtime, input.cwd)[1]!.execute as any)("resume", { subagentId: task.subagentId, prompt: "again", images })
+          : f.runtime.resume(task.subagentId, "again", images);
+        expect(snapshots).toEqual([]);
+        images[0]!.type = "text" as any;
+        images[0]!.data = "caller mutation";
+        images.reverse();
+        images.splice(0);
+        gate.resolve();
+        await expect(pending).rejects.toBe(probeError);
+        expect(snapshots).toEqual([expected]);
+        expect(snapshotSpawnState(f.runtime, f.root)).toEqual(before);
+        expect(f.calls).toEqual([]);
+        expect(f.updates).toEqual([]);
+        expect(f.notifications).toEqual([]);
+      }
+    }
+  });
+
+  test("resume carries the admitted snapshot through recovery re-entry", async () => {
+    const f = fixture();
+    const task = await terminal(f);
+    const before = snapshotSpawnState(f.runtime, f.root);
+    const snapshots = observeSnapshot(f.runtime);
+    const gate = Promise.withResolvers<void>();
+    let operations = 0;
+    f.runtime["awaitTaskOperations"] = async () => {
+      if (++operations === 1) f.runtime["recovery"] = gate.promise;
+    };
+    const images = [{ ...png }, { ...svg }];
+    const expected = structuredClone(images);
+    const pending = f.runtime.resume(task.subagentId, "again", images);
+    await Promise.resolve();
+    images[0]!.mimeType = "text/plain";
+    images.splice(0);
+    f.runtime["recovery"] = undefined;
+    gate.resolve();
+    await expect(pending).rejects.toBe(probeError);
+    expect(operations).toBe(2);
+    expect(snapshots).toEqual([expected]);
+    expect(snapshotSpawnState(f.runtime, f.root)).toEqual(before);
+  });
+
+  test("model rejection and image snapshot happen before an outstanding spawn recovery wait", async () => {
+    const f = fixture();
+    const gate = Promise.withResolvers<void>();
+    f.runtime["recovery"] = gate.promise;
+    const images = [{ ...png }, { ...svg }];
+    const snapshots = observeSnapshot(f.runtime);
+    await expect(f.runtime.spawn({ ...input, model: null, images } as any)).rejects.toMatchObject({ code: "invalid_model_reference" });
+    expect(snapshots).toEqual([]);
+    const expected = structuredClone(images);
+    const pending = f.runtime.spawn({ ...input, images });
+    images.splice(0);
+    expect(snapshots).toEqual([]);
+    f.runtime["recovery"] = undefined;
+    gate.resolve();
+    await expect(pending).rejects.toBe(probeError);
+    expect(snapshots).toEqual([expected]);
+    expect(f.calls).toEqual([]);
+  });
+
+  test("production nonempty requests publish images and select the owned SDK child launch", async () => {
+    const f = fixture();
+    const task = await f.runtime.spawn({ ...input, images: [png, svg] });
+    const envelope = JSON.parse(readFileSync(join(dirname(task.resultPath), "image-input-1", "envelope.json"), "utf8"));
+    expect(envelope.images).toEqual([png, svg]);
+    const bootstrap = readFileSync(join(dirname(task.resultPath), "launch-1.cjs"), "utf8");
+    const encoded = bootstrap.match(/Buffer\.from\("([^"]+)"/)![1]!;
+    const spec = JSON.parse(Buffer.from(encoded, "base64").toString("utf8"));
+    expect(spec.args[0]).toBe("-e");
+    expect(spec.args[1]).toContain("runPaneImageChild");
+    expect(spec.args).toContain("--session");
+    expect(spec.args).toContain(paneChildExtensionPath);
+    expect(bootstrap).not.toContain(png.data);
+    writeFileSync(task.sessionFile, "retained session bytes\n");
+    writeFileSync(task.resultPath, JSON.stringify({ subagentId: task.subagentId, generation: 1, status: "completed", result: "done" }));
+    await f.runtime.join(task.subagentId);
+    const resumed = await f.runtime.resume(task.subagentId, "again", [svg]);
+    expect(resumed).toMatchObject({ generation: 2, sessionFile: task.sessionFile });
+    expect(JSON.parse(readFileSync(join(dirname(task.resultPath), "image-input-2", "envelope.json"), "utf8")).images).toEqual([svg]);
+  });
+
+  test("resume retains unknown/active/overlap guards before the private image seam and never reads a registry", async () => {
+    const f = fixture();
+    await expect(f.runtime.resume("unknown", "again", [png])).rejects.toThrow("Unknown subagent");
+    const task = await f.runtime.spawn(input);
+    f.runtime.stop();
+    const snapshots = observeSnapshot(f.runtime);
+    await expect(f.runtime.resume(task.subagentId, "again", [png])).rejects.toThrow("Cannot resume an active subagent");
+    expect(snapshots).toEqual([]);
+    writeFileSync(task.resultPath, JSON.stringify({ subagentId: task.subagentId, generation: 1, status: "completed", result: "done" }));
+    await f.runtime.join(task.subagentId);
+    f.runtime["launches"].set(`${task.subagentId}:2`, Promise.resolve());
+    await expect(f.runtime.resume(task.subagentId, "again", [png])).rejects.toThrow("Cannot resume an active subagent");
+    expect(snapshots).toEqual([]);
+    f.runtime["launches"].clear();
+    Object.defineProperty(f.runtime, "registry", { get() { throw new Error("Registry must not be read"); } });
+    await expect(f.runtime.resume(task.subagentId, "again", [svg])).rejects.toBe(probeError);
+    expect(snapshots).toEqual([[svg]]);
+  });
+
+  test("registered schemas expose optional upstream image shape while runtime survives schema mutation", async () => {
+    const f = fixture();
+    const tools = createSubagentTools(f.runtime, input.cwd);
+    for (const tool of tools.slice(0, 2)) {
+      const schema = tool.parameters as any;
+      expect(schema.required).not.toContain("images");
+      expect(schema.properties.images).toMatchObject({
+        type: "array", items: { type: "object", required: ["type", "data", "mimeType"], properties: {
+          type: { const: "image" }, data: { type: "string", minLength: 1 }, mimeType: { type: "string", minLength: 1 },
+        } },
+      });
+      delete schema.properties.images;
+    }
+    await expect((tools[0]!.execute as any)("spawn", { ...input, images: null })).rejects.toThrow("Invalid images input.");
+    const task = await terminal(f);
+    const before = snapshotSpawnState(f.runtime, f.root);
+    await expect((tools[1]!.execute as any)("resume", { subagentId: task.subagentId, prompt: "again", images: null })).rejects.toThrow("Invalid images input.");
+    expect(snapshotSpawnState(f.runtime, f.root)).toEqual(before);
+  });
+});
+
+describe("I-TRANSPORT private publication and binding", () => {
+  const images: ImageContent[] = [
+    { type: "image", data: Buffer.from("first private image bytes").toString("base64"), mimeType: "image/png" },
+    { type: "image", data: Buffer.from("second private image bytes").toString("base64"), mimeType: "image/jpeg" },
+  ];
+  const input = { agent: "handler", cwd: "/repo", prompt: "designated text", label: "transport", taskSlug: "task" };
+  const fixtures: ReturnType<typeof fixture>[] = [];
+  const spies: Array<{ mockRestore(): void }> = [];
+  const fault = new Error(`SECRET ${images[0]!.data} /private/image-input-1/envelope.json`);
+
+  function watch<T extends { mockRestore(): void }>(spy: T): T { spies.push(spy); return spy; }
+  function fixture(): {
+    root: string; notifications: CompletionNotification[]; updates: SubagentTask[][];
+    calls: unknown[]; transport: HerdrTransport; runtime: SubagentRuntime;
+  } {
+    const root = mkdtempSync(join(tmpdir(), "subagents-image-transport-"));
+    const notifications: CompletionNotification[] = [];
+    const updates: SubagentTask[][] = [];
+    const { calls, transport } = fakeTransport();
+    const runtime = new SubagentRuntime(transport, handlerRegistry(), root, value => { notifications.push(value); });
+    runtime.onTaskUpdate(() => { updates.push(runtime.listTasks().map(task => runtime.inspect(task.subagentId))); });
+    const f = { root, notifications, updates, calls, transport, runtime };
+    fixtures.push(f);
+    return f;
+  }
+  function scopeTask(f: ReturnType<typeof fixture>, subagentId = "task", generation = 1) {
+    const scope = join(f.root, "tasks");
+    const artifactDir = join(scope, `${subagentId}-artifacts`);
+    mkdirSync(artifactDir, { recursive: true });
+    f.runtime["selectScope"](scope);
+    return { subagentId, generation, resultPath: join(artifactDir, `result-${generation}.json`) };
+  }
+  function directory(task: { resultPath: string; generation: number }) {
+    return join(dirname(task.resultPath), `image-input-${task.generation}`);
+  }
+  function payload(task: { resultPath: string; generation: number }) { return join(directory(task), "envelope.json"); }
+  function envelope(task: { resultPath: string; generation: number }) { return JSON.parse(readFileSync(payload(task), "utf8")); }
+  function assertPrivatePublicText(value: unknown, tasks: Array<{ resultPath: string; generation: number }> = []) {
+    const text = typeof value === "string" ? value : JSON.stringify(value);
+    for (const image of images) expect(text).not.toContain(image.data);
+    for (const task of tasks) {
+      expect(text).not.toContain(directory(task));
+      expect(text).not.toContain(payload(task));
+      expect(text).not.toContain(directory(task).replaceAll("\\", "\\\\"));
+    }
+    expect(text).not.toContain("envelope.json");
+    expect(text).not.toContain("envelope.tmp");
+    expect(text).not.toContain("SECRET");
+  }
+  function inspectLaunch(f: ReturnType<typeof fixture>, task: SubagentTask) {
+    const bootstrapPath = join(dirname(task.resultPath), `launch-${task.generation}.cjs`);
+    const script = readFileSync(join(dirname(task.resultPath), `launch-${task.generation}.ps1`), "utf8");
+    const bootstrap = readFileSync(bootstrapPath, "utf8");
+    const encoded = bootstrap.match(/Buffer\.from\("([^"]+)"/)![1]!;
+    const spec = JSON.parse(Buffer.from(encoded, "base64").toString("utf8")) as { args: string[] };
+    for (const value of [f.calls, script, bootstrap, spec, task, f.runtime.inspect(task.subagentId), f.runtime.listTasks(), f.updates, f.notifications]) {
+      assertPrivatePublicText(value, [task]);
+    }
+    expect(spec.args.at(-1)).toStartWith(input.prompt);
+    return spec.args;
+  }
+  async function complete(f: ReturnType<typeof fixture>, task: SubagentTask) {
+    writeFileSync(task.resultPath, JSON.stringify({ subagentId: task.subagentId, generation: task.generation, status: "completed", result: "safe result" }));
+    await f.runtime.join(task.subagentId);
+  }
+  function independentRead(task: ReturnType<typeof scopeTask>) {
+    // A separate local process observes only the public filename. Safe output contains no bytes/path.
+    const result = spawnSync("node", ["-e", 'const fs = require("node:fs"); const path = fs.readFileSync(0, "utf8"); if (!fs.existsSync(path)) process.stdout.write("absent"); else { const e = JSON.parse(fs.readFileSync(path, "utf8")); process.stdout.write(JSON.stringify({version:e.version,subagentId:e.subagentId,generation:e.generation,count:e.images.length})); }'], {
+      input: payload(task), encoding: "utf8",
+    });
+    expect(result.status).toBe(0);
+    expect(result.stderr).toBe("");
+    return result.stdout;
+  }
+  afterEach(() => {
+    for (const spy of spies.splice(0).reverse()) spy.mockRestore();
+    for (const f of fixtures.splice(0)) {
+      f.runtime.stop();
+      rmSync(f.root, { recursive: true, force: true });
+    }
+  });
+
+  test("atomic publication hides partial writes and retains the first ordered snapshot through launch", async () => {
+    const f = fixture();
+    const started = Promise.withResolvers<void>();
+    const release = Promise.withResolvers<void>();
+    const originalOpen = fsPromises.open;
+    watch(spyOn(fsPromises, "open").mockImplementation(async (...args: Parameters<typeof fsPromises.open>) => {
+      const file = await originalOpen(...args);
+      const write = file.writeFile.bind(file);
+      watch(spyOn(file, "writeFile").mockImplementation(async data => {
+        const text = String(data);
+        const half = Math.floor(text.length / 2);
+        await write(text.slice(0, half), "utf8");
+        started.resolve();
+        await release.promise;
+        await write(text.slice(half), "utf8");
+      }));
+      return file;
+    }));
+    const supplied = structuredClone(images);
+    const pending = f.runtime.spawn({ ...input, images: supplied });
+    await started.promise;
+    const task = { subagentId: "task", generation: 1, resultPath: join(f.root, "tasks", "task-artifacts", "result-1.json") };
+    expect(independentRead(task)).toBe("absent");
+    expect(existsSync(join(directory(task), "envelope.tmp"))).toBeTrue();
+    expect(f.calls).toEqual([]); // No child surface before complete publication.
+    supplied[0]!.data = "mutated";
+    supplied.reverse();
+    supplied.splice(0);
+    release.resolve();
+    const launched = await pending;
+    expect(independentRead(task)).toBe(JSON.stringify({ version: 1, subagentId: "task", generation: 1, count: 2 }));
+    expect(envelope(launched)).toEqual({ version: 1, subagentId: "task", generation: 1, images });
+    expect(readdirSync(directory(task))).toEqual(["envelope.json"]);
+    inspectLaunch(f, launched);
+  });
+
+  test("concurrent tasks and fresh resumed generations bind independent complete envelopes", async () => {
+    const f = fixture();
+    const launchEnvelopes: unknown[] = [];
+    const createTab = f.transport.createTab.bind(f.transport);
+    f.transport.createTab = async value => {
+      expect(value.env!.PI_HERDR_SUBAGENT_IMAGE_INPUT).toBe("1");
+      const task = { resultPath: value.env!.PI_HERDR_SUBAGENT_RESULT_PATH!, generation: Number(value.env!.PI_HERDR_SUBAGENT_GENERATION) };
+      const observed = envelope(task);
+      expect(observed.subagentId).toBe(value.env!.PI_HERDR_SUBAGENT_ID);
+      expect(observed.generation).toBe(task.generation);
+      launchEnvelopes.push(observed);
+      return createTab(value);
+    };
+    const first = await Promise.all(["alpha", "bravo"].map((taskSlug, index) => f.runtime.spawn({ ...input, taskSlug, images: [images[index]!] })));
+    for (const task of first) await complete(f, task);
+    const next = await Promise.all(first.map((task, index) => f.runtime.resume(task.subagentId, input.prompt, [images[1 - index]!])));
+    expect(new Set([...first, ...next].map(payload)).size).toBe(4);
+    for (let index = 0; index < first.length; index++) {
+      expect(envelope(next[index]!)).toEqual({ version: 1, subagentId: first[index]!.subagentId, generation: 2, images: [images[1 - index]!] });
+      expect(existsSync(directory(first[index]!))).toBeFalse(); // Terminal leftovers belong to I-CLEANUP.
+      expect(next[index]!.sessionFile).toBe(first[index]!.sessionFile);
+    }
+    expect(launchEnvelopes).toHaveLength(4);
+    for (const task of next) inspectLaunch(f, task);
+    assertPrivatePublicText(f.notifications, [...first, ...next]);
+  });
+
+  test("omitted and empty launches do no image I/O or expectation, even with an old envelope", async () => {
+    const f = fixture();
+    const old = scopeTask(f);
+    mkdirSync(directory(old));
+    writeFileSync(payload(old), "must not be read");
+    const publish = watch(spyOn(f.runtime as any, "publishImageInput"));
+    const open = watch(spyOn(fsPromises, "open").mockRejectedValue(fault));
+    const tools = createSubagentTools(f.runtime, input.cwd);
+    const first = (await (tools[0]!.execute as any)("spawn", input)).details as SubagentTask;
+    await complete(f, first);
+    const pendingGeneration = { ...first, generation: 2 };
+    mkdirSync(directory(pendingGeneration));
+    writeFileSync(payload(pendingGeneration), "must not be read on text resume");
+    const read = fs.readFileSync;
+    const imageReads = watch(spyOn(fs, "readFileSync").mockImplementation(((path: fs.PathOrFileDescriptor, options: any) => {
+      if (String(path).endsWith("envelope.json")) throw fault;
+      return read(path, options);
+    }) as typeof fs.readFileSync));
+    const next = (await (tools[1]!.execute as any)("resume", { subagentId: first.subagentId, prompt: input.prompt, images: [] })).details as SubagentTask;
+    expect(publish).not.toHaveBeenCalled();
+    expect(open).not.toHaveBeenCalled();
+    imageReads.mockRestore();
+    expect(readFileSync(payload(old), "utf8")).toBe("must not be read");
+    expect(readFileSync(payload(next), "utf8")).toBe("must not be read on text resume");
+    const creates = f.calls.filter(value => (value as any).op === "create") as Array<{ input: { env: Record<string, string> } }>;
+    for (const call of creates) expect(call.input.env).not.toHaveProperty("PI_HERDR_SUBAGENT_IMAGE_INPUT");
+  });
+
+  test("real host access controls keep the directory and envelope private", async () => {
+    const f = fixture();
+    const task = scopeTask(f);
+    const publication = await f.runtime["publishImageInput"](task, images);
+    if (process.platform === "win32") {
+      const script = [
+        "$ErrorActionPreference = 'Stop'",
+        `$path = [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('${Buffer.from(directory(task)).toString("base64")}'))`,
+        "$sid = [Security.Principal.WindowsIdentity]::GetCurrent().User.Value",
+        "[void][Reflection.Assembly]::LoadWithPartialName('System.Web.Extensions')",
+        "$rows = @()",
+        "foreach ($acl in @([IO.Directory]::GetAccessControl($path), [IO.File]::GetAccessControl($path + '\\envelope.json'))) {",
+        "  $rules = @()",
+        "  foreach ($rule in $acl.GetAccessRules($true, $true, [Security.Principal.SecurityIdentifier])) {",
+        "    $rules += @{ sid = $rule.IdentityReference.Value; rights = [string]$rule.FileSystemRights; type = [string]$rule.AccessControlType; inherited = $rule.IsInherited }",
+        "  }",
+        "  $rows += @{ owner = $acl.GetOwner([Security.Principal.SecurityIdentifier]).Value; protected = $acl.AreAccessRulesProtected; rules = @($rules) }",
+        "}",
+        "[Console]::Out.Write([Web.Script.Serialization.JavaScriptSerializer]::new().Serialize(@{ sid = $sid; rows = @($rows) }))",
+        "",
+      ].join("\n");
+      const result = spawnSync("powershell.exe", ["-NoLogo", "-NoProfile", "-NonInteractive", "-Command", "Invoke-Expression ([Console]::In.ReadToEnd())"], { input: script, encoding: "utf8" });
+      expect(result.status).toBe(0);
+      expect(result.stderr).toBe("");
+      const actual = JSON.parse(result.stdout);
+      expect(actual.rows).toHaveLength(2);
+      expect(actual.rows[0].protected).toBeTrue();
+      for (const row of actual.rows) {
+        expect(row.owner).toBe(actual.sid);
+        expect(row.rules).toHaveLength(1);
+        expect(row.rules[0]).toMatchObject({ sid: actual.sid, rights: "FullControl", type: "Allow" });
+      }
+      expect(actual.rows[0].rules[0].inherited).toBeFalse();
+      expect(actual.rows[1].rules[0].inherited).toBeTrue();
+    } else {
+      expect(fs.lstatSync(directory(task)).mode & 0o777).toBe(0o700);
+      expect(fs.lstatSync(payload(task)).mode & 0o777).toBe(0o600);
+      expect(fs.lstatSync(payload(task)).uid).toBe(process.getuid!());
+    }
+    publication.check();
+    publication.cleanup();
+    expect(existsSync(directory(task))).toBeFalse();
+    publication.cleanup(); // Already absent is safe for this owning publication.
+  });
+
+  test("storage rejects cross-task/generation paths, invalid identities and ancestor redirects", async () => {
+    const f = fixture();
+    const task = scopeTask(f);
+    for (const changed of [
+      { ...task, subagentId: "../outside" }, { ...task, generation: 0 }, { ...task, generation: 1.5 },
+      { ...task, subagentId: "other" }, { ...task, generation: 2 },
+      { ...task, resultPath: join(f.root, "result-1.json") },
+    ]) {
+      await expect(f.runtime["publishImageInput"](changed, images)).rejects.toThrow("Image input failed at storage.");
+    }
+    for (const level of ["scope-parent", "scope", "task", "generation"]) {
+      const item = fixture();
+      const owned = scopeTask(item);
+      const outside = fixture().root;
+      writeFileSync(join(outside, "sentinel"), "untouched");
+      const target = level === "scope-parent" ? item.root : level === "scope" ? join(item.root, "tasks") : level === "task" ? dirname(owned.resultPath) : directory(owned);
+      rmSync(target, { recursive: true, force: true });
+      fs.symlinkSync(outside, target, process.platform === "win32" ? "junction" : "dir");
+      const error = await item.runtime["publishImageInput"](owned, images).catch(value => value);
+      expect(error).toBeInstanceOf(Error);
+      assertPrivatePublicText(String(error));
+      expect(readdirSync(outside)).toEqual(["sentinel"]);
+      rmSync(target, { force: true });
+      mkdirSync(item.root, { recursive: true });
+    }
+  });
+
+  test("existing generation storage is never adopted, overwritten, or removed", async () => {
+    const f = fixture();
+    const task = scopeTask(f);
+    mkdirSync(directory(task));
+    writeFileSync(payload(task), "foreign generation payload");
+    await expect(f.runtime["publishImageInput"](task, images)).rejects.toThrow("Image input failed at create.");
+    expect(readFileSync(payload(task), "utf8")).toBe("foreign generation payload");
+  });
+
+  test("create, write, publish and post-rename faults clean only their owned files with safe stage errors", async () => {
+    for (const stage of ["directory", "open", "write", "rename", "after-rename"]) {
+      const f = fixture();
+      const task = scopeTask(f);
+      const durable = join(dirname(task.resultPath), "keep.json");
+      writeFileSync(durable, "durable");
+      if (stage === "directory") {
+        const mkdir = fs.mkdirSync;
+        watch(spyOn(fs, "mkdirSync").mockImplementation(((path: fs.PathLike, options: fs.MakeDirectoryOptions) => {
+          if (String(path) === directory(task)) throw fault;
+          return mkdir(path, options);
+        }) as typeof fs.mkdirSync));
+      } else if (stage === "open" || stage === "write") {
+        const open = fsPromises.open;
+        watch(spyOn(fsPromises, "open").mockImplementation(async (...args: Parameters<typeof fsPromises.open>) => {
+          if (stage === "open") throw fault;
+          const file = await open(...args);
+          watch(spyOn(file, "writeFile").mockRejectedValue(fault));
+          return file;
+        }));
+      } else {
+        const rename = fs.renameSync;
+        watch(spyOn(fs, "renameSync").mockImplementation((from, to) => {
+          if (stage === "after-rename") rename(from, to);
+          throw fault;
+        }));
+      }
+      const error = await f.runtime["publishImageInput"](task, images).catch(value => value);
+      expect(error.message).toBe(`Image input failed at ${stage === "write" ? "write" : stage.includes("rename") ? "publish" : "create"}.`);
+      expect(error.cause).toBeUndefined();
+      assertPrivatePublicText(String(error), [task]);
+      expect(existsSync(directory(task))).toBeFalse();
+      expect(readFileSync(durable, "utf8")).toBe("durable");
+      for (const spy of spies.splice(0).reverse()) spy.mockRestore();
+    }
+  });
+
+  test("permission setup failure is explicit and leaves no payload", async () => {
+    if (process.platform !== "win32") return; // Windows fault; POSIX permissions are asserted in the host check.
+    const f = fixture();
+    const task = scopeTask(f);
+    const native = watch(spyOn(childProcess, "spawnSync"));
+    for (const status of [1, 0]) {
+      native.mockReturnValue({ status, stdout: "", stderr: fault.message } as any);
+      await expect(f.runtime["publishImageInput"](task, images)).rejects.toThrow("Image input failed at access.");
+      expect(existsSync(directory(task))).toBeFalse();
+    }
+  });
+
+  test("create-surface, bootstrap-write and run failures clean published envelopes and redact public errors", async () => {
+    for (const stage of ["surface", "bootstrap", "run"]) {
+      const f = fixture();
+      if (stage === "surface") f.transport.createTab = async () => { throw fault; };
+      if (stage === "run") f.transport.run = async () => { throw fault; };
+      if (stage === "bootstrap") {
+        const write = fsPromises.writeFile;
+        watch(spyOn(fsPromises, "writeFile").mockImplementation((async (...args: Parameters<typeof fsPromises.writeFile>) => {
+          if (String(args[0]).endsWith(".cjs")) throw fault;
+          return write(...args);
+        }) as typeof fsPromises.writeFile));
+      }
+      const tools = createSubagentTools(f.runtime, input.cwd);
+      await expect((tools[0]!.execute as any)("spawn", { ...input, images })).rejects.toThrow("Image input failed at launch.");
+      const task = f.runtime.inspect("task");
+      expect(task.status).toBe("failed");
+      expect(existsSync(directory(task))).toBeFalse();
+      expect(f.notifications).toHaveLength(1);
+      const publicTool = await (tools[2]!.execute as any)("inspect", { subagentId: "task" });
+      const joined = await (tools[3]!.execute as any)("join", { subagentId: "task" });
+      assertPrivatePublicText([task, publicTool, joined, f.notifications, f.updates, JSON.parse(readFileSync(join(dirname(task.resultPath), "task.json"), "utf8"))], [task]);
+      if (stage === "run") {
+        assertPrivatePublicText(readFileSync(join(dirname(task.resultPath), "launch-1.cjs"), "utf8"), [task]);
+        expect(f.calls).toContainEqual({ op: "closeTab", tabId: "tab-1" });
+      }
+      for (const spy of spies.splice(0).reverse()) spy.mockRestore();
+    }
+  });
+
+  test("cleanup deletion failure keeps the safe primary launch error and its separate diagnostic", async () => {
+    const f = fixture();
+    f.transport.run = async () => { throw fault; };
+    const remove = fs.rmSync;
+    watch(spyOn(fs, "rmSync").mockImplementation((path, options) => {
+      if (String(path).endsWith("envelope.json")) throw fault;
+      return remove(path, options);
+    }));
+    const error = await f.runtime.spawn({ ...input, images }).catch(value => value);
+    expect(error.message).toBe("Image input failed at launch. Image input cleanup failed.");
+    expect(error.cause).toBeUndefined();
+    const task = f.runtime.inspect("task");
+    expect(existsSync(payload(task))).toBeTrue();
+    expect(envelope(task).images).toEqual(images);
+    expect(task.error).toContain(error.message);
+    assertPrivatePublicText([String(error), task, f.notifications], [task]);
+  });
+
+  test("a redirected directory between publication and launch is refused and cleanup never follows it", async () => {
+    const f = fixture();
+    const outside = fixture().root;
+    writeFileSync(join(outside, "envelope.json"), "foreign payload");
+    let moved = "";
+    const create = f.transport.createTab.bind(f.transport);
+    f.transport.createTab = async value => {
+      const task = { resultPath: value.env!.PI_HERDR_SUBAGENT_RESULT_PATH!, generation: 1 };
+      moved = `${directory(task)}-held`;
+      fs.renameSync(directory(task), moved);
+      fs.symlinkSync(outside, directory(task), process.platform === "win32" ? "junction" : "dir");
+      return create(value);
+    };
+    await expect(f.runtime.spawn({ ...input, images })).rejects.toThrow("Image input failed at launch. Image input cleanup failed.");
+    expect(f.calls.some(value => (value as any).op === "run")).toBeFalse();
+    expect(readFileSync(join(outside, "envelope.json"), "utf8")).toBe("foreign payload");
+    expect(readFileSync(join(moved, "envelope.json"), "utf8")).toContain(images[0]!.data);
+    rmSync(join(dirname(moved), "image-input-1"), { force: true });
+  });
+
+  for (const ancestor of ["task", "scope"] as const) {
+    for (const retry of ["join", "recover"] as const) {
+      test(`post-publication ${ancestor} redirection retains bounded ${retry} settlement and cleanup intent`, async () => {
+        const f = fixture();
+        const outside = fixture().root;
+        const artifactDir = join(f.root, "tasks", "task-artifacts");
+        const target = ancestor === "task" ? artifactDir : dirname(artifactDir);
+        const held = `${target}-held`;
+        const externalArtifact = ancestor === "task" ? outside : join(outside, "task-artifacts");
+        mkdirSync(externalArtifact, { recursive: true });
+        writeFileSync(join(externalArtifact, "sentinel"), "untouched");
+        // An external Result must not replace the original safe failure or cause effects.
+        const externalResult = JSON.stringify({ subagentId: "task", generation: 1, status: "completed", result: "FOREIGN_RESULT" });
+        writeFileSync(join(externalArtifact, "result-1.json"), externalResult);
+        let redirected = false;
+        let heldPayload = "";
+        let heldManifest = "";
+        let queuedBytes = "";
+        let payloadBytes = "";
+        const create = f.transport.createTab.bind(f.transport);
+        f.transport.createTab = async value => {
+          const task = { resultPath: value.env!.PI_HERDR_SUBAGENT_RESULT_PATH!, generation: 1 };
+          payloadBytes = readFileSync(payload(task), "utf8"); // Publication is complete before this boundary.
+          queuedBytes = readFileSync(join(artifactDir, "task.json"), "utf8");
+          fs.renameSync(target, held);
+          const heldArtifact = ancestor === "task" ? held : join(held, "task-artifacts");
+          heldPayload = join(heldArtifact, "image-input-1", "envelope.json");
+          heldManifest = join(heldArtifact, "task.json");
+          fs.symlinkSync(outside, target, process.platform === "win32" ? "junction" : "dir");
+          redirected = true;
+          return create(value); // Accepted identities must survive the check immediately after this.
+        };
+        const assertExternalUnchanged = () => {
+          expect(readdirSync(externalArtifact).sort()).toEqual(["result-1.json", "sentinel"]);
+          expect(readFileSync(join(externalArtifact, "result-1.json"), "utf8")).toBe(externalResult);
+          expect(readFileSync(join(externalArtifact, "sentinel"), "utf8")).toBe("untouched");
+          if (ancestor === "scope") expect(readdirSync(outside)).toEqual(["task-artifacts"]);
+        };
+        const close = f.transport.closeTab.bind(f.transport);
+        f.transport.closeTab = async id => {
+          const durable = JSON.parse(readFileSync(join(artifactDir, "task.json"), "utf8"));
+          expect(durable).toMatchObject({ generation: 1, status: "failed", error: "ImageInputError: Image input failed at storage. Image input cleanup failed.",
+            surfaceCleanups: [{ generation: 1, tabId: "tab-1", paneId: "pane-1", status: "pending" }] });
+          return close(id);
+        };
+        try {
+          const error = await f.runtime.spawn({ ...input, images }).catch(value => value);
+          assertExternalUnchanged();
+          expect(error.message).toBe("ImageInputError: Image input failed at storage. Image input cleanup failed.; terminal persistence failed.");
+          expect(error.cause?.message).toBe("Image input failed at storage. Image input cleanup failed.");
+          const task = f.runtime.inspect("task");
+          expect(task).toMatchObject({ generation: 1, status: "failed", tabId: "tab-1", paneId: "pane-1", error: String(error.cause) });
+          expect(task.result).toBeUndefined();
+          expect(f.runtime["pendingSettlements"].size).toBe(1);
+          expect(f.runtime["imageCleanups"].has("task:1")).toBeTrue();
+          expect(f.runtime["launches"].size).toBe(0);
+          expect(f.runtime["monitors"].size).toBe(0);
+          expect(readFileSync(heldPayload, "utf8")).toBe(payloadBytes);
+          expect(readFileSync(heldManifest, "utf8")).toBe(queuedBytes);
+          // Each public operation retries at most once and rejects while storage is untrusted.
+          const retrySpy = watch(spyOn(f.runtime as any, "retrySettlement"));
+          for (const operation of [() => f.runtime.join("task"), () => f.runtime.resume("task", "retry"), () => f.runtime.remove("task"), () => f.runtime.recover(input.cwd)]) {
+            retrySpy.mockClear();
+            await expect(operation()).rejects.toThrow("Image input failed at storage.");
+            expect(retrySpy).toHaveBeenCalledTimes(1);
+            expect(f.runtime["pendingSettlements"].size).toBe(1);
+            expect(f.runtime.inspect("task")).toMatchObject({ generation: 1, tabId: "tab-1", error: String(error.cause) });
+            expect(f.notifications).toEqual([]);
+            expect(f.calls).toHaveLength(1); // Accepted create only; no run, close, or pane verification.
+            assertExternalUnchanged();
+          }
+          rmSync(target, { force: true });
+          fs.renameSync(held, target);
+          redirected = false;
+          if (retry === "recover") await f.runtime.recover(input.cwd);
+          const settled = await f.runtime.join("task");
+          expect(settled).toMatchObject({ generation: 1, status: "failed", tabId: "tab-1", paneId: "pane-1", error: String(error.cause), surfaceCleanups: [{ generation: 1, status: "closed", tabId: "tab-1" }] });
+          expect(f.runtime["pendingSettlements"].size).toBe(0);
+          expect(existsSync(directory(settled))).toBeFalse();
+          expect(existsSync(settled.resultPath)).toBeFalse(); // No synthetic Result.
+          expect(f.calls).toEqual([f.calls[0], { op: "closeTab", tabId: "tab-1" }]);
+          expect(f.notifications).toHaveLength(1);
+          assertPrivatePublicText([String(error), settled, f.notifications], [settled]);
+          expect(JSON.stringify([settled, f.notifications])).not.toContain("FOREIGN_RESULT");
+          await f.runtime.join("task");
+          expect(f.calls).toHaveLength(2);
+          expect(f.notifications).toHaveLength(1);
+          assertExternalUnchanged();
+        } finally {
+          if (redirected) { rmSync(target, { force: true }); fs.renameSync(held, target); }
+        }
+      });
+    }
+  }
+
+  for (const ancestor of ["task", "scope"] as const) {
+    for (const operation of ["join", "cancel", "recover", "bootstrap"] as const) {
+      test(`running Result storage refuses ${ancestor} redirection during ${operation} and recovers safely`, async () => {
+        const f = fixture();
+        const task = await f.runtime.spawn({ ...input, images });
+        f.runtime.stop();
+        const target = ancestor === "task" ? dirname(task.resultPath) : dirname(dirname(task.resultPath));
+        const held = `${target}-held`;
+        const outside = fixture().root;
+        const externalArtifact = ancestor === "task" ? outside : join(outside, "task-artifacts");
+        mkdirSync(externalArtifact, { recursive: true });
+        writeFileSync(join(externalArtifact, "sentinel"), "untouched");
+        const externalResult = join(externalArtifact, "result-1.json");
+        if (operation === "join" || operation === "recover") {
+          writeFileSync(externalResult, JSON.stringify({ subagentId: "task", generation: 1, status: "completed", result: "FOREIGN_RESULT" }));
+          writeFileSync(join(externalArtifact, "task.json"), readFileSync(join(dirname(task.resultPath), "task.json")));
+        }
+        const externalBefore = readdirSync(externalArtifact).sort().map(name => [name, readFileSync(join(externalArtifact, name), "utf8")]);
+        const manifestBefore = readFileSync(join(dirname(task.resultPath), "task.json"), "utf8");
+        let redirected = true;
+        fs.renameSync(target, held);
+        fs.symlinkSync(outside, target, process.platform === "win32" ? "junction" : "dir");
+        try {
+          if (operation === "bootstrap") {
+            const heldArtifact = ancestor === "task" ? held : join(held, "task-artifacts");
+            const generated = readFileSync(join(heldArtifact, "launch-1.cjs"), "utf8");
+            const encoded = generated.match(/Buffer\.from\("([^"]+)"/)![1]!;
+            const spec = JSON.parse(Buffer.from(encoded, "base64").toString("utf8"));
+            spec.command = "herdr-nonexistent-image-bootstrap-command";
+            const runnable = join(f.root, "fallback.cjs");
+            writeFileSync(runnable, generated.replace(encoded, Buffer.from(JSON.stringify(spec)).toString("base64")));
+            const child = spawnSync(process.execPath, [runnable], { env: { ...process.env,
+              PI_HERDR_SUBAGENT_IMAGE_INPUT: "1", PI_HERDR_SUBAGENT_RESULT_PATH: task.resultPath,
+              PI_HERDR_SUBAGENT_ID: task.subagentId, PI_HERDR_SUBAGENT_GENERATION: "1",
+            }, encoding: "utf8", timeout: 10000 });
+            expect(child.status).toBe(1);
+            expect(`${child.stdout}${child.stderr}`).not.toContain(images[0]!.data);
+          } else {
+            await expect(operation === "join" ? f.runtime.join("task")
+              : operation === "cancel" ? f.runtime.cancel("task") : f.runtime.recover(input.cwd)).rejects.toThrow();
+          }
+          expect(readdirSync(externalArtifact).sort().map(name => [name, readFileSync(join(externalArtifact, name), "utf8")])).toEqual(externalBefore);
+          expect(f.runtime.inspect("task")).toMatchObject({ status: "running", generation: 1 });
+          expect(f.runtime.inspect("task").result).toBeUndefined();
+          expect(JSON.stringify(f.updates)).not.toContain("FOREIGN_RESULT");
+          expect(f.notifications).toEqual([]);
+          expect(f.calls.filter(value => (value as any).op === "closeTab")).toEqual([]);
+          rmSync(target, { force: true }); fs.renameSync(held, target); redirected = false;
+          expect(readFileSync(join(dirname(task.resultPath), "task.json"), "utf8")).toBe(manifestBefore);
+          if (operation !== "cancel") writeFileSync(task.resultPath, JSON.stringify({ subagentId: "task", generation: 1, status: "completed", result: "OWNED_RESULT" }));
+          const settled = await f.runtime.join("task");
+          expect(settled).toMatchObject(operation === "cancel" ? { status: "cancelled", result: undefined } : { status: "completed", result: "OWNED_RESULT" });
+          expect(JSON.stringify([settled, f.notifications])).not.toContain("FOREIGN_RESULT");
+          expect(f.notifications).toHaveLength(1);
+          expect(f.calls.filter(value => (value as any).op === "closeTab")).toHaveLength(1);
+          expect(existsSync(directory(task))).toBeFalse();
+        } finally {
+          if (redirected) { rmSync(target, { force: true }); fs.renameSync(held, target); }
+        }
+      }, 30_000);
+    }
+  }
+
+  test("spawn refuses a redirected scope before filesystem task reservation", async () => {
+    const f = fixture();
+    const outside = fixture().root;
+    writeFileSync(join(outside, "sentinel"), "untouched");
+    fs.symlinkSync(outside, join(f.root, "tasks"), process.platform === "win32" ? "junction" : "dir");
+    await expect(f.runtime.spawn({ ...input, images })).rejects.toThrow("Image input failed at storage.");
+    expect(f.calls).toEqual([]);
+    expect(f.runtime.listTasks()).toEqual([]);
+    expect(readdirSync(outside)).toEqual(["sentinel"]);
+    rmSync(join(f.root, "tasks"), { force: true });
+  });
+
+  test("failed resume cleans only its new generation and preserves previous artifacts", async () => {
+    const f = fixture();
+    const first = await f.runtime.spawn({ ...input, images: [images[0]!] });
+    writeFileSync(first.sessionFile, "retained session");
+    await complete(f, first);
+    expect(existsSync(directory(first))).toBeFalse();
+    const firstResult = readFileSync(first.resultPath, "utf8");
+    f.transport.run = async () => { throw fault; };
+    await expect(f.runtime.resume(first.subagentId, input.prompt, [images[1]!])).rejects.toThrow("Image input failed at launch.");
+    const second = f.runtime.inspect(first.subagentId);
+    expect(second).toMatchObject({ generation: 2, status: "failed", sessionFile: first.sessionFile });
+    expect(existsSync(directory(second))).toBeFalse();
+    expect(existsSync(directory(first))).toBeFalse();
+    expect(readFileSync(first.resultPath, "utf8")).toBe(firstResult);
+    expect(readFileSync(first.sessionFile, "utf8")).toBe("retained session");
+    assertPrivatePublicText([second, f.notifications], [first, second]);
+  });
+
+  test("regular directory and file replacements are refused by filesystem identity", async () => {
+    for (const replacement of ["directory", "file"]) {
+      const f = fixture();
+      let foreign = "";
+      const create = f.transport.createTab.bind(f.transport);
+      f.transport.createTab = async value => {
+        const task = { resultPath: value.env!.PI_HERDR_SUBAGENT_RESULT_PATH!, generation: 1 };
+        const target = replacement === "directory" ? directory(task) : payload(task);
+        fs.renameSync(target, `${target}-held`);
+        if (replacement === "directory") mkdirSync(target);
+        foreign = payload(task);
+        writeFileSync(foreign, "foreign replacement");
+        return create(value);
+      };
+      await expect(f.runtime.spawn({ ...input, images })).rejects.toThrow("Image input failed at launch. Image input cleanup failed.");
+      expect(f.calls.some(value => (value as any).op === "run")).toBeFalse();
+      expect(readFileSync(foreign, "utf8")).toBe("foreign replacement");
+    }
+  });
+
+  test("hardlink redirection is refused before launch and leaves the foreign link untouched", async () => {
+    const f = fixture();
+    const outside = fixture().root;
+    const create = f.transport.createTab.bind(f.transport);
+    f.transport.createTab = async value => {
+      const task = { resultPath: value.env!.PI_HERDR_SUBAGENT_RESULT_PATH!, generation: 1 };
+      fs.linkSync(payload(task), join(outside, "linked"));
+      return create(value);
+    };
+    await expect(f.runtime.spawn({ ...input, images })).rejects.toThrow("Image input failed at launch. Image input cleanup failed.");
+    expect(f.calls.some(value => (value as any).op === "run")).toBeFalse();
+    expect(fs.lstatSync(join(outside, "linked")).nlink).toBe(2);
+  });
+
+  test("complete Herdr argv, launch scripts, prompt and tool outputs contain only a non-payload expectation", async () => {
+    const f = fixture();
+    const herdrArgs: string[][] = [];
+    const client = createHerdrClient(async (_command, args) => {
+      herdrArgs.push([...args]);
+      return { code: 0, stderr: "", stdout: JSON.stringify({ result: { root_pane: { pane_id: "wF:p6" }, tab: { tab_id: "wF:t5", workspace_id: "wF" } } }) };
+    });
+    const actual = createHerdrTransport(client, { workspaceId: "wF" });
+    f.transport.createTab = actual.createTab;
+    f.transport.run = actual.run;
+    const tools = createSubagentTools(f.runtime, input.cwd);
+    const spawned = await (tools[0]!.execute as any)("spawn", { ...input, images, model: "test/model", thinking: "high" }, undefined, undefined, { modelRegistry: modelRegistry("test/model") });
+    const task = spawned.details as SubagentTask;
+    const args = inspectLaunch(f, task);
+    expect(args).toContain("test/model");
+    expect(args.slice(args.indexOf("--model"), -1)).toEqual(["--model", "test/model", "--thinking", "high"]);
+    expect(herdrArgs[0]).toContain("PI_HERDR_SUBAGENT_IMAGE_INPUT=1");
+    assertPrivatePublicText([herdrArgs, spawned], [task]);
+    const rendered = (tools[0] as any).renderCall({ ...input, images }).render(120);
+    assertPrivatePublicText(rendered, [task]);
+    await complete(f, task);
+    const joined = await (tools[3]!.execute as any)("join", { subagentId: task.subagentId });
+    assertPrivatePublicText([joined, f.notifications, readFileSync(task.resultPath, "utf8")], [task]);
+    const resumed = await (tools[1]!.execute as any)("resume", { subagentId: task.subagentId, prompt: input.prompt, images: [images[1]!] });
+    const resumedArgs = inspectLaunch(f, resumed.details);
+    expect(resumedArgs.slice(resumedArgs.indexOf("--model"), -1)).toEqual(["--model", "test/model:high"]);
+    assertPrivatePublicText([herdrArgs, resumed], [task, resumed.details]);
+  });
+});
+
+describe("I-CLEANUP generation lifecycle", () => {
+  const images: ImageContent[] = [{ type: "image", data: "AQ==", mimeType: "image/png" }];
+  const input = { agent: "handler", cwd: "/repo", prompt: "initial", label: "cleanup", taskSlug: "task", images };
+  const fixtures: ReturnType<typeof fixture>[] = [];
+  const spies: Array<{ mockRestore(): void }> = [];
+  function fixture(): { root: string; calls: unknown[]; transport: HerdrTransport; notifications: CompletionNotification[]; runtime: SubagentRuntime } {
+    const root = mkdtempSync(join(tmpdir(), "subagents-image-cleanup-"));
+    const { calls, transport } = fakeTransport();
+    const notifications: CompletionNotification[] = [];
+    const runtime = new SubagentRuntime(transport, handlerRegistry(), root, value => { notifications.push(value); });
+    const f = { root, calls, transport, notifications, runtime };
+    fixtures.push(f);
+    return f;
+  }
+  const directory = (task: Pick<SubagentTask, "resultPath" | "generation">) => join(dirname(task.resultPath), `image-input-${task.generation}`);
+  const payload = (task: Pick<SubagentTask, "resultPath" | "generation">) => join(directory(task), "envelope.json");
+  function result(task: SubagentTask, status: "completed" | "failed" | "cancelled" = "completed") {
+    writeFileSync(task.resultPath, JSON.stringify({ subagentId: task.subagentId, generation: task.generation, status,
+      ...(status === "completed" ? { result: "authoritative" } : status === "failed" ? { error: "image_input_failed:read" } : {}) }));
+  }
+  afterEach(() => {
+    for (const spy of spies.splice(0).reverse()) spy.mockRestore();
+    for (const f of fixtures.splice(0)) { f.runtime.stop(); rmSync(f.root, { recursive: true, force: true }); }
+  });
+
+  test("settle and cancel clean exactly their generation, preserve Results and unrelated active tasks", async () => {
+    for (const status of ["completed", "failed", "cancelled"] as const) {
+      const f = fixture();
+      const [task, other] = await Promise.all([f.runtime.spawn(input), f.runtime.spawn({ ...input, taskSlug: "other" })]);
+      const otherBytes = readFileSync(payload(other));
+      writeFileSync(task.sessionFile, "session retained");
+      if (status === "cancelled") await Promise.all([f.runtime.cancel(task.subagentId), f.runtime.cancel(task.subagentId)]);
+      else { result(task, status); await Promise.all([f.runtime.join(task.subagentId), f.runtime.join(task.subagentId)]); }
+      const bytes = readFileSync(task.resultPath);
+      expect(existsSync(directory(task))).toBeFalse();
+      expect(readFileSync(payload(other))).toEqual(otherBytes);
+      expect(f.runtime.inspect(other.subagentId).status).toBe("running");
+      expect(f.notifications).toHaveLength(1);
+      expect(f.notifications[0]!.status).toBe(status);
+      expect(readFileSync(task.sessionFile, "utf8")).toBe("session retained");
+      for (const name of ["task.json", "launch-1.cjs", "launch-1.ps1"]) expect(existsSync(join(dirname(task.resultPath), name))).toBeTrue();
+      await f.runtime.recover(input.cwd);
+      expect(readFileSync(task.resultPath)).toEqual(bytes);
+      expect(readFileSync(payload(other))).toEqual(otherBytes);
+    }
+  }, 60_000);
+
+  test("successive image and text resumes isolate each fresh payload and reject stale cleanup callbacks", async () => {
+    const f = fixture();
+    let task = await f.runtime.spawn(input);
+    writeFileSync(task.sessionFile, "native retained history");
+    for (const generation of [1, 2, 3]) {
+      expect(task.generation).toBe(generation);
+      const oldTask = f.runtime["get"](task.subagentId);
+      result(task);
+      await f.runtime.join(task.subagentId);
+      const resultBytes = readFileSync(task.resultPath);
+      expect(existsSync(directory(task))).toBeFalse();
+      const next = await f.runtime.resume(task.subagentId, "new initial", generation === 3 ? [] : images);
+      expect(f.runtime["cleanupImageInputs"](oldTask)).toBeFalse();
+      if (generation < 3) expect(existsSync(payload(next))).toBeTrue();
+      else expect(existsSync(directory(next))).toBeFalse();
+      expect(readFileSync(task.resultPath)).toEqual(resultBytes);
+      expect(next.sessionFile).toBe(task.sessionFile);
+      task = next;
+    }
+    await f.runtime.remove(task.subagentId);
+    expect(existsSync(task.sessionFile)).toBeFalse();
+    expect(existsSync(dirname(task.resultPath))).toBeFalse();
+  }, 60_000);
+
+  test("restart retains live input and cleans classified terminal/interrupted orphans without replay", async () => {
+    for (const scenario of ["live", "queued", "lost", "terminal", "completed", "failed", "cancelled", "stale", "malformed"]) {
+      const f = fixture();
+      const task = await f.runtime.spawn(input);
+      f.runtime.stop();
+      const original = readFileSync(payload(task));
+      const manifestPath = join(dirname(task.resultPath), "task.json");
+      const manifest = JSON.parse(readFileSync(manifestPath, "utf8"));
+      manifest.opaque = { keep: [1, null] };
+      if (scenario === "queued") { manifest.status = "queued"; delete manifest.startedAt; }
+      if (scenario === "terminal") { manifest.status = "failed"; manifest.error = "primary"; }
+      writeFileSync(manifestPath, JSON.stringify(manifest));
+      if (["completed", "failed", "cancelled"].includes(scenario)) result(task, scenario as "completed" | "failed" | "cancelled");
+      if (scenario === "stale") writeFileSync(task.resultPath, JSON.stringify({ subagentId: "other", generation: 1, status: "completed", result: "wrong" }));
+      if (scenario === "malformed") writeFileSync(task.resultPath, "{broken");
+      const resultBytes = existsSync(task.resultPath) ? readFileSync(task.resultPath) : undefined;
+      const recovered = fakeTransport(scenario !== "lost");
+      const runtime = new SubagentRuntime(recovered.transport, handlerRegistry(), f.root);
+      try {
+        for (let attempt = 0; attempt < 2; attempt++) {
+          await runtime.recover(input.cwd);
+          expect(runtime.inspect(task.subagentId).status).toBe(scenario === "live" ? "running" : scenario === "completed" ? "completed" : scenario === "cancelled" ? "cancelled" : "failed");
+          if (scenario === "live") expect(readFileSync(payload(task))).toEqual(original);
+          else expect(existsSync(directory(task))).toBeFalse();
+          if (scenario === "queued") expect(runtime.inspect(task.subagentId).error).toBe("launch_interrupted");
+          if (resultBytes) expect(readFileSync(task.resultPath)).toEqual(resultBytes);
+          else expect(existsSync(task.resultPath)).toBeFalse();
+          expect(JSON.parse(readFileSync(manifestPath, "utf8")).opaque).toEqual(manifest.opaque);
+          expect(recovered.calls.some(call => ["create", "run", "send"].includes((call as any).op))).toBeFalse();
+        }
+      } finally { runtime.stop(); }
+    }
+  }, 60_000);
+
+  test("deletion failure preserves primary outcome and retries once on recovery, resume or remove", async () => {
+    for (const action of ["recover", "resume", "remove"]) {
+      const f = fixture();
+      const task = await f.runtime.spawn(input);
+      writeFileSync(task.sessionFile, "session");
+      const remove = fs.rmSync;
+      let attempts = 0;
+      const deletion = spyOn(fs, "rmSync").mockImplementation((path, options) => {
+        if (String(path) === payload(task)) { attempts++; throw new Error("SECRET /private/image-path AQ=="); }
+        return remove(path, options);
+      }); spies.push(deletion);
+      const warnings = spyOn(console, "warn").mockImplementation(() => {}); spies.push(warnings);
+      result(task, "failed");
+      await expect(f.runtime.join(task.subagentId)).resolves.toMatchObject({ status: "failed", error: "image_input_failed:read" });
+      expect(attempts).toBe(1);
+      expect(warnings.mock.calls).toEqual([["Image input cleanup failed for task generation 1."]]);
+      const bytes = readFileSync(task.resultPath);
+      const notification = { ...f.notifications[0] };
+      if (action === "remove") {
+        await expect(f.runtime.remove(task.subagentId)).rejects.toThrow("Image input failed at cleanup. Image input cleanup failed.");
+        expect(existsSync(task.sessionFile)).toBeTrue();
+        expect(readFileSync(task.resultPath)).toEqual(bytes);
+      }
+      deletion.mockRestore();
+      if (action === "recover") { f.runtime.stop(); await f.runtime.recover(input.cwd); }
+      if (action === "resume") {
+        const next = await f.runtime.resume(task.subagentId, "fresh", images);
+        expect(existsSync(payload(next))).toBeTrue();
+      }
+      if (action === "remove") await f.runtime.remove(task.subagentId);
+      expect(existsSync(directory(task))).toBeFalse();
+      if (action !== "remove") expect(readFileSync(task.resultPath)).toEqual(bytes);
+      expect(notification).toEqual({ subagentId: "task", generation: 1, status: "failed", label: "cleanup", reason: "image_input_failed:read" });
+      expect(JSON.stringify(warnings.mock.calls)).not.toMatch(/SECRET|private|AQ==|envelope/);
+      for (const spy of spies.splice(0).reverse()) spy.mockRestore();
+    }
+  }, 60_000);
+
+  test("recovery removes private prior-generation temporaries and preserves the live current generation", async () => {
+    const f = fixture();
+    const first = await f.runtime.spawn(input);
+    result(first); await f.runtime.join(first.subagentId);
+    const second = await f.runtime.resume(first.subagentId, "fresh", images);
+    await f.runtime["publishImageInput"](first, images);
+    fs.renameSync(payload(first), join(directory(first), "envelope.tmp"));
+    const current = readFileSync(payload(second));
+    f.runtime.stop();
+    const rebuilt = new SubagentRuntime(f.transport, handlerRegistry(), f.root);
+    try {
+      await rebuilt.recover(input.cwd);
+      expect(existsSync(directory(first))).toBeFalse();
+      expect(readFileSync(payload(second))).toEqual(current);
+      expect(rebuilt.inspect(first.subagentId)).toMatchObject({ generation: 2, status: "running" });
+    } finally { rebuilt.stop(); }
+  }, 60_000);
+
+  test("cleanup refuses redirections, hardlinks, foreign additions and future-generation payloads", async () => {
+    for (const scenario of ["directory", "file", "hardlink", "addition", "future", "replacement"]) {
+      const f = fixture();
+      const task = await f.runtime.spawn(input);
+      const outside = join(f.root, "outside"); mkdirSync(outside);
+      const sentinel = join(outside, "sentinel"); writeFileSync(sentinel, "foreign");
+      const target = scenario === "directory" ? directory(task) : payload(task);
+      if (["directory", "file"].includes(scenario)) {
+        fs.renameSync(target, `${target}-held`);
+        fs.symlinkSync(scenario === "directory" ? outside : sentinel, target, process.platform === "win32" ? scenario === "directory" ? "junction" : "file" : scenario === "directory" ? "dir" : "file");
+      }
+      if (scenario === "hardlink") fs.linkSync(payload(task), join(outside, "linked"));
+      if (scenario === "addition") writeFileSync(join(directory(task), "foreign"), "foreign");
+      if (scenario === "future") await f.runtime["publishImageInput"]({ ...task, generation: 2, resultPath: join(dirname(task.resultPath), "result-2.json") }, images);
+      if (scenario === "replacement") { fs.renameSync(directory(task), `${directory(task)}-held`); mkdirSync(directory(task)); writeFileSync(payload(task), "foreign"); }
+      const warnings = spyOn(console, "warn").mockImplementation(() => {}); spies.push(warnings);
+      result(task); await f.runtime.join(task.subagentId);
+      await expect(f.runtime.remove(task.subagentId)).rejects.toThrow("cleanup");
+      expect(readFileSync(sentinel, "utf8")).toBe("foreign");
+      expect(readFileSync(task.resultPath, "utf8")).toContain("authoritative");
+      if (scenario === "future") expect(existsSync(join(dirname(task.resultPath), "image-input-2", "envelope.json"))).toBeTrue();
+      if (scenario === "replacement") expect(readFileSync(payload(task), "utf8")).toBe("foreign");
+      if (["directory", "file"].includes(scenario)) rmSync(target, { force: true });
+      for (const spy of spies.splice(0).reverse()) spy.mockRestore();
+    }
+  }, 60_000);
+});
 
 function snapshotSpawnState(runtime: SubagentRuntime, root: string) {
   const files: Record<string, string> = {};

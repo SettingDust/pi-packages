@@ -10,7 +10,8 @@
     "test": "bun test"
   },
   "dependencies": {
-    "@settingdust/pi-herdr": "workspace:*"
+    "@settingdust/pi-herdr": "workspace:*",
+    "jiti": "2.7.0"
   },
   "peerDependencies": {
     "@earendil-works/pi-ai": "*",

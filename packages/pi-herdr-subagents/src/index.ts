@@ -1,13 +1,16 @@
 import { randomUUID } from "node:crypto";
-import { execFile } from "node:child_process";
-import { existsSync, lstatSync, realpathSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync } from "node:fs";
-import { writeFile } from "node:fs/promises";
+import { resultPublisher } from "./result-publication.js";
+import { createRequire } from "node:module";
+import { checkImageAccess, checkedImageDirectory, cleanupImages, ImageInputError, protectImageDirectory, snapshotImages } from "./image-input.js";
+import { execFile, spawnSync } from "node:child_process";
+import { constants, closeSync, fstatSync, openSync, existsSync, lstatSync, realpathSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, rmdirSync, unlinkSync, type Stats } from "node:fs";
+import { open, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { basename, dirname, isAbsolute, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { setTimeout as delay } from "node:timers/promises";
 import { promisify } from "node:util";
-import { StringEnum, Type } from "@earendil-works/pi-ai";
+import { StringEnum, Type, type ImageContent } from "@earendil-works/pi-ai";
 import { defineTool, getAgentDir, type ExtensionAPI, type ExtensionContext, type Theme } from "@earendil-works/pi-coding-agent";
 import { Text, stripTerminalSequences, truncateToWidth, type Component, type TUI } from "@earendil-works/pi-tui";
 import { commandFailure, createHerdrClient, hasHerdrErrorCode, type HerdrClient } from "@settingdust/pi-herdr";
@@ -129,6 +132,11 @@ export function validateExplicitSpawnModel(model: unknown, registry?: SpawnModel
   return model;
 }
 
+function readImages(input: { images?: ImageContent[] }): ImageContent[] | undefined {
+  try { return input.images; }
+  catch { throw new Error("Invalid images input."); }
+}
+
 export type TaskStatus = "queued" | "running" | "completed" | "failed" | "cancelled";
 export type ActiveTaskStatus = Extract<TaskStatus, "queued" | "running">;
 export type SurfaceCleanupStatus = "pending" | "closed" | "already_closed" | "not_created" | "identity_missing" | "failed";
@@ -158,6 +166,8 @@ function checkedRetainedPath(path: string, directory: boolean): string {
   if (relative(absolute, canonical) !== "") throw new Error("invalid_retained_path");
   return canonical;
 }
+
+type ImageInputPublication = { check(): void; cleanup(): void };
 
 export type TaskIdAllocationErrorCode = "invalid_task_slug" | "task_id_exhausted" | "filesystem_reservation_failed";
 
@@ -231,7 +241,7 @@ function resolveCurrentPiInvocation(): { command: string; args: string[] } {
   return { command: "pi", args: [] };
 }
 
-function buildNodeLaunchScript(cwd: string, command: string, args: string[], retainedSession = false): string {
+function buildNodeLaunchScript(cwd: string, command: string, args: string[], retainedSession = false, imageInput = false): string {
   const invocation = command === "pi" ? resolveCurrentPiInvocation() : { command, args: [] };
   const spec = Buffer.from(JSON.stringify({ cwd, command: invocation.command, args: [...invocation.args, ...args] }), "utf8").toString("base64");
   if (retainedSession) return [
@@ -245,21 +255,30 @@ function buildNodeLaunchScript(cwd: string, command: string, args: string[], ret
   ].join("\r\n");
   return [
     `const { spawnSync } = require("node:child_process");`,
-    `const { existsSync, renameSync, writeFileSync } = require("node:fs");`,
+    `const resultModule = ${JSON.stringify(resolve(dirname(fileURLToPath(import.meta.url)), "result-publication.ts"))};`,
+    `const resultTools = require(${JSON.stringify(createRequire(import.meta.url).resolve("jiti"))}).createJiti(resultModule)(resultModule);`,
+    ...(imageInput ? [
+      `const { dirname, join } = require("node:path");`,
+      `const imageModule = ${JSON.stringify(resolve(dirname(fileURLToPath(import.meta.url)), "image-input.ts"))};`,
+      `const imageTools = require(${JSON.stringify(createRequire(import.meta.url).resolve("jiti"))}).createJiti(imageModule)(imageModule);`,
+    ] : []),
     `const spec = JSON.parse(Buffer.from(${JSON.stringify(spec)}, "base64").toString("utf8"));`,
-    `const fail = error => {`,
+    `const fail = async error => {`,
     `  const path = process.env.PI_HERDR_SUBAGENT_RESULT_PATH;`,
     `  const subagentId = process.env.PI_HERDR_SUBAGENT_ID;`,
     `  const generation = Number(process.env.PI_HERDR_SUBAGENT_GENERATION);`,
-    `  if (!path || !subagentId || !Number.isInteger(generation) || existsSync(path)) return;`,
-    `  const temporary = path + "." + process.pid + ".tmp";`,
-    `  writeFileSync(temporary, JSON.stringify({ subagentId, generation, status: "failed", error }));`,
-    `  renameSync(temporary, path);`,
+    `  if (!path || !subagentId || !Number.isInteger(generation)) return;`,
+    imageInput
+      ? `  const check = () => imageTools.imageLaunch(join(dirname(dirname(path)), subagentId + "-g1.jsonl"));`
+      : `  const check = () => {};`,
+    `  await resultTools.resultPublisher(path, check).publish(JSON.stringify({ subagentId, generation, status: "failed", error }));`,
     `};`,
-    `const result = spawnSync(spec.command, spec.args, { cwd: spec.cwd, env: process.env, stdio: "inherit" });`,
-    `if (result.error) { fail("launch_failed: " + result.error.message); throw result.error; }`,
-    `fail(result.status === 0 ? "child_exited_without_result" : "child_exit_" + (result.status ?? 1));`,
-    `process.exit(result.status ?? 1);`,
+    `(async () => {`,
+    `  const result = spawnSync(spec.command, spec.args, { cwd: spec.cwd, env: process.env, stdio: "inherit" });`,
+    `  if (result.error) { await fail("launch_failed: " + result.error.message); throw result.error; }`,
+    `  await fail(result.status === 0 ? "child_exited_without_result" : "child_exit_" + (result.status ?? 1));`,
+    `  process.exit(result.status ?? 1);`,
+    `})().catch(() => { console.error("Child Result publication or launch failed."); process.exit(1); });`,
     "",
   ].join("\r\n");
 }
@@ -362,15 +381,66 @@ export class AgentRegistry {
   get(name: string): AgentDefinition | undefined { return this.agents.get(name); }
 }
 
-async function writeAtomic(path: string, value: unknown): Promise<void> {
+// Only a current-generation Result can authorize takeover, never a manifest.
+// Exactly two links, one matching local publication temporary, and private storage
+// account for every link; an outside link cannot be mistaken for a leftover.
+function cleanupResultTemporary(path: string, file: number, expected: Stats): void {
+  if (expected.nlink !== 2) throw new Error();
+  const directory = dirname(path);
+  const ownedDirectory = checkedImageDirectory(directory);
+  checkImageAccess(directory, true);
+  const prefix = basename(path) + ".";
+  const candidates = readdirSync(directory).filter(name => name.startsWith(prefix)
+    && /^[1-9]\d*-[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\.tmp$/.test(name.slice(prefix.length)));
+  const sameFile = (stat: Stats) => stat.isFile() && !stat.isSymbolicLink()
+    && stat.nlink === 2 && stat.dev === expected.dev && stat.ino === expected.ino;
+  const matches = candidates.filter(name => sameFile(lstatSync(join(directory, name))));
+  if (matches.length !== 1) throw new Error();
+  const temporary = join(directory, matches[0]!);
+  checkImageAccess(path, false, 2);
+  checkImageAccess(temporary, false, 2);
+  const currentDirectory = checkedImageDirectory(directory);
+  if (currentDirectory.dev !== ownedDirectory.dev || currentDirectory.ino !== ownedDirectory.ino
+    || !sameFile(fstatSync(file)) || !sameFile(lstatSync(path)) || !sameFile(lstatSync(temporary))) throw new Error();
+  unlinkSync(temporary);
+}
+
+function readTaskArtifact(path: string, result = false): string | undefined {
+  let file: number | undefined;
+  try {
+    const expected = lstatSync(path, { throwIfNoEntry: false });
+    if (!expected) return;
+    const check = (stat: Stats) => {
+      if (!stat.isFile() || stat.isSymbolicLink() || stat.nlink !== 1
+        || stat.dev !== expected.dev || stat.ino !== expected.ino) throw new Error();
+    };
+    if (!expected.isFile() || expected.isSymbolicLink()) throw new Error();
+    if (relative(resolve(path), realpathSync(path)) !== "") throw new Error();
+    file = openSync(path, constants.O_RDONLY | (constants.O_NOFOLLOW ?? 0));
+    if (result && expected.nlink === 2) cleanupResultTemporary(path, file, expected);
+    check(fstatSync(file));
+    const bytes = readFileSync(file, "utf8");
+    check(fstatSync(file));
+    check(lstatSync(path));
+    return bytes;
+  } catch { throw new ImageInputError("storage"); }
+  finally { if (file !== undefined) closeSync(file); }
+}
+
+async function writeAtomic(path: string, value: unknown, check = () => {}, commit = () => {}): Promise<void> {
+  check();
+  commit();
   mkdirSync(dirname(path), { recursive: true, mode: 0o700 });
   const temporary = `${path}.${process.pid}-${randomUUID()}.tmp`;
   try {
+    check();
     await writeFile(temporary, JSON.stringify(value));
+    check();
+    commit();
     renameSync(temporary, path);
   } finally {
-    try { rmSync(temporary, { force: true }); }
-    catch { /* Temporary-file cleanup is best effort. */ }
+    try { check(); rmSync(temporary, { force: true }); }
+    catch { /* Never clean a temporary through redirected storage. */ }
   }
 }
 
@@ -455,13 +525,17 @@ export class SubagentRuntime {
   private tasks = new Map<string, SubagentTask>();
   private activeTasksDir?: string;
   private monitors = new Map<string, AbortController>();
+  private monitorEpoch = 0;
   private notified = new Set<string>();
   private manifestUnknown = new Map<string, Json>();
   private launches = new Map<string, Promise<void>>();
+  private removals = new Map<SubagentTask, Promise<void>>();
   private settlements = new Map<string, Promise<void>>();
   private pendingSettlements = new Map<string, (effects: boolean) => Promise<void>>();
   private recovery?: Promise<void>;
   private cleanups = new Map<string, Promise<void>>();
+  private cleanupOutcomes = new Map<string, { task: SubagentTask; index: number; record: SurfaceCleanupRecord }>();
+  private imageCleanups = new Map<string, () => void>();
   private taskUpdateListeners = new Set<() => void>();
   private completionNotifier?: CompletionNotifier;
 
@@ -565,16 +639,29 @@ export class SubagentRuntime {
     model?: unknown;
     thinking?: string;
     parentSessionFile?: string;
+    images?: ImageContent[];
   }, registry?: SpawnModelRegistry): Promise<SubagentTask> {
-    while (this.recovery) await this.recovery;
     const model = validateExplicitSpawnModel(input.model, registry);
+    const images = snapshotImages(readImages(input));
+    while (this.recovery) await this.recovery;
     const taskSlug = validateTaskSlug(input.taskSlug);
     this.resolveAgent(input.agent);
     const tasksDir = this.tasksDir(input.cwd, input.parentSessionFile);
     this.selectScope(tasksDir);
+    if (images?.length) {
+      try {
+        let parent = resolve(tasksDir);
+        while (!lstatSync(parent, { throwIfNoEntry: false })) parent = dirname(parent);
+        checkedImageDirectory(parent);
+      } catch { throw new ImageInputError("storage"); }
+    }
     const { subagentId, artifactDir } = this.reserveSubagentId(tasksDir, taskSlug);
     const launchArgs = model === undefined ? [] : ["--model", model, ...(input.thinking ? ["--thinking", input.thinking] : [])];
-    return this.start({ ...input, model, subagentId, taskSlug, generation: 1, artifactDir, launchArgs });
+    return this.start({
+      agent: input.agent, cwd: input.cwd, prompt: input.prompt, label: input.label,
+      thinking: input.thinking, parentSessionFile: input.parentSessionFile,
+      model, subagentId, taskSlug, generation: 1, artifactDir, launchArgs, images,
+    });
   }
 
   recover(cwd: string, parentSessionFile?: string, notifiedKeys: Iterable<string> = []): Promise<void> {
@@ -595,6 +682,14 @@ export class SubagentRuntime {
     // Same-scope reconstruction owns cleanup and notification after retrying durable intent.
     await this.awaitAllOperations(this.activeTasksDir !== resolve(tasksDir));
     this.selectScope(tasksDir);
+    if (existsSync(tasksDir)) {
+      try {
+        checkedImageDirectory(tasksDir, false);
+        for (const entry of readdirSync(tasksDir, { withFileTypes: true })) {
+          if (entry.name.endsWith("-artifacts") && !entry.isFile()) checkedImageDirectory(join(tasksDir, entry.name), false);
+        }
+      } catch { throw new ImageInputError("storage"); }
+    }
     this.stop();
     this.tasks.clear();
     this.manifestUnknown.clear();
@@ -673,18 +768,21 @@ export class SubagentRuntime {
         await this.persist(task);
         if (task.status === "running") this.startMonitor(task);
         await this.runPendingCleanups(task);
+        this.cleanupImageInputs(task); // Older orphan generations only; the retained child owns the current input.
       }
     }
     this.notifyTaskUpdate();
   }
 
-  async resume(subagentId: string, prompt: string): Promise<SubagentTask> {
+  async resume(subagentId: string, prompt: string, images?: ImageContent[]): Promise<SubagentTask> {
+    const snapshot = snapshotImages(images);
     while (this.recovery) await this.recovery;
     const old = this.get(subagentId);
     await this.awaitTaskOperations(old);
-    if (this.recovery) { await this.recovery; return this.resume(subagentId, prompt); }
+    if (this.recovery) { await this.recovery; return this.resume(subagentId, prompt, snapshot); }
     if (isActiveStatus(old.status) || this.tasks.get(subagentId) !== old
       || this.launches.has(`${subagentId}:${old.generation + 1}`)) throw new Error("Cannot resume an active subagent");
+    this.cleanupImageInputs(old); // One bounded retry before the next generation owns its own input.
     return this.start({
       subagentId: old.subagentId,
       taskSlug: old.taskSlug,
@@ -699,6 +797,7 @@ export class SubagentRuntime {
       artifactDir: dirname(old.resultPath),
       launchArgs: old.model ? ["--model", old.thinking ? `${old.model}:${old.thinking}` : old.model] : [],
       surfaceCleanups: cloneJson(old.surfaceCleanups),
+      images: snapshot,
     });
   }
 
@@ -712,7 +811,7 @@ export class SubagentRuntime {
   private selectScope(tasksDir: string): void {
     const scope = resolve(tasksDir);
     if (scope === this.activeTasksDir) return;
-    if (this.launches.size || this.settlements.size || this.cleanups.size || this.pendingSettlements.size) {
+    if (this.launches.size || this.settlements.size || this.cleanups.size || this.pendingSettlements.size || this.cleanupOutcomes.size) {
       throw new Error("Cannot change task scope with unresolved operations");
     }
     this.stop();
@@ -720,6 +819,7 @@ export class SubagentRuntime {
     this.tasks.clear();
     this.notified.clear();
     this.manifestUnknown.clear();
+    this.imageCleanups.clear();
   }
 
   private reserveSubagentId(tasksDir: string, taskSlug: string): { subagentId: string; artifactDir: string } {
@@ -740,6 +840,84 @@ export class SubagentRuntime {
     throw new TaskIdAllocationError("task_id_exhausted");
   }
 
+  private imageInputDirectory(task: Pick<SubagentTask, "subagentId" | "generation" | "resultPath">): string {
+    const scope = this.activeTasksDir;
+    if (!scope || !isNotificationSubagentId(task.subagentId) || !Number.isSafeInteger(task.generation) || task.generation < 1
+      || task.resultPath !== join(scope, `${task.subagentId}-artifacts`, `result-${task.generation}.json`)) throw new ImageInputError("storage");
+    try { checkedImageDirectory(dirname(task.resultPath)); }
+    catch { throw new ImageInputError("storage"); }
+    // I-CHILD: only marker "1" expects this sibling; absence must bypass all image I/O.
+    return join(dirname(task.resultPath), `image-input-${task.generation}`);
+  }
+
+  private async publishImageInput(task: Pick<SubagentTask, "subagentId" | "generation" | "resultPath">, images: ImageContent[]): Promise<ImageInputPublication> {
+    const directory = this.imageInputDirectory(task);
+    const temporary = join(directory, "envelope.tmp");
+    const published = join(directory, "envelope.json");
+    let ownedDirectory: Stats | undefined;
+    let ownedFile: Stats | undefined;
+    let stage = "create";
+    const sameFile = (a: Stats, b: Stats) => a.dev === b.dev && a.ino === b.ino;
+    const checkDirectory = () => {
+      this.imageInputDirectory(task);
+      const current = checkedImageDirectory(directory);
+      if (!ownedDirectory || !sameFile(current, ownedDirectory)) throw new Error();
+    };
+    const checkFile = (path: string, checkAccess = true) => {
+      const current = lstatSync(path);
+      if (!ownedFile || !current.isFile() || current.isSymbolicLink() || current.nlink !== 1 || !sameFile(current, ownedFile)) throw new Error();
+      if (checkAccess && process.platform !== "win32" && (current.uid !== process.getuid?.() || (current.mode & 0o777) !== 0o600)) throw new Error();
+    };
+    const cleanup = () => {
+      if (!ownedDirectory) {
+        if (lstatSync(directory, { throwIfNoEntry: false })) throw new Error();
+        return;
+      }
+      this.imageInputDirectory(task);
+      if (!lstatSync(directory, { throwIfNoEntry: false })) { ownedDirectory = undefined; return; }
+      checkDirectory(); // Never follow a replaced directory, even during failure cleanup.
+      for (const path of [temporary, published]) {
+        if (!lstatSync(path, { throwIfNoEntry: false })) continue;
+        checkFile(path, false);
+        rmSync(path);
+      }
+      rmdirSync(directory); // Do not recursively remove unowned additions.
+      ownedDirectory = undefined;
+    };
+    // Retain the publication's inode evidence even after a failed delete. Recovery in
+    // this owner must not reinterpret a replacement as an orphan it is free to delete.
+    this.imageCleanups.set(this.taskKey(task), cleanup);
+    try {
+      mkdirSync(directory, { mode: 0o700 }); // Exclusive generation reservation; never adopt an existing envelope.
+      ownedDirectory = lstatSync(directory);
+      stage = "access";
+      protectImageDirectory(directory);
+      checkDirectory();
+      if (readdirSync(directory).length) throw new Error();
+      stage = "create";
+      const file = await open(temporary, "wx", 0o600);
+      try {
+        ownedFile = await file.stat();
+        checkDirectory();
+        checkFile(temporary);
+        stage = "write";
+        await file.writeFile(JSON.stringify({ version: 1, subagentId: task.subagentId, generation: task.generation, images }), "utf8");
+      } finally { await file.close(); }
+      stage = "publish";
+      checkDirectory();
+      checkFile(temporary);
+      if (lstatSync(published, { throwIfNoEntry: false })) throw new Error();
+      renameSync(temporary, published);
+      const check = () => { checkDirectory(); checkFile(published); };
+      check();
+      return { check, cleanup };
+    } catch {
+      let cleanupFailed = false;
+      try { cleanup(); } catch { cleanupFailed = true; }
+      throw new ImageInputError(stage, cleanupFailed);
+    }
+  }
+
   private async start(input: {
     subagentId: string;
     taskSlug?: string;
@@ -755,15 +933,17 @@ export class SubagentRuntime {
     artifactDir?: string;
     launchArgs: string[];
     surfaceCleanups?: unknown[];
+    images?: ImageContent[];
   }): Promise<SubagentTask> {
     const completionNotifier = this.completionNotifier;
     const agent = this.resolveAgent(input.agent);
     const tasksDir = input.artifactDir ? dirname(input.artifactDir) : this.tasksDir(input.cwd, input.parentSessionFile);
     this.selectScope(tasksDir);
     const artifactDir = input.artifactDir ?? join(tasksDir, `${input.subagentId}-artifacts`);
+    const resultPath = join(artifactDir, `result-${input.generation}.json`);
+    if (input.images?.length) this.imageInputDirectory({ ...input, resultPath });
     mkdirSync(artifactDir, { recursive: true, mode: 0o700 });
     const sessionFile = input.sessionFile ?? join(tasksDir, `${input.subagentId}-g1.jsonl`);
-    const resultPath = join(artifactDir, `result-${input.generation}.json`);
     const queuedAt = new Date().toISOString();
     const task: SubagentTask = {
       subagentId: input.subagentId, taskSlug: input.taskSlug, generation: input.generation, agent: input.agent, cwd: input.cwd, label: input.label,
@@ -775,10 +955,13 @@ export class SubagentRuntime {
     let finishLaunch!: () => void;
     const launch = new Promise<void>(resolve => { finishLaunch = resolve; });
     this.launches.set(launchKey, launch);
+    let imageInput: ImageInputPublication | undefined;
     try {
+      if (input.images?.length) imageInput = await this.publishImageInput(task, input.images);
       await this.persist(task);
       this.tasks.set(task.subagentId, task);
       this.notifyTaskUpdate();
+      imageInput?.check();
       const surface = await this.transport.createTab({
         cwd: input.cwd,
         label: input.label,
@@ -786,10 +969,12 @@ export class SubagentRuntime {
           PI_HERDR_SUBAGENT_ID: input.subagentId,
           PI_HERDR_SUBAGENT_GENERATION: String(input.generation),
           PI_HERDR_SUBAGENT_RESULT_PATH: resultPath,
+          ...(imageInput ? { PI_HERDR_SUBAGENT_IMAGE_INPUT: "1" } : {}),
         },
       });
       task.tabId = surface.tabId;
       task.paneId = surface.paneId;
+      imageInput?.check();
       if (this.tasks.get(task.subagentId) !== task) {
         try { await this.transport.closeTab(task.tabId); } catch { /* Removal already owns the visible state. */ }
         throw new Error("Subagent was removed during launch");
@@ -805,21 +990,44 @@ export class SubagentRuntime {
       task.updatedAt = task.startedAt;
       await this.persist(task);
       this.notifyTaskUpdate();
+      imageInput?.check();
       const args = ["--session", sessionFile, "-e", paneChildExtensionPath, "--system-prompt", agent.body, "--exclude-tools", "subagent_spawn,subagent_resume,subagent_inspect,subagent_join,subagent_steer,subagent_cancel,subagent_remove", ...input.launchArgs];
       args.push(`${input.prompt}\n\nWhen subagent_done is available, submit the complete final result text in the caller/Agent-required format once as its result argument. Do not output the full result separately before or after successful submission. If unavailable, return that text as your final assistant response; this alone does not record successful runtime completion. If submission fails, correct and retry or report the failure.`);
       const launchScript = join(artifactDir, `launch-${input.generation}.ps1`);
       const bootstrapScript = join(artifactDir, `launch-${input.generation}.cjs`);
-      await writeFile(bootstrapScript, buildNodeLaunchScript(input.cwd, "pi", args));
+      let command = "pi";
+      let childArgs = args;
+      if (imageInput) {
+        // Use the package-owned TS loader for Node/Bun; the entry stays in src so
+        // resource discovery cannot load an executable as an extension.
+        const entry = resolve(dirname(fileURLToPath(import.meta.url)), "pane-image-entry.ts");
+        const jiti = createRequire(import.meta.url).resolve("jiti");
+        const owned = `require(${JSON.stringify(jiti)}).createJiti(${JSON.stringify(entry)}).import(${JSON.stringify(entry)}).then(m => m.runPaneImageChild(process.argv.slice(1))).catch(() => process.exit(1));`;
+        command = bootstrapRuntime();
+        childArgs = ["-e", owned, "--", ...args];
+      }
+      await writeFile(bootstrapScript, buildNodeLaunchScript(input.cwd, command, childArgs, false, !!imageInput));
       await writeFile(launchScript, `\ufeff$ErrorActionPreference = 'Stop'\r\n${powerShellInvocation(bootstrapRuntime(), [bootstrapScript])}\r\nexit $LASTEXITCODE\r\n`);
+      imageInput?.check();
       await this.transport.run(task.paneId, "powershell.exe", ["-NoLogo", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", launchScript]);
       this.startMonitor(task);
       return snapshotTask(task);
-    } catch (error) {
+    } catch (failure) {
+      let error = failure;
+      if (input.images?.length) {
+        const stage = failure instanceof ImageInputError ? failure.stage : "launch";
+        let cleanupFailed = failure instanceof ImageInputError && failure.cleanupFailed;
+        try { imageInput?.cleanup(); } catch { cleanupFailed = true; }
+        error = new ImageInputError(stage, cleanupFailed);
+        // Keep terminal intent even while storage is untrusted. The settlement
+        // read/write boundaries recheck it on every bounded retry.
+      }
       // Retain even an unwritten admission so this runtime can retry the same generation.
       this.tasks.set(task.subagentId, task);
       try {
         await this.settle(task, "failed", completionNotifier, undefined, String(error), !task.tabId);
       } catch (settlementError) {
+        if (input.images?.length) throw new Error(`${String(error)}; terminal persistence failed.`, { cause: error });
         throw new Error(`${String(error)}; terminal persistence failed: ${String(settlementError)}`, { cause: error });
       }
       throw error;
@@ -877,11 +1085,13 @@ export class SubagentRuntime {
       }
       const key = this.taskKey(task);
       await waitForPromise(this.launches.get(key), signal);
+      await waitForPromise(this.awaitTaskOperations(task, signal), signal);
       signal?.throwIfAborted();
       if (this.recovery || (this.tasks.has(id) && this.tasks.get(id) !== task)) continue;
       while (isActiveStatus(task.status)) {
         signal?.throwIfAborted();
         if (this.recovery || (this.tasks.has(id) && this.tasks.get(id) !== task)) break;
+        this.checkResultStorage(task);
         if (existsSync(task.resultPath)) await waitForPromise(this.settleFromResult(task, completionNotifier), signal);
         else await delay(50, undefined, { signal });
       }
@@ -900,14 +1110,17 @@ export class SubagentRuntime {
   }
 
   async cancel(id: string): Promise<SubagentTask> {
+    while (this.recovery) await this.recovery;
     const task = this.get(id);
     const completionNotifier = this.completionNotifier;
     await this.launches.get(this.taskKey(task));
+    await this.awaitTaskOperations(task);
+    if (this.recovery || this.tasks.get(id) !== task) {
+      await this.recovery;
+      return this.cancel(id);
+    }
     if (isActiveStatus(task.status)) {
-      this.stopMonitor(task);
       await this.settle(task, "cancelled", completionNotifier, undefined, undefined, !task.tabId, true);
-    } else {
-      await this.awaitTaskOperations(task);
     }
     return snapshotTask(task);
   }
@@ -915,30 +1128,60 @@ export class SubagentRuntime {
   async remove(id: string): Promise<void> {
     while (this.recovery) await this.recovery;
     const task = this.get(id);
-    if (this.launches.has(`${id}:${task.generation + 1}`)) throw new Error("Cannot remove a subagent during generation admission");
-    this.stopMonitor(task);
+    // A failed attempt may restore its monitor only before the next removal pauses it.
+    const operation = Promise.resolve(this.removals.get(task)).catch(() => {}).then(async () => {
+      if (!this.tasks.has(id)) return; // A preceding successful removal already owns the deletion.
+      await this.removeTask(task);
+    });
+    this.removals.set(task, operation);
+    try { await operation; }
+    finally { if (this.removals.get(task) === operation) this.removals.delete(task); }
+  }
+
+  private async removeTask(task: SubagentTask): Promise<void> {
+    const id = task.subagentId;
+    const generation = task.generation;
+    const checkOwner = () => {
+      if (this.tasks.get(id) !== task || task.generation !== generation
+        || this.launches.has(`${id}:${generation + 1}`)) throw new Error("Subagent generation is no longer current");
+    };
+    if (this.launches.has(`${id}:${generation + 1}`)) throw new Error("Cannot remove a subagent during generation admission");
+    checkOwner();
     await this.launches.get(this.taskKey(task));
     await this.awaitTaskOperations(task);
-    if (this.recovery || this.tasks.get(id) !== task) {
-      await this.recovery;
-      return this.remove(id);
+    await this.recovery;
+    checkOwner();
+    const monitorEpoch = this.monitorEpoch;
+    const monitored = this.monitors.has(this.taskKey(task));
+    this.stopMonitor(task);
+    try {
+      this.prepareRecoveryCleanups(task);
+      await this.persist(task, checkOwner);
+      checkOwner();
+      await this.runPendingCleanups(task, checkOwner);
+      checkOwner();
+      const cleanup = recognizedCleanupRecords(task.surfaceCleanups, task.generation)
+        .find(value => value.record.status === "pending" || value.record.status === "failed")?.record;
+      if (cleanup) throw new Error(`surface_cleanup_failed: ${cleanup.error ?? "cleanup remains pending"}`);
+      if (isActiveStatus(task.status) && task.tabId) await this.transport.closeTab(task.tabId);
+      checkOwner();
+      if (!this.cleanupImageInputs(task, true)) throw new ImageInputError("cleanup", true);
+      rmSync(task.sessionFile, { force: true });
+      rmSync(dirname(task.resultPath), { recursive: true, force: true });
+      this.tasks.delete(id);
+      for (const key of this.imageCleanups.keys()) if (key.startsWith(`${id}:`)) this.imageCleanups.delete(key);
+      this.manifestUnknown.delete(id);
+      this.notifyTaskUpdate();
+    } catch (error) {
+      // Resume only this removal's paused monitor, never a stopped runtime or replaced generation.
+      if (monitored && this.monitorEpoch === monitorEpoch && this.tasks.get(id) === task
+        && task.generation === generation && task.status === "running" && !this.launches.has(`${id}:${generation + 1}`)) this.startMonitor(task);
+      throw error;
     }
-    if (this.launches.has(`${id}:${task.generation + 1}`)) throw new Error("Cannot remove a subagent during generation admission");
-    this.prepareRecoveryCleanups(task);
-    await this.persist(task);
-    await this.runPendingCleanups(task);
-    const cleanup = recognizedCleanupRecords(task.surfaceCleanups, task.generation)
-      .find(value => value.record.status === "pending" || value.record.status === "failed")?.record;
-    if (cleanup) throw new Error(`surface_cleanup_failed: ${cleanup.error ?? "cleanup remains pending"}`);
-    if (isActiveStatus(task.status) && task.tabId) await this.transport.closeTab(task.tabId);
-    this.tasks.delete(id);
-    this.manifestUnknown.delete(id);
-    this.notifyTaskUpdate();
-    rmSync(task.sessionFile, { force: true });
-    rmSync(dirname(task.resultPath), { recursive: true, force: true });
   }
 
   stop(): void {
+    this.monitorEpoch++;
     for (const controller of this.monitors.values()) controller.abort();
     this.monitors.clear();
   }
@@ -949,27 +1192,31 @@ export class SubagentRuntime {
 
   private startMonitor(task: SubagentTask): void {
     const key = this.taskKey(task);
-    if (this.monitors.has(key) || task.status !== "running") return;
+    if (this.tasks.get(task.subagentId) !== task || this.monitors.has(key) || task.status !== "running") return;
     const controller = new AbortController();
+    const current = () => !controller.signal.aborted && this.tasks.get(task.subagentId) === task && this.monitors.get(key) === controller;
     const completionNotifier = this.completionNotifier;
     this.monitors.set(key, controller);
     void (async () => {
-      while (!controller.signal.aborted && task.status === "running") {
+      while (current() && task.status === "running") {
         try { await delay(500, undefined, { signal: controller.signal, ref: false }); }
         catch { break; }
-        if (existsSync(task.resultPath)) {
-          await this.settleFromResult(task, completionNotifier);
-          break;
-        }
+        if (!current()) break;
         try {
+          this.checkResultStorage(task);
+          if (existsSync(task.resultPath)) {
+            await this.settleFromResult(task, completionNotifier);
+            break;
+          }
           const paneExists = await this.transport.paneExists(task.paneId);
-          if (controller.signal.aborted) break;
+          if (!current()) break;
           if (!paneExists) {
             await this.settle(task, "failed", completionNotifier, undefined, "pane_closed");
             break;
           }
         } catch (error) {
-          if (controller.signal.aborted) break;
+          if (!current()) break;
+          if (error instanceof ImageInputError) continue; // Retry owned storage without adopting a foreign Result.
           await this.settle(task, "failed", completionNotifier, undefined, `pane_verification_failed: ${error instanceof Error ? error.message : String(error)}`);
           break;
         }
@@ -978,7 +1225,8 @@ export class SubagentRuntime {
     })();
   }
 
-  private stopMonitor(task: Pick<SubagentTask, "subagentId" | "generation">): void {
+  private stopMonitor(task: SubagentTask): void {
+    if (this.tasks.get(task.subagentId) !== task) return;
     const key = this.taskKey(task);
     this.monitors.get(key)?.abort();
     this.monitors.delete(key);
@@ -1005,25 +1253,62 @@ export class SubagentRuntime {
     if (existing) return existing;
     if (this.pendingSettlements.has(key)) return this.retrySettlement(key);
     if (!recovering && !isActiveStatus(task.status)) return Promise.resolve();
+    let terminalIntentPersisted = false;
     this.pendingSettlements.set(key, async effects => {
-      this.stopMonitor(task);
-      if (writeCancelledResult && !existsSync(task.resultPath)) {
-        await writeAtomic(task.resultPath, { subagentId: task.subagentId, generation: task.generation, status: "cancelled" });
+      const launching = this.launches.has(key);
+      const running = task.status === "running" && !launching;
+      const before = { status: task.status, result: task.result, error: task.error, updatedAt: task.updatedAt, surfaceCleanups: task.surfaceCleanups };
+      let trusted = false;
+      try {
+        if (!terminalIntentPersisted) {
+          if (writeCancelledResult) this.checkResultStorage(task);
+          if (writeCancelledResult && !existsSync(task.resultPath)) {
+            await resultPublisher(task.resultPath, () => this.checkResultStorage(task)).publish(JSON.stringify({ subagentId: task.subagentId, generation: task.generation, status: "cancelled" }));
+          }
+          this.checkResultStorage(task);
+          const current = existsSync(task.resultPath) ? this.readResult(task) : undefined;
+          trusted = true;
+          if (current) {
+            task.status = current.valid ? current.status : "failed";
+            task.result = current.valid ? current.result : undefined;
+            task.error = current.error;
+          } else {
+            task.status = status;
+            task.result = result;
+            task.error = error;
+          }
+          task.updatedAt = new Date().toISOString();
+          this.applyCurrentResult(task);
+          this.stopMonitor(task);
+          this.prepareCleanup(task, notCreated);
+          if (recovering) this.prepareRecoveryCleanups(task);
+          await this.persist(task);
+          terminalIntentPersisted = true;
+        } else {
+          // Retry the retained outcome/reconciled Result, not pre-commit intent or effects.
+          this.applyCurrentResult(task);
+          await this.persist(task);
+        }
+        await this.reconcileCurrentResult(task);
+        if (!effects) return;
+        if (!this.recovery) this.notifyTaskUpdate();
+        await this.runPendingCleanups(task);
+        this.cleanupImageInputs(task);
+        await this.reconcileCurrentResult(task);
+        await this.notifyTerminal(task, completionNotifier);
+      } catch (failure) {
+        if (running && !terminalIntentPersisted) {
+          Object.assign(task, before);
+          this.startMonitor(task); // Keep a running generation eligible for its first Result after a transient storage failure.
+        } else if (launching && !trusted && !terminalIntentPersisted) {
+          // An unpersisted launch failure retains its original diagnostic for a later bounded retry.
+          task.status = status;
+          task.result = result;
+          task.error = error;
+          task.updatedAt = new Date().toISOString();
+        }
+        throw failure;
       }
-      task.status = status;
-      task.result = result;
-      task.error = error;
-      task.updatedAt = new Date().toISOString();
-      this.applyCurrentResult(task);
-      this.prepareCleanup(task, notCreated);
-      if (recovering) this.prepareRecoveryCleanups(task);
-      await this.persist(task);
-      await this.reconcileCurrentResult(task);
-      if (!effects) return;
-      if (!this.recovery) this.notifyTaskUpdate();
-      await this.runPendingCleanups(task);
-      await this.reconcileCurrentResult(task);
-      await this.notifyTerminal(task, completionNotifier);
     });
     return this.retrySettlement(key);
   }
@@ -1046,6 +1331,9 @@ export class SubagentRuntime {
   }
 
   private applyCurrentResult(task: SubagentTask): boolean {
+    // A redirected image launch must not adopt an external Result on settlement
+    // or retry. Preserve the original local error/identity until storage is safe.
+    this.checkResultStorage(task);
     if (!existsSync(task.resultPath)) return false;
     const result = this.readResult(task);
     const status = result.valid ? result.status : "failed";
@@ -1058,8 +1346,8 @@ export class SubagentRuntime {
     return true;
   }
 
-  private async reconcileCurrentResult(task: SubagentTask): Promise<void> {
-    if (this.applyCurrentResult(task)) await this.persist(task);
+  private async reconcileCurrentResult(task: SubagentTask, commit = () => {}): Promise<void> {
+    if (this.applyCurrentResult(task)) await this.persist(task, commit);
   }
 
   private prepareCleanup(task: SubagentTask, notCreated: boolean, retry = false): void {
@@ -1092,33 +1380,56 @@ export class SubagentRuntime {
     }
   }
 
-  private async runPendingCleanups(task: SubagentTask): Promise<void> {
+  private async runPendingCleanups(task: SubagentTask, commit = () => {}): Promise<void> {
+    await this.retryCleanupOutcomes(task, undefined, commit);
     const generations = recognizedCleanupRecords(task.surfaceCleanups, task.generation)
       .filter(value => value.record.status === "pending")
       .map(value => value.record.generation);
-    for (const generation of generations) await this.runCleanup(task, generation);
+    for (const generation of generations) await this.runCleanup(task, generation, commit);
   }
 
-  private runCleanup(task: SubagentTask, generation = task.generation): Promise<void> {
+  private cleanupOwner(outcome: { task: SubagentTask; index: number; record: SurfaceCleanupRecord }): { task: SubagentTask; index: number | undefined } {
+    const current = this.tasks.get(outcome.task.subagentId);
+    if (!current || current === outcome.task || current.generation < outcome.record.generation) {
+      return { task: outcome.task, index: outcome.index };
+    }
+    return {
+      task: current,
+      index: recognizedCleanup(current.surfaceCleanups, outcome.record.generation)?.index,
+    };
+  }
+
+  private runCleanup(task: SubagentTask, generation = task.generation, commit = () => {}): Promise<void> {
     const key = `${task.subagentId}:${generation}`;
     const existing = this.cleanups.get(key);
     if (existing) return existing;
-    const cleanup = recognizedCleanup(task.surfaceCleanups, generation);
-    if (!cleanup || cleanup.record.status !== "pending") return Promise.resolve();
-    const operation = (async () => {
-      if (isTerminalStatus(task.status)) await this.reconcileCurrentResult(task);
-      try {
-        const status = await this.transport.closeTab(cleanup.record.tabId!);
-        setCleanup(task, cleanup.index, cleanupRecord(cleanup.record, { ...cleanup.record, status }));
-      } catch (error) {
-        setCleanup(task, cleanup.index, cleanupRecord(cleanup.record, {
-          ...cleanup.record,
-          status: "failed",
-          error: briefReason(error instanceof Error ? error.message : String(error)),
-        }));
+    const retained = this.cleanupOutcomes.get(key);
+    const cleanup = retained ?? recognizedCleanup(task.surfaceCleanups, generation);
+    if (!cleanup || (!retained && cleanup.record.status !== "pending")) return Promise.resolve();
+    const ownerInfo = retained ? this.cleanupOwner(retained) : { task, index: cleanup?.index };
+    const owner = ownerInfo.task;
+    const operation = Promise.resolve().then(async () => {
+      if (isTerminalStatus(owner.status)) await this.reconcileCurrentResult(owner, commit);
+      let record = cleanup.record;
+      if (!retained) {
+        try {
+          const status = await this.transport.closeTab(record.tabId!);
+          record = cleanupRecord(record, { ...record, status });
+        } catch (error) {
+          record = cleanupRecord(record, {
+            ...record,
+            status: "failed",
+            error: briefReason(error instanceof Error ? error.message : String(error)),
+          });
+        }
+        // Retain executed outcome and exact task ownership until its write succeeds.
+        // A bounded retry must persist this evidence, never repeat the close effect.
+        this.cleanupOutcomes.set(key, { task: owner, index: cleanup.index, record });
       }
-      await this.persist(task);
-    })();
+      setCleanup(owner, ownerInfo.index, record);
+      await this.persist(owner, commit);
+      this.cleanupOutcomes.delete(key);
+    });
     this.cleanups.set(key, operation);
     void operation.then(
       () => { if (this.cleanups.get(key) === operation) this.cleanups.delete(key); },
@@ -1127,19 +1438,66 @@ export class SubagentRuntime {
     return operation;
   }
 
+  private cleanupImageInputs(task: SubagentTask, removing = false): boolean {
+    if (this.tasks.get(task.subagentId) !== task || this.launches.has(`${task.subagentId}:${task.generation + 1}`)) return false;
+    try {
+      this.imageInputDirectory(task);
+      const generations = new Set<number>();
+      for (const key of this.imageCleanups.keys()) {
+        if (key.startsWith(`${task.subagentId}:`)) generations.add(Number(key.slice(task.subagentId.length + 1)));
+      }
+      for (const name of readdirSync(dirname(task.resultPath))) {
+        if (!name.startsWith("image-input-")) continue;
+        const value = name.slice("image-input-".length);
+        const generation = Number(value);
+        if (!Number.isSafeInteger(generation) || generation < 1 || String(generation) !== value || generation > task.generation) {
+          if (removing) throw new Error();
+          continue;
+        }
+        generations.add(generation);
+      }
+      let succeeded = true;
+      for (const generation of generations) {
+        if (generation > task.generation || (generation === task.generation && isActiveStatus(task.status) && !removing)) continue;
+        try {
+          const cleanup = this.imageCleanups.get(`${task.subagentId}:${generation}`);
+          if (cleanup) cleanup();
+          else cleanupImages({ ...task, generation, resultPath: join(dirname(task.resultPath), `result-${generation}.json`) });
+        } catch { succeeded = false; }
+      }
+      if (succeeded) return true;
+    } catch { /* Safe stage/identity only, never a filesystem exception or payload. */ }
+    warnSafely(console.warn, `Image input cleanup failed for ${task.subagentId} generation ${task.generation}.`);
+    return false;
+  }
+
   private operationFor(task: SubagentTask): Promise<void> | undefined {
-    const key = this.taskKey(task);
-    return this.settlements.get(key) ?? this.cleanups.get(key);
+    const operations = [...this.cleanups].filter(([key]) => key.startsWith(`${task.subagentId}:`)).map(([, operation]) => operation);
+    const settlement = this.settlements.get(this.taskKey(task));
+    if (settlement) operations.push(settlement);
+    if (operations.length) return Promise.all(operations).then(() => {});
+  }
+
+  private async retryCleanupOutcomes(task?: SubagentTask, signal?: AbortSignal, commit = () => {}): Promise<void> {
+    for (const outcome of this.cleanupOutcomes.values()) {
+      const owner = this.cleanupOwner(outcome).task;
+      if (task && owner !== task) continue;
+      signal?.throwIfAborted();
+      await this.runCleanup(owner, outcome.record.generation, commit);
+    }
   }
 
   private async awaitTaskOperations(task: SubagentTask, signal?: AbortSignal): Promise<void> {
     await this.operationFor(task);
+    signal?.throwIfAborted();
+    await this.retryCleanupOutcomes(task, signal);
     signal?.throwIfAborted();
     await this.retrySettlement(this.taskKey(task));
   }
 
   private async awaitAllOperations(effects: boolean): Promise<void> {
     await Promise.all([...this.launches.values(), ...this.settlements.values(), ...this.cleanups.values()]);
+    await this.retryCleanupOutcomes();
     for (const key of this.pendingSettlements.keys()) await this.retrySettlement(key, effects);
   }
 
@@ -1160,7 +1518,10 @@ export class SubagentRuntime {
 
   private recordPath(task: SubagentTask): string { return join(dirname(task.resultPath), "task.json"); }
 
-  private async persist(task: SubagentTask): Promise<void> {
+  private async persist(task: SubagentTask, commit = () => {}): Promise<void> {
+    // Publication ownership outlives launch failure and guards terminal retries;
+    // rejecting here retains pending settlement without writing through redirection.
+    if (this.imageCleanups.has(this.taskKey(task))) this.imageInputDirectory(task);
     const record: TaskRecordV2 = {
       ...(this.manifestUnknown.get(task.subagentId) ?? {}),
       version: 2, subagentId: task.subagentId, ...(task.taskSlug ? { taskSlug: task.taskSlug } : {}), generation: task.generation, agent: task.agent, cwd: task.cwd, label: task.label,
@@ -1170,7 +1531,7 @@ export class SubagentRuntime {
       ...(task.error ? { error: task.error } : {}),
       ...(task.surfaceCleanups ? { surfaceCleanups: cloneJson(task.surfaceCleanups) } : {}),
     };
-    await writeAtomic(this.recordPath(task), record);
+    await writeAtomic(this.recordPath(task), record, () => this.checkResultStorage(task), commit);
   }
 
   private taskFromRecord(record: TaskRecord, artifactDir: string): SubagentTask {
@@ -1191,8 +1552,12 @@ export class SubagentRuntime {
   }
 
   private readTaskRecord(path: string, tasksDir: string, artifactDir: string, subagentId: string): TaskRecord | undefined {
+    try { checkedImageDirectory(artifactDir, false); }
+    catch { throw new ImageInputError("storage"); }
     try {
-      const value = JSON.parse(readFileSync(path, "utf8")) as Json;
+      const bytes = readTaskArtifact(path);
+      if (bytes === undefined) return;
+      const value = JSON.parse(bytes) as Json;
       const legacy = isLegacySubagentId(subagentId);
       const canonical = typeof value.taskSlug === "string" && isCanonicalFinalId(subagentId, value.taskSlug);
       if ((value.version !== 1 && value.version !== 2) || value.subagentId !== subagentId || (!legacy && !canonical)
@@ -1217,21 +1582,38 @@ export class SubagentRuntime {
       if (value.notifiedGeneration !== undefined && value.notifiedGeneration !== value.generation) return;
       if (resolve(artifactDir) !== resolve(join(tasksDir, `${subagentId}-artifacts`))) return;
       return value as TaskRecord;
-    } catch { return; }
+    } catch (error) {
+      if (error instanceof ImageInputError) throw error;
+      return;
+    }
+  }
+
+  private checkResultStorage(task: SubagentTask): void {
+    if (this.imageCleanups.has(this.taskKey(task))) this.imageInputDirectory(task);
+    else {
+      // Recovery may retain a live child after its envelope has been consumed.
+      // Result trust must not depend on an in-memory publication/cleanup entry.
+      try { checkedImageDirectory(dirname(task.resultPath), false); }
+      catch { throw new ImageInputError("storage"); }
+    }
   }
 
   private readResult(task: SubagentTask):
     | { valid: true; status: Exclude<TaskStatus, ActiveTaskStatus>; result?: string; error?: string }
     | { valid: false; error: string } {
+    this.checkResultStorage(task); // Storage failure must throw before invalid-Result handling or settlement intent.
     try {
-      const value = JSON.parse(readFileSync(task.resultPath, "utf8")) as Json;
+      const value = JSON.parse(readTaskArtifact(task.resultPath, true) ?? "") as Json;
       if (value.subagentId !== task.subagentId || value.generation !== task.generation) return { valid: false, error: "result_identity_mismatch" };
       if (!isTerminalStatus(value.status)) return { valid: false, error: "invalid_result_status" };
       if (value.status === "completed" && typeof value.result !== "string") return { valid: false, error: "invalid_result" };
       if (value.result !== undefined && typeof value.result !== "string") return { valid: false, error: "invalid_result" };
       if (value.error !== undefined && typeof value.error !== "string") return { valid: false, error: "invalid_result" };
       return { valid: true, status: value.status, result: value.result as string | undefined, error: value.error as string | undefined };
-    } catch { return { valid: false, error: "invalid_result" }; }
+    } catch (error) {
+      if (error instanceof ImageInputError) throw error;
+      return { valid: false, error: "invalid_result" };
+    }
   }
 }
 
@@ -1311,7 +1693,12 @@ function isFinalCleanupStatus(value: SurfaceCleanupStatus): boolean {
 async function waitForPromise(promise: Promise<void> | undefined, signal?: AbortSignal): Promise<void> {
   if (!promise) return;
   if (!signal) return promise;
-  signal.throwIfAborted();
+  // The caller may already have created work before observing cancellation.
+  // Attach a rejection observer even when this wait exits immediately.
+  if (signal.aborted) {
+    void promise.catch(() => {});
+    signal.throwIfAborted();
+  }
   let abort!: () => void;
   const aborted = new Promise<void>((_resolve, reject) => {
     abort = () => reject(new DOMException("The operation was aborted", "AbortError"));
@@ -1401,10 +1788,23 @@ function fallback(result: ToolResult): string {
   return result.content?.find(part => part.type === "text")?.text || "Subagent action failed.";
 }
 
+function callIdentity(args: unknown, key: "agent" | "label" | "subagentId"): string {
+  // Pi falls back to serializing *all* arguments if a renderer throws. Read only
+  // allowlisted identity strings, without enumerating/coercing arguments or images.
+  try {
+    const value = args && typeof args === "object" ? (args as Record<string, unknown>)[key] : undefined;
+    return typeof value === "string" ? cleanIdentity(value) : "";
+  } catch { return ""; }
+}
+
 function renderSpawnCall(args: unknown, theme?: ThemeLike): Text {
-  const input = args as { agent?: string; label?: string };
-  const suffix = [input.agent, input.label].filter(Boolean).join(" · ");
+  const suffix = [callIdentity(args, "agent"), callIdentity(args, "label")].filter(Boolean).join(" · ");
   return new Text(`${title(theme, "spawn")}${suffix ? paint(theme, "dim", `  ${suffix}`) : ""}`, 0, 0);
+}
+
+function renderResumeCall(args: unknown, theme?: ThemeLike): Text {
+  const identity = callIdentity(args, "subagentId");
+  return new Text(`${title(theme, "resume")}${identity ? paint(theme, "dim", `  ${identity}`) : ""}`, 0, 0);
 }
 
 function renderSpawnResult(result: ToolResult, _options: unknown, theme?: ThemeLike): Text {
@@ -1438,6 +1838,9 @@ function renderJoinResult(result: ToolResult, options: { expanded?: boolean; isP
 }
 
 export function createSubagentTools(runtime: SubagentRuntime, cwd: string, parentSessionFile?: string) {
+  const imagesSchema = Type.Optional(Type.Array(Type.Object({
+    type: Type.Literal("image"), data: Type.String({ minLength: 1 }), mimeType: Type.String({ minLength: 1 }),
+  })));
   const result = (details: unknown) => ({ content: [{ type: "text" as const, text: JSON.stringify(details) }], details });
   const tool = (name: string, description: string, parameters: any, execute: (params: any, update: ToolUpdate | undefined, signal: AbortSignal | undefined, ctx: ExtensionContext | undefined) => Promise<unknown>, renderer: Record<string, unknown> = {}) => defineTool({
     name, label: name, description, parameters, ...renderer,
@@ -1448,14 +1851,18 @@ export function createSubagentTools(runtime: SubagentRuntime, cwd: string, paren
   });
   return [
     // Optional avoids schema rejection so missing values use the stable runtime error contract.
-    tool("subagent_spawn", "Start one background subagent without waiting for completion. Select a registered agent and provide prompt, label, taskSlug, and optional exact model/thinking settings. taskSlug is required and must be a caller-provided canonical task identity. Call directly or through a caller-owned tool wrapper using the same inputs. The parent receives a terminal completion notification without the full result text. When the effective registered tool contract and available resources permit it, you may successively launch independent, authorized, nonconflicting tasks, then wait for terminal notifications instead of polling or routinely calling inspect or join. Use subagent_inspect for an explicit non-blocking snapshot and subagent_join after a terminal notification, or when an immediate full result wait is explicitly necessary.", Type.Object({ agent: StringEnum(runtime.agentNames()), prompt: Type.String({ minLength: 1 }), label: Type.String({ minLength: 1 }), taskSlug: Type.Optional(Type.String()), model: Type.Optional(Type.String()), thinking: Type.Optional(Type.String()) }), async (params, _update, _signal, ctx) => {
-      try { return await runtime.spawn({ ...params, cwd, parentSessionFile }, ctx?.modelRegistry); }
+    tool("subagent_spawn", "Start one background subagent without waiting for completion. Select a registered agent and provide prompt, label, taskSlug, and optional exact model/thinking settings. taskSlug is required and must be a caller-provided canonical task identity. Call directly or through a caller-owned tool wrapper using the same inputs. The parent receives a terminal completion notification without the full result text. When the effective registered tool contract and available resources permit it, you may successively launch independent, authorized, nonconflicting tasks, then wait for terminal notifications instead of polling or routinely calling inspect or join. Use subagent_inspect for an explicit non-blocking snapshot and subagent_join after a terminal notification, or when an immediate full result wait is explicitly necessary.", Type.Object({ agent: StringEnum(runtime.agentNames()), prompt: Type.String({ minLength: 1 }), label: Type.String({ minLength: 1 }), taskSlug: Type.Optional(Type.String()), model: Type.Optional(Type.String()), thinking: Type.Optional(Type.String()), images: imagesSchema }), async (params, _update, _signal, ctx) => {
+      try { return await runtime.spawn({
+        agent: params.agent, prompt: params.prompt, label: params.label, taskSlug: params.taskSlug,
+        model: params.model, thinking: params.thinking, cwd, parentSessionFile,
+        get images() { return params.images; },
+      }, ctx?.modelRegistry); }
       catch (error) {
         if (!(error instanceof ExplicitSpawnModelError)) throw error;
         return { code: error.code, detail: error.detail, ...(error.operation ? { operation: error.operation } : {}) };
       }
     }, { renderCall: renderSpawnCall, renderResult: renderSpawnResult }),
-    tool("subagent_resume", "Resume a completed or failed subagent.", Type.Object({ subagentId: Type.String(), prompt: Type.String({ minLength: 1 }) }), params => runtime.resume(params.subagentId, params.prompt)),
+    tool("subagent_resume", "Resume a completed or failed subagent.", Type.Object({ subagentId: Type.String(), prompt: Type.String({ minLength: 1 }), images: imagesSchema }), params => runtime.resume(params.subagentId, params.prompt, readImages(params)), { renderCall: renderResumeCall }),
     tool("subagent_inspect", "Return a non-blocking subagent snapshot for an explicit status check; do not poll this tool while waiting. Prefer the terminal completion notification, then use subagent_join for the full Result.", Type.Object({ subagentId: Type.String() }), params => Promise.resolve(runtime.inspect(params.subagentId))),
     tool("subagent_join", "Wait for a subagent and read its full Result. Use after a terminal completion notification, or when an explicit immediate Result wait is necessary; do not use it for routine polling. Caller cancellation, including ESC, stops only this wait and does not cancel the subagent; use subagent_cancel to cancel it.", Type.Object({ subagentId: Type.String(), generation: Type.Optional(Type.Number()) }), async (params, update, signal) => { update?.(runtime.inspect(params.subagentId)); return runtime.join(params.subagentId, params.generation, signal); }, { renderCall: renderJoinCall, renderResult: renderJoinResult }),
     tool("subagent_steer", "Send a message to a running subagent.", Type.Object({ subagentId: Type.String(), message: Type.String({ minLength: 1 }) }), params => runtime.steer(params.subagentId, params.message)),

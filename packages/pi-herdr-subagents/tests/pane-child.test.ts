@@ -1,10 +1,13 @@
-import { expect, test } from "bun:test";
-import { existsSync, mkdtempSync, readFileSync, renameSync, rmSync } from "node:fs";
+import { expect, spyOn, test } from "bun:test";
+import * as fs from "node:fs";
+import * as fsPromises from "node:fs/promises";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import { writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { visibleWidth, type Component } from "@earendil-works/pi-tui";
 import paneChild from "../extensions/pane-child.js";
+import { consumeImages, imageLaunch, protectImageDirectory } from "../src/image-input.js";
 
 type Handler = (...args: any[]) => unknown;
 type DoneTool = {
@@ -65,19 +68,30 @@ function installFakeTimers(): { timers: FakeTimers; restore(): void } {
   return { timers, restore: () => { globalThis.setTimeout = setTimeout; globalThis.clearTimeout = clearTimeout; } };
 }
 
-function childFixture(operations?: Operations) {
+function childFixture(operations?: Operations, imageInput = false) {
   const root = mkdtempSync(join(tmpdir(), "pane-child-test-"));
-  const resultPath = join(root, "result.json");
-  const environment = ["PI_HERDR_SUBAGENT_RESULT_PATH", "PI_HERDR_SUBAGENT_ID", "PI_HERDR_SUBAGENT_GENERATION"];
+  const artifactDir = join(root, "tasks", "subagent-1-artifacts");
+  if (imageInput) mkdirSync(artifactDir, { recursive: true });
+  const resultPath = imageInput ? join(artifactDir, "result-1.json") : join(root, "result.json");
+  const environment = ["PI_HERDR_SUBAGENT_RESULT_PATH", "PI_HERDR_SUBAGENT_ID", "PI_HERDR_SUBAGENT_GENERATION", "PI_HERDR_SUBAGENT_IMAGE_INPUT"];
   const previous = new Map(environment.map(name => [name, process.env[name]]));
+  if (imageInput) process.env.PI_HERDR_SUBAGENT_IMAGE_INPUT = "1";
+  else delete process.env.PI_HERDR_SUBAGENT_IMAGE_INPUT;
   process.env.PI_HERDR_SUBAGENT_RESULT_PATH = resultPath;
   process.env.PI_HERDR_SUBAGENT_ID = "subagent-1";
   process.env.PI_HERDR_SUBAGENT_GENERATION = "1";
+  const imageDirectory = join(artifactDir, "image-input-1");
+  const payload = join(imageDirectory, "envelope.json");
+  if (imageInput) {
+    mkdirSync(imageDirectory, { mode: 0o700 }); protectImageDirectory(imageDirectory);
+    writeFileSync(payload, JSON.stringify({ version: 1, subagentId: "subagent-1", generation: 1,
+      images: [{ type: "image", data: "AQ==", mimeType: "image/png" }] }), { mode: 0o600 });
+  }
   const handlers = new Map<string, Handler[]>();
   const tools = new Map<string, DoneTool>();
   const messages: Array<{ text: string; options: unknown }> = [];
   const starts: string[] = [];
-  paneChild({
+  const control = paneChild({
     on(event: string, handler: Handler) { handlers.set(event, [...(handlers.get(event) ?? []), handler]); },
     registerTool(tool: { name: string } & DoneTool) { tools.set(tool.name, tool); },
     sendUserMessage(text: string, options: unknown) { messages.push({ text, options }); },
@@ -90,6 +104,10 @@ function childFixture(operations?: Operations) {
   };
   return {
     resultPath,
+    imageDirectory,
+    payload,
+    launch: imageInput ? imageLaunch(join(root, "tasks", "subagent-1-g1.jsonl")) : undefined,
+    control: control!,
     messages,
     starts,
     emit,
@@ -111,6 +129,63 @@ function childFixture(operations?: Operations) {
       rmSync(root, { recursive: true, force: true });
     },
   };
+}
+
+for (const ancestor of ["task", "scope"] as const) {
+  for (const outcome of ["done", "failure"] as const) {
+    for (const timing of ["before-write", "after-write"] as const) {
+      test(`image Result writer refuses ${ancestor} redirection ${timing} for ${outcome} and retries safely`, async () => {
+        let redirect = () => {};
+        let writes = 0;
+        let publications = 0;
+        const child = childFixture({
+          async writeFile(path, data) { writes++; await writeFile(path, data); if (timing === "after-write") redirect(); },
+          rename(source, destination) { publications++; renameSync(source, destination); },
+        }, true);
+        const artifact = dirname(child.resultPath);
+        const target = ancestor === "task" ? artifact : dirname(artifact);
+        const held = `${target}-held`;
+        const outside = join(dirname(dirname(artifact)), "outside");
+        const externalArtifact = ancestor === "task" ? outside : join(outside, "subagent-1-artifacts");
+        mkdirSync(externalArtifact, { recursive: true });
+        writeFileSync(join(externalArtifact, "sentinel"), "untouched");
+        let redirected = false;
+        let shutdowns = 0;
+        redirect = () => {
+          if (redirected) return;
+          renameSync(target, held);
+          fs.symlinkSync(outside, target, process.platform === "win32" ? "junction" : "dir");
+          redirected = true;
+        };
+        const complete = () => outcome === "done"
+          ? child.done.execute("done", { result: "OWNED_RESULT" }, undefined, undefined, { shutdown() { shutdowns++; } })
+          : child.control.fail("storage", () => { shutdowns++; });
+        try {
+          if (timing === "before-write") redirect();
+          await expect(complete()).rejects.toThrow();
+          expect(fs.readdirSync(externalArtifact)).toEqual(["sentinel"]);
+          expect(readFileSync(join(externalArtifact, "sentinel"), "utf8")).toBe("untouched");
+          expect(writes).toBe(timing === "before-write" ? 0 : 1);
+          expect(publications).toBe(0);
+          expect(shutdowns).toBe(0);
+          expect(child.control.isActive()).toBeTrue();
+          rmSync(target, { force: true }); renameSync(held, target); redirected = false;
+          redirect = () => {};
+          await complete();
+          expect(JSON.parse(readFileSync(child.resultPath, "utf8"))).toMatchObject(outcome === "done"
+            ? { status: "completed", result: "OWNED_RESULT" } : { status: "failed", error: "image_input_failed:storage" });
+          expect(publications).toBe(1);
+          expect(shutdowns).toBe(1);
+          child.emit("session_shutdown");
+          expect(existsSync(child.imageDirectory)).toBeFalse();
+          expect(fs.readdirSync(externalArtifact)).toEqual(["sentinel"]);
+        } finally {
+          if (redirected) { rmSync(target, { force: true }); renameSync(held, target); }
+          child.cleanup();
+        }
+      }, 30_000);
+    }
+  }
 }
 
 const completed = (summary: string) => `status: completed\nsummary: ${summary}\nreport: ok`;
@@ -365,3 +440,219 @@ test("subagent_done clears nudges and atomically records the Result", async () =
     child.cleanup();
   }
 });
+
+
+test("image failure control shares the completion barrier and keeps first successful Result", async () => {
+  const blocked = new Deferred();
+  const child = childFixture({ writeFile: async (path, body) => { await blocked.promise; await writeFile(path, body); }, rename: renameSync });
+  try {
+    expect(child.control.isActive()).toBeTrue();
+    const success = child.done.execute("first", { result: "authoritative success" }, undefined, undefined, { shutdown() {} });
+    const failure = child.control.fail("normalization");
+    expect(child.control.isActive()).toBeFalse();
+    expect(child.input("extension")).toEqual({ action: "handled" });
+    blocked.resolve();
+    await Promise.all([success, failure]);
+    expect(JSON.parse(readFileSync(child.resultPath, "utf8"))).toEqual({ subagentId: "subagent-1", generation: 1, status: "completed", result: "authoritative success" });
+    await child.control.fail("delivery");
+    expect(readFileSync(child.resultPath, "utf8")).not.toContain("image_input_failed");
+  } finally { child.cleanup(); }
+});
+
+test("published child Result survives failed temporary unlink and later completion", async () => {
+  const child = childFixture(undefined, true);
+  const unlink = fs.unlinkSync;
+  let temporary = "";
+  let failOnce = true;
+  const warn = spyOn(console, "warn").mockImplementation(() => {});
+  const cleanup = spyOn(fs, "unlinkSync").mockImplementation(path => {
+    if (String(path).startsWith(child.resultPath + ".") && String(path).endsWith(".tmp")) {
+      temporary = String(path);
+      if (failOnce) { failOnce = false; throw new Error("private path and payload must not be logged"); }
+    }
+    return unlink(path);
+  });
+  let shutdowns = 0;
+  try {
+    await child.done.execute("first", { result: "FIRST_DURABLE_RESULT" }, undefined, undefined, { shutdown() { shutdowns++; } });
+    expect(child.control.isActive()).toBeFalse();
+    expect(child.input()).toEqual({ action: "handled" });
+    const first = readFileSync(child.resultPath);
+    expect(existsSync(temporary)).toBeTrue();
+    await child.done.execute("later", { result: "SECOND_RESULT" }, undefined, undefined, { shutdown() { shutdowns++; } });
+    expect(existsSync(temporary)).toBeFalse();
+    expect(readFileSync(child.resultPath)).toEqual(first);
+    expect(JSON.parse(first.toString()).result).toBe("FIRST_DURABLE_RESULT");
+    expect(shutdowns).toBe(1);
+    expect(warn).toHaveBeenCalled();
+    expect(JSON.stringify(warn.mock.calls)).not.toContain("private path and payload must not be logged");
+  } finally { cleanup.mockRestore(); warn.mockRestore(); child.cleanup(); }
+});
+
+test("child Result temporary creation cannot write through a preexisting hardlink", async () => {
+  const child = childFixture(undefined, true);
+  const sentinel = join(dirname(dirname(dirname(child.resultPath))), "external-sentinel");
+  writeFileSync(sentinel, "DO_NOT_OVERWRITE");
+  const original = fsPromises.open;
+  let collision = "";
+  const writer = spyOn(fsPromises, "open").mockImplementation((path, flags, mode) => {
+    if (String(path).startsWith(child.resultPath + ".") && String(path).endsWith(".tmp")) {
+      collision = String(path);
+      fs.linkSync(sentinel, collision);
+    }
+    return original(path, flags, mode);
+  });
+  try {
+    await expect(child.done.execute("collision", { result: "OWNED_RESULT" }, undefined, undefined, { shutdown() {} })).rejects.toThrow();
+    expect(collision).not.toBe("");
+    expect(readFileSync(sentinel, "utf8")).toBe("DO_NOT_OVERWRITE");
+    expect(readFileSync(collision, "utf8")).toBe("DO_NOT_OVERWRITE");
+    expect(existsSync(child.resultPath)).toBeFalse();
+    expect(child.control.isActive()).toBeTrue();
+    writer.mockRestore();
+    fs.unlinkSync(collision);
+    await child.done.execute("safe", { result: "OWNED_RESULT" }, undefined, undefined, { shutdown() {} });
+    expect(JSON.parse(readFileSync(child.resultPath, "utf8")).result).toBe("OWNED_RESULT");
+  } finally { writer.mockRestore(); child.cleanup(); }
+});
+
+for (const leaf of ["hardlink", "symlink"] as const) {
+  test(`child refuses preexisting redirected Result ${leaf} and retains active retry`, async () => {
+    const child = childFixture(undefined, true);
+    const foreign = join(dirname(dirname(dirname(child.resultPath))), "foreign-result");
+    const bytes = JSON.stringify({ subagentId: "subagent-1", generation: 1, status: "completed", result: "FOREIGN_RESULT" });
+    writeFileSync(foreign, bytes);
+    if (leaf === "hardlink") fs.linkSync(foreign, child.resultPath);
+    else fs.symlinkSync(foreign, child.resultPath, "file");
+    let shutdowns = 0;
+    try {
+      await expect(child.done.execute("foreign", { result: "OWNED_RESULT" }, undefined, undefined, { shutdown() { shutdowns++; } })).rejects.toThrow();
+      expect(child.control.isActive()).toBeTrue();
+      expect(shutdowns).toBe(0);
+      expect(readFileSync(foreign, "utf8")).toBe(bytes);
+      fs.unlinkSync(child.resultPath);
+      await child.done.execute("safe", { result: "OWNED_RESULT" }, undefined, undefined, { shutdown() { shutdowns++; } });
+      expect(JSON.parse(readFileSync(child.resultPath, "utf8")).result).toBe("OWNED_RESULT");
+      expect(shutdowns).toBe(1);
+    } finally { child.cleanup(); }
+  }, process.platform === "win32" ? 30_000 : 10_000); // Rejection and safe retry retain real serialized ACL checks.
+}
+
+test("image failure preserves an already published authoritative Result", async () => {
+  const child = childFixture();
+  try {
+    const original = JSON.stringify({ subagentId: "subagent-1", generation: 1, status: "completed", result: "previous writer" });
+    await writeFile(child.resultPath, original);
+    await child.control.fail("startup");
+    expect(readFileSync(child.resultPath, "utf8")).toBe(original);
+    expect(child.control.isActive()).toBeFalse();
+  } finally { child.cleanup(); }
+});
+
+test("image failure persists a safe stage and shutdown closes image activity", async () => {
+  const child = childFixture();
+  const clock = installFakeTimers();
+  try {
+    child.emit("agent_end");
+    const failing = child.control.fail("path/payload/decoder detail");
+    expect(child.control.isActive()).toBeFalse();
+    expect(clock.timers.pending).toBe(0);
+    expect(child.input("rpc")).toEqual({ action: "handled" });
+    await failing;
+    expect(JSON.parse(readFileSync(child.resultPath, "utf8"))).toEqual({ subagentId: "subagent-1", generation: 1, status: "failed", error: "image_input_failed:delivery" });
+  } finally { clock.restore(); child.cleanup(); }
+  const shutdown = childFixture();
+  try {
+    shutdown.emit("session_shutdown");
+    expect(shutdown.control.isActive()).toBeFalse();
+  } finally { shutdown.cleanup(); }
+});
+
+test("I-CLEANUP child consumption and read failure delete only the expected payload", async () => {
+  for (const scenario of ["success", "read", "envelope"]) {
+    const child = childFixture(undefined, true);
+    let read: { mockRestore(): void } | undefined;
+    try {
+      if (scenario === "read") read = spyOn(fsPromises, "open").mockRejectedValue(new Error("SECRET /private/AQ=="));
+      if (scenario === "envelope") writeFileSync(child.payload, "{broken");
+      if (scenario === "success") {
+        expect(await consumeImages(child.launch!, child.control.isActive)).toEqual([{ type: "image", data: "AQ==", mimeType: "image/png" }]);
+        await child.control.fail("delivery");
+      } else {
+        await expect(consumeImages(child.launch!, child.control.isActive)).rejects.toThrow(`Image input failed at ${scenario}.`);
+        read?.mockRestore(); // Inject only the consumer read, not the subsequent Result open.
+        await child.control.fail(scenario);
+      }
+      expect(existsSync(child.imageDirectory)).toBeFalse();
+      expect(readFileSync(child.resultPath, "utf8")).toContain("image_input_failed:");
+      expect(readFileSync(child.resultPath, "utf8")).not.toMatch(/SECRET|private|AQ==|envelope\.json/);
+    } finally { read?.mockRestore(); child.cleanup(); }
+  }
+}, 60_000);
+
+test("I-CLEANUP child completion and shutdown clean pending input, preserve the winning Result", async () => {
+  for (const scenario of ["done", "shutdown", "failure"]) {
+    const child = childFixture(undefined, true);
+    try {
+      const other = join(child.imageDirectory, "..", "image-input-2");
+      mkdirSync(other); writeFileSync(join(other, "envelope.json"), "other generation");
+      if (scenario === "done") await child.done.execute("done", { result: "winning Result" }, undefined, undefined, { shutdown() {} });
+      if (scenario === "failure") await child.control.fail("delivery");
+      child.emit("session_shutdown");
+      expect(child.control.isActive()).toBeFalse();
+      expect(existsSync(child.imageDirectory)).toBeFalse();
+      expect(readFileSync(join(other, "envelope.json"), "utf8")).toBe("other generation");
+      const bytes = scenario !== "shutdown" ? readFileSync(child.resultPath) : undefined;
+      child.emit("session_shutdown"); // Missing files are successful cleanup.
+      if (bytes) expect(readFileSync(child.resultPath)).toEqual(bytes);
+      else expect(existsSync(child.resultPath)).toBeFalse();
+      await expect(consumeImages(child.launch!, child.control.isActive)).rejects.toThrow("Image input failed at terminal.");
+    } finally { child.cleanup(); }
+  }
+}, 60_000);
+
+test("I-CLEANUP child delete failure reports safely, preserves Result, and retries at shutdown", async () => {
+  const child = childFixture(undefined, true);
+  const remove = fs.rmSync;
+  const deletion = spyOn(fs, "rmSync").mockImplementation((path, options) => {
+    if (String(path) === child.payload) throw new Error("SECRET /private/AQ==");
+    return remove(path, options);
+  });
+  const warnings = spyOn(console, "warn").mockImplementation(() => {});
+  try {
+    await child.done.execute("done", { result: "winning Result" }, undefined, undefined, { shutdown() {} });
+    expect(warnings.mock.calls).toEqual([["Image input cleanup failed for the child generation."]]);
+    const bytes = readFileSync(child.resultPath);
+    expect(existsSync(child.payload)).toBeTrue();
+    await child.control.fail("delivery");
+    expect(readFileSync(child.resultPath)).toEqual(bytes);
+    deletion.mockRestore();
+    child.emit("session_shutdown");
+    expect(existsSync(child.imageDirectory)).toBeFalse();
+    expect(readFileSync(child.resultPath)).toEqual(bytes);
+  } finally { deletion.mockRestore(); warnings.mockRestore(); child.cleanup(); }
+}, 60_000);
+
+test("I-CLEANUP shutdown during a pending open prevents attachment and cleans the orphan", async () => {
+  const child = childFixture(undefined, true);
+  const opened = Promise.withResolvers<void>();
+  const release = Promise.withResolvers<void>();
+  const open = fsPromises.open;
+  const opening = spyOn(fsPromises, "open").mockImplementation(async (...args: Parameters<typeof fsPromises.open>) => {
+    const file = await open(...args);
+    opened.resolve(); await release.promise;
+    return file;
+  });
+  const warnings = spyOn(console, "warn").mockImplementation(() => {});
+  try {
+    const consuming = consumeImages(child.launch!, child.control.isActive);
+    await opened.promise;
+    child.emit("session_shutdown");
+    release.resolve();
+    await expect(consuming).rejects.toThrow("Image input failed at terminal.");
+    // Windows may retain an open handle until close; the next bounded boundary retries.
+    child.emit("session_shutdown");
+    expect(existsSync(child.imageDirectory)).toBeFalse();
+    expect(existsSync(child.resultPath)).toBeFalse();
+  } finally { release.resolve(); opening.mockRestore(); warnings.mockRestore(); child.cleanup(); }
+}, 60_000);

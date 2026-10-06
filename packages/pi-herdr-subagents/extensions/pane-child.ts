@@ -1,25 +1,39 @@
-import { renameSync } from "node:fs";
-import { writeFile } from "node:fs/promises";
+import { dirname, join } from "node:path";
+import { cleanupImages, imageLaunch } from "../src/image-input.js";
+import { resultPublisher, type ResultOperations } from "../src/result-publication.js";
 import { Type } from "@earendil-works/pi-ai";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { stripTerminalSequences, Text } from "@earendil-works/pi-tui";
 
-type CompletionState = "active" | "settling" | "settled";
-type PaneChildOperations = {
-  writeFile(path: string, data: string): Promise<void>;
-  rename(source: string, destination: string): void;
+export type PaneChildControl = {
+  isActive(): boolean;
+  fail(stage: string, shutdown?: () => void): Promise<void>;
 };
+export const paneChildControlChannel = "pi-herdr-subagent:control";
 
-export default function paneChild(
-  pi: ExtensionAPI,
-  operations: PaneChildOperations = { writeFile, rename: renameSync },
-): void {
+type CompletionState = "active" | "settling" | "settled";
+export default function paneChild(pi: ExtensionAPI, operations?: ResultOperations): PaneChildControl | undefined {
   const resultPath = process.env.PI_HERDR_SUBAGENT_RESULT_PATH;
   const subagentId = process.env.PI_HERDR_SUBAGENT_ID;
   const generation = Number(process.env.PI_HERDR_SUBAGENT_GENERATION);
   if (!resultPath || !subagentId || !Number.isInteger(generation)) return;
+  const expectsImages = process.env.PI_HERDR_SUBAGENT_IMAGE_INPUT === "1";
+  const imageEnvironment = { PI_HERDR_SUBAGENT_IMAGE_INPUT: "1", PI_HERDR_SUBAGENT_RESULT_PATH: resultPath,
+    PI_HERDR_SUBAGENT_ID: subagentId, PI_HERDR_SUBAGENT_GENERATION: String(generation) };
+  const validateResultStorage = () => {
+    if (expectsImages) imageLaunch(join(dirname(dirname(resultPath)), `${subagentId}-g1.jsonl`), imageEnvironment);
+  };
+  const cleanupImageInput = () => {
+    if (!expectsImages) return;
+    try { cleanupImages(imageLaunch(join(dirname(dirname(resultPath)), `${subagentId}-g1.jsonl`), imageEnvironment)); }
+    catch {
+      try { console.warn("Image input cleanup failed for the child generation."); } catch { /* Diagnostics cannot replace the Result. */ }
+    }
+  };
   let completionState: CompletionState = "active";
   let pendingCompletion: Promise<void> | undefined;
+  const publisher = resultPublisher(resultPath, validateResultStorage, operations);
+  const cleanupTemporary = publisher.cleanup;
   const nudgeDelay = Math.max(1000, Number.parseInt(process.env.PI_SUBAGENT_NUDGE_DELAY_MS ?? "5000", 10) || 5000);
   let nudgeTimer: ReturnType<typeof setTimeout> | undefined;
   let inputAfterAgentEnd = false;
@@ -46,23 +60,23 @@ export default function paneChild(
     inputAfterAgentEnd = true;
     clearNudge();
   });
-  on("session_shutdown", clearNudge);
-  const finish = (result: string, ctx: { shutdown(): void }): Promise<void> => {
-    if (completionState === "settled") return Promise.resolve();
+  let live = true;
+  on("session_shutdown", () => { live = false; clearNudge(); cleanupTemporary(); cleanupImageInput(); });
+  const persist = (body: { status: "completed"; result: string } | { status: "failed"; error: string }, ctx: { shutdown(): void }): Promise<void> => {
+    if (completionState === "settled") { cleanupTemporary(); return Promise.resolve(); }
     if (pendingCompletion) return pendingCompletion;
 
     completionState = "settling";
     clearNudge();
-    const temporary = `${resultPath}.${process.pid}.tmp`;
-    const persistence = Promise.resolve()
-      .then(() => operations.writeFile(temporary, JSON.stringify({ subagentId, generation, status: "completed", result })))
-      .then(() => operations.rename(temporary, resultPath));
+    const persistence = Promise.resolve().then(() => publisher.publish(JSON.stringify({ subagentId, generation, ...body })));
     pendingCompletion = persistence.then(
       () => {
-        completionState = "settled";
+        completionState = "settled"; // Publication, not temporary deletion, owns the terminal barrier.
+        if (body.status === "completed") cleanupImageInput();
         ctx.shutdown();
       },
       error => {
+        cleanupTemporary();
         completionState = "active";
         pendingCompletion = undefined;
         throw error;
@@ -70,6 +84,19 @@ export default function paneChild(
     );
     return pendingCompletion;
   };
+  const control: PaneChildControl = {
+    isActive: () => live && completionState === "active",
+    async fail(stage, shutdown = () => {}) {
+      // An in-flight successful Result retains precedence over input/startup failure.
+      if (pendingCompletion) { try { await pendingCompletion; } catch { /* Failed persistence is retryable. */ } }
+      if (completionState === "settled") return;
+      const safeStage = /^[a-z_]+$/.test(stage) ? stage : "delivery";
+      await persist({ status: "failed", error: `image_input_failed:${safeStage}` }, { shutdown });
+    },
+  };
+  pi.events?.on(paneChildControlChannel, (receive: unknown) => {
+    if (typeof receive === "function") receive(control);
+  });
   pi.registerTool({
     name: "subagent_done",
     label: "Subagent Done",
@@ -80,8 +107,9 @@ export default function paneChild(
       return new Text(typeof args.result === "string" ? `${title}\n${stripTerminalSequences(args.result)}` : title, 0, 0);
     },
     async execute(_id, params, _signal, _update, ctx) {
-      await finish(params.result, ctx);
+      await persist({ status: "completed", result: params.result }, ctx);
       return { content: [{ type: "text", text: "Subagent result recorded." }], details: {} };
     },
   });
+  return control;
 }
