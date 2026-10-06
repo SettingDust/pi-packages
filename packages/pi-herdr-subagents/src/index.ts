@@ -9,7 +9,7 @@ import { tmpdir } from "node:os";
 import { basename, dirname, isAbsolute, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { setTimeout as delay } from "node:timers/promises";
-import { promisify } from "node:util";
+import { isDeepStrictEqual, promisify } from "node:util";
 import { StringEnum, Type, type ImageContent } from "@earendil-works/pi-ai";
 import { defineTool, getAgentDir, type ExtensionAPI, type ExtensionContext, type Theme } from "@earendil-works/pi-coding-agent";
 import { Text, stripTerminalSequences, truncateToWidth, type Component, type TUI } from "@earendil-works/pi-tui";
@@ -710,14 +710,14 @@ export class SubagentRuntime {
       if (record.notifiedGeneration === record.generation) this.notified.add(this.taskKey(task));
       const result = existsSync(task.resultPath) ? this.readResult(task) : undefined;
       if (result?.valid) {
+        if (task.status !== result.status || task.error !== result.error) task.updatedAt = new Date().toISOString();
         task.status = result.status;
         task.result = result.result;
         task.error = result.error;
-        task.updatedAt = new Date().toISOString();
       } else if (result && !result.valid) {
+        if (task.status !== "failed" || task.error !== result.error) task.updatedAt = new Date().toISOString();
         task.status = "failed";
         task.error = result.error;
-        task.updatedAt = new Date().toISOString();
       } else if (record.version === 2 && record.status === "queued") {
         task.status = "failed";
         task.error = "launch_interrupted";
@@ -762,7 +762,7 @@ export class SubagentRuntime {
       }
       this.tasks.set(task.subagentId, task);
       if (isTerminalStatus(task.status)) {
-        await this.settle(task, task.status, completionNotifier, task.result, task.error, false, false, true);
+        await this.settle(task, task.status, completionNotifier, task.result, task.error, false, false, record);
       } else {
         this.prepareRecoveryCleanups(task);
         await this.persist(task);
@@ -1246,7 +1246,7 @@ export class SubagentRuntime {
     error?: string,
     notCreated = false,
     writeCancelledResult = false,
-    recovering = false,
+    recovering?: TaskRecord,
   ): Promise<void> {
     const key = this.taskKey(task);
     const existing = this.settlements.get(key);
@@ -1277,12 +1277,17 @@ export class SubagentRuntime {
             task.result = result;
             task.error = error;
           }
-          task.updatedAt = new Date().toISOString();
+          if (!recovering) task.updatedAt = new Date().toISOString();
           this.applyCurrentResult(task);
           this.stopMonitor(task);
           this.prepareCleanup(task, notCreated);
           if (recovering) this.prepareRecoveryCleanups(task);
-          await this.persist(task);
+          // A matching Result is loaded into memory, not persisted in the manifest.
+          // Keep all settlement/recheck effects, but do not rewrite unchanged V2 state.
+          if (!recovering || recovering.version === 1 || !isDeepStrictEqual(
+            { ...task, result: undefined },
+            { ...this.taskFromRecord(recovering, dirname(task.resultPath)), result: undefined },
+          )) await this.persist(task);
           terminalIntentPersisted = true;
         } else {
           // Retry the retained outcome/reconciled Result, not pre-commit intent or effects.
@@ -1441,7 +1446,11 @@ export class SubagentRuntime {
   private cleanupImageInputs(task: SubagentTask, removing = false): boolean {
     if (this.tasks.get(task.subagentId) !== task || this.launches.has(`${task.subagentId}:${task.generation + 1}`)) return false;
     try {
-      this.imageInputDirectory(task);
+      const artifactDir = dirname(task.resultPath);
+      const directory = lstatSync(artifactDir);
+      if (!directory.isDirectory() || directory.isSymbolicLink()
+        || relative(resolve(artifactDir), realpathSync(artifactDir)) !== "") throw new Error();
+      // Discover names only; absence needs no recursive image-storage validation.
       const generations = new Set<number>();
       for (const key of this.imageCleanups.keys()) {
         if (key.startsWith(`${task.subagentId}:`)) generations.add(Number(key.slice(task.subagentId.length + 1)));
@@ -1456,6 +1465,8 @@ export class SubagentRuntime {
         }
         generations.add(generation);
       }
+      if (!generations.size && !removing) return true;
+      this.imageInputDirectory(task); // Full scope/ancestor checks before cleanup or artifact removal.
       let succeeded = true;
       for (const generation of generations) {
         if (generation > task.generation || (generation === task.generation && isActiveStatus(task.status) && !removing)) continue;

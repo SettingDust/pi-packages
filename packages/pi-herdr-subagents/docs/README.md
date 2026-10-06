@@ -9,6 +9,10 @@ This directory owns durable authority and bounded implementation work for `@sett
 
 PRDs own product scope, ADRs own accepted decisions, and Specs own normative behavior. Work Context records settled evidence and current state; Plans and Waves derive from authority and do not create it.
 
+## Recovery Performance Correction
+
+[Recovery performance Work](works/recovery-performance/work.md) derives from lifecycle section 3.2.1 and the image cleanup contract. It removes redundant writes for unchanged V2 terminal tasks and avoids recursive image checks when discovery finds no cleanup work. Recovery still rereads the selected disk scope and retains Result precedence, notification replay and bounded cleanup retries. Evidence and verification limits are tracked in the Work Context and Plan.
+
 ## Image Input Implementation
 
 - [Image input PRD](prd/image-input.md): accepted direct-image scope for spawn and resumed-generation initial input.

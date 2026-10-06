@@ -1,0 +1,1474 @@
+bun test v1.4.2 (744846f84)
+
+tests\image-input.test.ts:
+{
+  "status": "completed",
+  "stockCliStatus": "blocked",
+  "packageRoot": "E:\\Projects\\pi-packages\\node_modules\\.bun\\@earendil-works+pi-coding-agent@0.99.2+d7028e23c0a6b244\\node_modules\\@earendil-works\\pi-coding-agent",
+  "version": "0.99.2",
+  "checkedAt": "2026-10-05T15:23:55.988Z",
+  "validPredecode": [
+    1,
+    1
+  ],
+  "corruptPredecode": null,
+  "instrumentation": "stock CLI observations only: native AgentSession.prompt stops at an observation-only agent.prompt replacement. Separate sdkObservations execute original Agent.prompt with a real delegating guard and a test-only offline provider stream.",
+  "association": "InputEvent has no task/generation/designated-input identity; identical early, designated, and later interactive calls yield identical events.",
+  "blocker": "Normalization omits rejected images and still enters agent.prompt; before_agent_start is earlier, its throws are swallowed, and public preflightResult exposes only started/handled/queued, not normalization success or content. No supported fail-closed post-normalization package hook is exposed on this path.",
+  "providerCalls": 0,
+  "networkAttempts": 0,
+  "observations": [
+    {
+      "label": "ordered-g1",
+      "inputs": [
+        {
+          "keys": [
+            "images",
+            "source",
+            "streamingBehavior",
+            "text",
+            "type"
+          ],
+          "text": "I-SEAM initial task text",
+          "source": "interactive",
+          "images": 2
+        }
+      ],
+      "before": [
+        {
+          "text": "I-SEAM initial task text",
+          "images": 2
+        }
+      ],
+      "agentEntries": 1,
+      "normalized": [
+        {
+          "text": "I-SEAM initial task text",
+          "images": 2,
+          "order": [
+            0,
+            1
+          ],
+          "corruptPresent": false
+        }
+      ],
+      "errors": [],
+      "commands": 0,
+      "preflight": [
+        "designated:started"
+      ],
+      "shutdowns": 0,
+      "returned": true
+    },
+    {
+      "label": "ordered-g2",
+      "inputs": [
+        {
+          "keys": [
+            "images",
+            "source",
+            "streamingBehavior",
+            "text",
+            "type"
+          ],
+          "text": "I-SEAM initial task text",
+          "source": "interactive",
+          "images": 2
+        }
+      ],
+      "before": [
+        {
+          "text": "I-SEAM initial task text",
+          "images": 2
+        }
+      ],
+      "agentEntries": 1,
+      "normalized": [
+        {
+          "text": "I-SEAM initial task text",
+          "images": 2,
+          "order": [
+            0,
+            1
+          ],
+          "corruptPresent": false
+        }
+      ],
+      "errors": [],
+      "commands": 0,
+      "preflight": [
+        "designated:started"
+      ],
+      "shutdowns": 0,
+      "returned": true
+    },
+    {
+      "label": "early-unrelated",
+      "inputs": [
+        {
+          "keys": [
+            "images",
+            "source",
+            "streamingBehavior",
+            "text",
+            "type"
+          ],
+          "text": "I-SEAM initial task text",
+          "source": "extension",
+          "images": 0
+        },
+        {
+          "keys": [
+            "images",
+            "source",
+            "streamingBehavior",
+            "text",
+            "type"
+          ],
+          "text": "I-SEAM initial task text",
+          "source": "rpc",
+          "images": 0
+        },
+        {
+          "keys": [
+            "images",
+            "source",
+            "streamingBehavior",
+            "text",
+            "type"
+          ],
+          "text": "I-SEAM initial task text",
+          "source": "interactive",
+          "images": 0
+        },
+        {
+          "keys": [
+            "images",
+            "source",
+            "streamingBehavior",
+            "text",
+            "type"
+          ],
+          "text": "I-SEAM initial task text",
+          "source": "interactive",
+          "images": 0
+        },
+        {
+          "keys": [
+            "images",
+            "source",
+            "streamingBehavior",
+            "text",
+            "type"
+          ],
+          "text": "I-SEAM initial task text",
+          "source": "interactive",
+          "images": 0
+        },
+        {
+          "keys": [
+            "images",
+            "source",
+            "streamingBehavior",
+            "text",
+            "type"
+          ],
+          "text": "I-SEAM initial task text",
+          "source": "extension",
+          "images": 0
+        }
+      ],
+      "before": [
+        {
+          "text": "I-SEAM initial task text",
+          "images": 0
+        },
+        {
+          "text": "I-SEAM initial task text",
+          "images": 0
+        },
+        {
+          "text": "I-SEAM initial task text",
+          "images": 0
+        },
+        {
+          "text": "I-SEAM initial task text",
+          "images": 0
+        },
+        {
+          "text": "I-SEAM initial task text",
+          "images": 0
+        },
+        {
+          "text": "I-SEAM initial task text",
+          "images": 0
+        }
+      ],
+      "agentEntries": 6,
+      "normalized": [
+        {
+          "text": "I-SEAM initial task text",
+          "images": 0,
+          "order": [],
+          "corruptPresent": false
+        },
+        {
+          "text": "I-SEAM initial task text",
+          "images": 0,
+          "order": [],
+          "corruptPresent": false
+        },
+        {
+          "text": "I-SEAM initial task text",
+          "images": 0,
+          "order": [],
+          "corruptPresent": false
+        },
+        {
+          "text": "I-SEAM initial task text",
+          "images": 0,
+          "order": [],
+          "corruptPresent": false
+        },
+        {
+          "text": "I-SEAM initial task text",
+          "images": 0,
+          "order": [],
+          "corruptPresent": false
+        },
+        {
+          "text": "I-SEAM initial task text",
+          "images": 0,
+          "order": [],
+          "corruptPresent": false
+        }
+      ],
+      "errors": [],
+      "commands": 0,
+      "preflight": [
+        "early-extension:started",
+        "early-rpc:started",
+        "early-interactive:started",
+        "designated:started",
+        "later-interactive:started",
+        "completion-nudge:started"
+      ],
+      "shutdowns": 0,
+      "returned": true
+    },
+    {
+      "label": "corrupt-mixed",
+      "inputs": [
+        {
+          "keys": [
+            "images",
+            "source",
+            "streamingBehavior",
+            "text",
+            "type"
+          ],
+          "text": "I-SEAM initial task text",
+          "source": "interactive",
+          "images": 2
+        }
+      ],
+      "before": [
+        {
+          "text": "I-SEAM initial task text",
+          "images": 2
+        }
+      ],
+      "agentEntries": 1,
+      "normalized": [
+        {
+          "text": "I-SEAM initial task text\n\n[Image omitted: could not be resized below the inline image size limit.]",
+          "images": 1,
+          "order": [
+            0
+          ],
+          "corruptPresent": false
+        }
+      ],
+      "errors": [],
+      "commands": 0,
+      "preflight": [
+        "designated:started"
+      ],
+      "shutdowns": 0,
+      "returned": true
+    },
+    {
+      "label": "corrupt-only",
+      "inputs": [
+        {
+          "keys": [
+            "images",
+            "source",
+            "streamingBehavior",
+            "text",
+            "type"
+          ],
+          "text": "I-SEAM initial task text",
+          "source": "interactive",
+          "images": 1
+        }
+      ],
+      "before": [
+        {
+          "text": "I-SEAM initial task text",
+          "images": 1
+        }
+      ],
+      "agentEntries": 1,
+      "normalized": [
+        {
+          "text": "I-SEAM initial task text\n\n[Image omitted: could not be resized below the inline image size limit.]",
+          "images": 0,
+          "order": [],
+          "corruptPresent": false
+        }
+      ],
+      "errors": [],
+      "commands": 0,
+      "preflight": [
+        "designated:started"
+      ],
+      "shutdowns": 0,
+      "returned": true
+    },
+    {
+      "label": "throw-input",
+      "inputs": [
+        {
+          "keys": [
+            "images",
+            "source",
+            "streamingBehavior",
+            "text",
+            "type"
+          ],
+          "text": "I-SEAM initial task text",
+          "source": "interactive",
+          "images": 1
+        }
+      ],
+      "before": [
+        {
+          "text": "I-SEAM initial task text",
+          "images": 1
+        }
+      ],
+      "agentEntries": 1,
+      "normalized": [
+        {
+          "text": "I-SEAM initial task text\n\n[Image omitted: could not be resized below the inline image size limit.]",
+          "images": 0,
+          "order": [],
+          "corruptPresent": false
+        }
+      ],
+      "errors": [
+        "input"
+      ],
+      "commands": 0,
+      "preflight": [
+        "designated:started"
+      ],
+      "shutdowns": 0,
+      "returned": true
+    },
+    {
+      "label": "throw-before",
+      "inputs": [
+        {
+          "keys": [
+            "images",
+            "source",
+            "streamingBehavior",
+            "text",
+            "type"
+          ],
+          "text": "I-SEAM initial task text",
+          "source": "interactive",
+          "images": 1
+        }
+      ],
+      "before": [
+        {
+          "text": "I-SEAM initial task text",
+          "images": 1
+        }
+      ],
+      "agentEntries": 1,
+      "normalized": [
+        {
+          "text": "I-SEAM initial task text\n\n[Image omitted: could not be resized below the inline image size limit.]",
+          "images": 0,
+          "order": [],
+          "corruptPresent": false
+        }
+      ],
+      "errors": [
+        "before_agent_start"
+      ],
+      "commands": 0,
+      "preflight": [
+        "designated:started"
+      ],
+      "shutdowns": 0,
+      "returned": true
+    },
+    {
+      "label": "abort-before",
+      "inputs": [
+        {
+          "keys": [
+            "images",
+            "source",
+            "streamingBehavior",
+            "text",
+            "type"
+          ],
+          "text": "I-SEAM initial task text",
+          "source": "interactive",
+          "images": 1
+        }
+      ],
+      "before": [
+        {
+          "text": "I-SEAM initial task text",
+          "images": 1
+        }
+      ],
+      "agentEntries": 1,
+      "normalized": [
+        {
+          "text": "I-SEAM initial task text\n\n[Image omitted: could not be resized below the inline image size limit.]",
+          "images": 0,
+          "order": [],
+          "corruptPresent": false
+        }
+      ],
+      "errors": [],
+      "commands": 0,
+      "preflight": [
+        "designated:started"
+      ],
+      "shutdowns": 0,
+      "returned": true
+    },
+    {
+      "label": "shutdown-before",
+      "inputs": [
+        {
+          "keys": [
+            "images",
+            "source",
+            "streamingBehavior",
+            "text",
+            "type"
+          ],
+          "text": "I-SEAM initial task text",
+          "source": "interactive",
+          "images": 1
+        }
+      ],
+      "before": [
+        {
+          "text": "I-SEAM initial task text",
+          "images": 1
+        }
+      ],
+      "agentEntries": 1,
+      "normalized": [
+        {
+          "text": "I-SEAM initial task text\n\n[Image omitted: could not be resized below the inline image size limit.]",
+          "images": 0,
+          "order": [],
+          "corruptPresent": false
+        }
+      ],
+      "errors": [],
+      "commands": 0,
+      "preflight": [
+        "designated:started"
+      ],
+      "shutdowns": 1,
+      "returned": true
+    },
+    {
+      "label": "handled-early",
+      "inputs": [
+        {
+          "keys": [
+            "images",
+            "source",
+            "streamingBehavior",
+            "text",
+            "type"
+          ],
+          "text": "I-SEAM initial task text",
+          "source": "interactive",
+          "images": 1
+        }
+      ],
+      "before": [],
+      "agentEntries": 0,
+      "normalized": [],
+      "errors": [],
+      "commands": 0,
+      "preflight": [
+        "designated:handled"
+      ],
+      "shutdowns": 0,
+      "returned": true
+    },
+    {
+      "label": "late-transform",
+      "inputs": [
+        {
+          "keys": [
+            "images",
+            "source",
+            "streamingBehavior",
+            "text",
+            "type"
+          ],
+          "text": "I-SEAM initial task text",
+          "source": "interactive",
+          "images": 2
+        }
+      ],
+      "before": [
+        {
+          "text": "I-SEAM initial task text",
+          "images": 2
+        }
+      ],
+      "agentEntries": 1,
+      "normalized": [
+        {
+          "text": "I-SEAM initial task text\n\n[Image omitted: could not be resized below the inline image size limit.]",
+          "images": 1,
+          "order": [
+            0
+          ],
+          "corruptPresent": false
+        }
+      ],
+      "errors": [],
+      "commands": 0,
+      "preflight": [
+        "designated:started"
+      ],
+      "shutdowns": 0,
+      "returned": true
+    },
+    {
+      "label": "late-mutation",
+      "inputs": [
+        {
+          "keys": [
+            "images",
+            "source",
+            "streamingBehavior",
+            "text",
+            "type"
+          ],
+          "text": "I-SEAM initial task text",
+          "source": "interactive",
+          "images": 2
+        }
+      ],
+      "before": [
+        {
+          "text": "I-SEAM initial task text",
+          "images": 2
+        }
+      ],
+      "agentEntries": 1,
+      "normalized": [
+        {
+          "text": "I-SEAM initial task text\n\n[Image omitted: could not be resized below the inline image size limit.]",
+          "images": 1,
+          "order": [
+            0
+          ],
+          "corruptPresent": false
+        }
+      ],
+      "errors": [],
+      "commands": 0,
+      "preflight": [
+        "designated:started"
+      ],
+      "shutdowns": 0,
+      "returned": true
+    },
+    {
+      "label": "tight",
+      "inputs": [
+        {
+          "keys": [
+            "images",
+            "source",
+            "streamingBehavior",
+            "text",
+            "type"
+          ],
+          "text": "I-SEAM initial task text",
+          "source": "interactive",
+          "images": 2
+        }
+      ],
+      "before": [
+        {
+          "text": "I-SEAM initial task text",
+          "images": 2
+        }
+      ],
+      "agentEntries": 1,
+      "normalized": [
+        {
+          "text": "I-SEAM initial task text\n\n[Image omitted: could not be resized below the inline image size limit.]\n[Image omitted: could not be resized below the inline image size limit.]",
+          "images": 0,
+          "order": [],
+          "corruptPresent": false
+        }
+      ],
+      "errors": [],
+      "commands": 0,
+      "preflight": [
+        "designated:started"
+      ],
+      "shutdowns": 0,
+      "returned": true
+    },
+    {
+      "label": "late-profile",
+      "inputs": [
+        {
+          "keys": [
+            "images",
+            "source",
+            "streamingBehavior",
+            "text",
+            "type"
+          ],
+          "text": "I-SEAM initial task text",
+          "source": "interactive",
+          "images": 2
+        }
+      ],
+      "before": [
+        {
+          "text": "I-SEAM initial task text",
+          "images": 2
+        }
+      ],
+      "agentEntries": 1,
+      "normalized": [
+        {
+          "text": "I-SEAM initial task text\n\n[Image omitted: could not be resized below the inline image size limit.]\n[Image omitted: could not be resized below the inline image size limit.]",
+          "images": 0,
+          "order": [],
+          "corruptPresent": false
+        }
+      ],
+      "errors": [],
+      "commands": 0,
+      "preflight": [
+        "designated:started"
+      ],
+      "shutdowns": 0,
+      "returned": true
+    },
+    {
+      "label": "resize-off-corrupt",
+      "inputs": [
+        {
+          "keys": [
+            "images",
+            "source",
+            "streamingBehavior",
+            "text",
+            "type"
+          ],
+          "text": "I-SEAM initial task text",
+          "source": "interactive",
+          "images": 1
+        }
+      ],
+      "before": [
+        {
+          "text": "I-SEAM initial task text",
+          "images": 1
+        }
+      ],
+      "agentEntries": 1,
+      "normalized": [
+        {
+          "text": "I-SEAM initial task text",
+          "images": 1,
+          "order": [
+            -1
+          ],
+          "corruptPresent": true
+        }
+      ],
+      "errors": [],
+      "commands": 0,
+      "preflight": [
+        "designated:started"
+      ],
+      "shutdowns": 0,
+      "returned": true
+    },
+    {
+      "label": "command-bypass",
+      "inputs": [],
+      "before": [],
+      "agentEntries": 0,
+      "normalized": [],
+      "errors": [],
+      "commands": 1,
+      "preflight": [
+        "designated:handled"
+      ],
+      "shutdowns": 0,
+      "returned": true
+    },
+    {
+      "label": "template-expansion",
+      "inputs": [
+        {
+          "keys": [
+            "images",
+            "source",
+            "streamingBehavior",
+            "text",
+            "type"
+          ],
+          "text": "/i-seam-template argument",
+          "source": "interactive",
+          "images": 2
+        }
+      ],
+      "before": [
+        {
+          "text": "expanded argument",
+          "images": 2
+        }
+      ],
+      "agentEntries": 1,
+      "normalized": [
+        {
+          "text": "expanded argument",
+          "images": 2,
+          "order": [
+            0,
+            1
+          ],
+          "corruptPresent": false
+        }
+      ],
+      "errors": [],
+      "commands": 0,
+      "preflight": [
+        "designated:started"
+      ],
+      "shutdowns": 0,
+      "returned": true
+    }
+  ],
+  "sdkObservations": [
+    {
+      "label": "sdk-ordered-g1",
+      "task": "sdk-task",
+      "generation": 1,
+      "rejectedEarly": 4,
+      "fileReads": 1,
+      "guardedEntries": 1,
+      "realAgentEntries": 1,
+      "streamEntries": 1,
+      "offlineDelegations": 2,
+      "normalizedOrder": [
+        0,
+        1
+      ],
+      "finalOrder": [
+        0,
+        1
+      ],
+      "compactionRestored": true,
+      "continuationImages": 0
+    },
+    {
+      "label": "sdk-ordered-g2",
+      "task": "sdk-task",
+      "generation": 2,
+      "rejectedEarly": 4,
+      "fileReads": 1,
+      "guardedEntries": 1,
+      "realAgentEntries": 1,
+      "streamEntries": 1,
+      "offlineDelegations": 2,
+      "normalizedOrder": [
+        0,
+        1
+      ],
+      "finalOrder": [
+        0,
+        1
+      ],
+      "compactionRestored": true,
+      "continuationImages": 0
+    },
+    {
+      "label": "sdk-no-images",
+      "task": "sdk-task",
+      "generation": 1,
+      "rejectedEarly": 4,
+      "fileReads": 0,
+      "guardedEntries": 1,
+      "realAgentEntries": 1,
+      "streamEntries": 1,
+      "offlineDelegations": 2,
+      "normalizedOrder": [],
+      "finalOrder": [],
+      "compactionRestored": true,
+      "continuationImages": 0
+    },
+    {
+      "label": "sdk-stale-generation",
+      "task": "sdk-task",
+      "generation": 2,
+      "rejectedEarly": 4,
+      "fileReads": 1,
+      "guardedEntries": 0,
+      "realAgentEntries": 0,
+      "streamEntries": 0,
+      "offlineDelegations": 0,
+      "normalizedOrder": [],
+      "finalOrder": [],
+      "compactionRestored": true,
+      "failureStage": "generation_mismatch",
+      "error": "initial_images_rejected:generation_mismatch"
+    },
+    {
+      "label": "sdk-wrong-task",
+      "task": "sdk-task",
+      "generation": 1,
+      "rejectedEarly": 4,
+      "fileReads": 1,
+      "guardedEntries": 0,
+      "realAgentEntries": 0,
+      "streamEntries": 0,
+      "offlineDelegations": 0,
+      "normalizedOrder": [],
+      "finalOrder": [],
+      "compactionRestored": true,
+      "failureStage": "task_mismatch",
+      "error": "initial_images_rejected:task_mismatch"
+    },
+    {
+      "label": "sdk-corrupt",
+      "task": "sdk-task",
+      "generation": 1,
+      "rejectedEarly": 4,
+      "fileReads": 1,
+      "guardedEntries": 1,
+      "realAgentEntries": 0,
+      "streamEntries": 0,
+      "offlineDelegations": 0,
+      "normalizedOrder": [],
+      "finalOrder": [],
+      "compactionRestored": true,
+      "failureStage": "normalization_omitted_images",
+      "error": "initial_images_rejected:normalization_omitted_images"
+    },
+    {
+      "label": "sdk-resize-off",
+      "task": "sdk-task",
+      "generation": 1,
+      "rejectedEarly": 4,
+      "fileReads": 1,
+      "guardedEntries": 1,
+      "realAgentEntries": 0,
+      "streamEntries": 0,
+      "offlineDelegations": 0,
+      "normalizedOrder": [],
+      "finalOrder": [],
+      "compactionRestored": true,
+      "failureStage": "normalized_decode_failed",
+      "error": "initial_images_rejected:normalized_decode_failed"
+    },
+    {
+      "label": "sdk-tight",
+      "task": "sdk-task",
+      "generation": 1,
+      "rejectedEarly": 4,
+      "fileReads": 1,
+      "guardedEntries": 1,
+      "realAgentEntries": 0,
+      "streamEntries": 0,
+      "offlineDelegations": 0,
+      "normalizedOrder": [],
+      "finalOrder": [],
+      "compactionRestored": true,
+      "failureStage": "normalization_omitted_images",
+      "error": "initial_images_rejected:normalization_omitted_images"
+    },
+    {
+      "label": "sdk-late-profile",
+      "task": "sdk-task",
+      "generation": 1,
+      "rejectedEarly": 4,
+      "fileReads": 1,
+      "guardedEntries": 1,
+      "realAgentEntries": 0,
+      "streamEntries": 0,
+      "offlineDelegations": 0,
+      "normalizedOrder": [],
+      "finalOrder": [],
+      "compactionRestored": true,
+      "failureStage": "normalization_omitted_images",
+      "error": "initial_images_rejected:normalization_omitted_images"
+    },
+    {
+      "label": "sdk-late-transform",
+      "task": "sdk-task",
+      "generation": 1,
+      "rejectedEarly": 4,
+      "fileReads": 1,
+      "guardedEntries": 1,
+      "realAgentEntries": 0,
+      "streamEntries": 0,
+      "offlineDelegations": 0,
+      "normalizedOrder": [],
+      "finalOrder": [],
+      "compactionRestored": true,
+      "failureStage": "normalization_omitted_images",
+      "error": "initial_images_rejected:normalization_omitted_images"
+    },
+    {
+      "label": "sdk-late-mutation",
+      "task": "sdk-task",
+      "generation": 1,
+      "rejectedEarly": 4,
+      "fileReads": 1,
+      "guardedEntries": 1,
+      "realAgentEntries": 0,
+      "streamEntries": 0,
+      "offlineDelegations": 0,
+      "normalizedOrder": [],
+      "finalOrder": [],
+      "compactionRestored": true,
+      "failureStage": "normalization_omitted_images",
+      "error": "initial_images_rejected:normalization_omitted_images"
+    },
+    {
+      "label": "sdk-late-reorder",
+      "task": "sdk-task",
+      "generation": 1,
+      "rejectedEarly": 4,
+      "fileReads": 1,
+      "guardedEntries": 1,
+      "realAgentEntries": 0,
+      "streamEntries": 0,
+      "offlineDelegations": 0,
+      "normalizedOrder": [],
+      "finalOrder": [],
+      "compactionRestored": true,
+      "failureStage": "normalized_image_changed",
+      "error": "initial_images_rejected:normalized_image_changed"
+    },
+    {
+      "label": "sdk-input-drop",
+      "task": "sdk-task",
+      "generation": 1,
+      "rejectedEarly": 4,
+      "fileReads": 1,
+      "guardedEntries": 1,
+      "realAgentEntries": 0,
+      "streamEntries": 0,
+      "offlineDelegations": 0,
+      "normalizedOrder": [],
+      "finalOrder": [],
+      "compactionRestored": true,
+      "failureStage": "normalization_omitted_images",
+      "error": "initial_images_rejected:normalization_omitted_images"
+    },
+    {
+      "label": "sdk-context-drop",
+      "task": "sdk-task",
+      "generation": 1,
+      "rejectedEarly": 4,
+      "fileReads": 1,
+      "guardedEntries": 1,
+      "realAgentEntries": 1,
+      "streamEntries": 1,
+      "offlineDelegations": 0,
+      "normalizedOrder": [
+        0,
+        1
+      ],
+      "finalOrder": [],
+      "compactionRestored": true,
+      "failureStage": "final_context_changed",
+      "error": "initial_images_rejected:final_context_changed"
+    },
+    {
+      "label": "sdk-context-reorder",
+      "task": "sdk-task",
+      "generation": 1,
+      "rejectedEarly": 4,
+      "fileReads": 1,
+      "guardedEntries": 1,
+      "realAgentEntries": 1,
+      "streamEntries": 1,
+      "offlineDelegations": 0,
+      "normalizedOrder": [
+        0,
+        1
+      ],
+      "finalOrder": [],
+      "compactionRestored": true,
+      "failureStage": "final_context_changed",
+      "error": "initial_images_rejected:final_context_changed"
+    },
+    {
+      "label": "sdk-convert-drop",
+      "task": "sdk-task",
+      "generation": 1,
+      "rejectedEarly": 4,
+      "fileReads": 1,
+      "guardedEntries": 1,
+      "realAgentEntries": 1,
+      "streamEntries": 1,
+      "offlineDelegations": 0,
+      "normalizedOrder": [
+        0,
+        1
+      ],
+      "finalOrder": [],
+      "compactionRestored": true,
+      "failureStage": "final_context_changed",
+      "error": "initial_images_rejected:final_context_changed"
+    },
+    {
+      "label": "sdk-request-profile",
+      "task": "sdk-task",
+      "generation": 1,
+      "rejectedEarly": 4,
+      "fileReads": 1,
+      "guardedEntries": 1,
+      "realAgentEntries": 1,
+      "streamEntries": 1,
+      "offlineDelegations": 0,
+      "normalizedOrder": [
+        0,
+        1
+      ],
+      "finalOrder": [],
+      "compactionRestored": true,
+      "failureStage": "final_model_image_limits_changed",
+      "error": "initial_images_rejected:final_model_image_limits_changed"
+    },
+    {
+      "label": "sdk-request-text-only",
+      "task": "sdk-task",
+      "generation": 1,
+      "rejectedEarly": 4,
+      "fileReads": 1,
+      "guardedEntries": 1,
+      "realAgentEntries": 1,
+      "streamEntries": 1,
+      "offlineDelegations": 0,
+      "normalizedOrder": [
+        0,
+        1
+      ],
+      "finalOrder": [],
+      "compactionRestored": true,
+      "failureStage": "final_context_changed",
+      "error": "initial_images_rejected:final_context_changed"
+    },
+    {
+      "label": "sdk-handled",
+      "task": "sdk-task",
+      "generation": 1,
+      "rejectedEarly": 4,
+      "fileReads": 1,
+      "guardedEntries": 0,
+      "realAgentEntries": 0,
+      "streamEntries": 0,
+      "offlineDelegations": 0,
+      "normalizedOrder": [],
+      "finalOrder": [],
+      "compactionRestored": true,
+      "failureStage": "initial_call_not_started",
+      "error": "initial_images_rejected:initial_call_not_started"
+    }
+  ],
+  "sdkBoundary": "An exclusive, generation-checked SDK call decorates public Agent.prompt with a real guard that delegates accepted calls. Actual Pi normalization omissions, corrupt decode with resizing disabled, and input reordering fail before original Agent.prompt. A public streamFunction guard rejects late context/conversion changes and effective model image limits with an explicit error stream before any delegate, preserving Agent settlement.",
+  "interactiveBoundary": "Exported AgentSessionRuntime and InteractiveMode constructed offline; public runtime.newSession replacement and disposal executed. init/run and retained pane CLI lifecycle traced in source only; no terminal/herdr integration claimed.",
+  "rpcBoundary": "RPC prompt has structured images and response id; command handling forwards to the same AgentSession.prompt normalization. Source-only: raw RPC retains omission-and-continue behavior; it is not the SDK guard or a pane replacement.",
+  "limitations": "Initial preflight auto-compaction is temporarily suspended and restored. Fixtures prove ordered PNG inputs; the guard uses public resizeImage and conservatively rejects other normalization output not reproduced by it, so all MIME conversion variants are not established. Provider-specific payload conversion and real TTY/pane integration were not executed. File modes are requested in an isolated sandbox; Windows ACL/privacy guarantees and complete downstream transport are not established. Failed calls keep ordinary prompt entry closed; production lifecycle wiring must publish generation-scoped failure. Runtime session replacement must reinstall session-local guards.",
+  "sources": [
+    {
+      "locator": "E:\\Projects\\pi-packages\\node_modules\\.bun\\@earendil-works+pi-coding-agent@0.99.2+d7028e23c0a6b244\\node_modules\\@earendil-works\\pi-coding-agent\\dist\\core\\agent-session.js",
+      "title": "dist/core/agent-session.js",
+      "claim": "Actual normalization omissions append hints and still enter agent.prompt; the start hook precedes normalization.",
+      "accessed": "2026-10-05T15:23:55.988Z",
+      "scope": "Installed unbundled SDK declarations/source and fixture-observed AgentSession path; no provider execution.",
+      "sha256": "4da636cea504ccec903c7b39f5eb1553f4f64469408f06e5b7938c7682b131d1",
+      "support": [
+        {
+          "anchor": "async _runInputHandlers(",
+          "line": 1414
+        },
+        {
+          "anchor": "async _normalizePromptImages(",
+          "line": 1427
+        },
+        {
+          "anchor": "async prompt(text, options)",
+          "line": 1455
+        },
+        {
+          "anchor": "emitBeforeAgentStart(expandedText",
+          "line": 1529
+        },
+        {
+          "anchor": "const normalized = await this._normalizePromptImages",
+          "line": 1537
+        },
+        {
+          "anchor": "preflightResult?.(\"started\")",
+          "line": 1568
+        },
+        {
+          "anchor": "await this.agent.prompt(messages)",
+          "line": 1328
+        }
+      ]
+    },
+    {
+      "locator": "E:\\Projects\\pi-packages\\node_modules\\.bun\\@earendil-works+pi-coding-agent@0.99.2+d7028e23c0a6b244\\node_modules\\@earendil-works\\pi-coding-agent\\dist\\core\\extensions\\runner.js",
+      "title": "dist/core/extensions/runner.js",
+      "claim": "Input/start handler exceptions are caught and logged; input handled alone short-circuits before normalization.",
+      "accessed": "2026-10-05T15:23:55.988Z",
+      "scope": "Installed unbundled SDK declarations/source and fixture-observed AgentSession path; no provider execution.",
+      "sha256": "7583772d6d29a23c06496b6e0b4764ace220fb4289d5523916323642efa50306",
+      "support": [
+        {
+          "anchor": "async emitBeforeAgentStart(",
+          "line": 1115
+        },
+        {
+          "anchor": "async emitInput(",
+          "line": 1196
+        }
+      ]
+    },
+    {
+      "locator": "E:\\Projects\\pi-packages\\node_modules\\.bun\\@earendil-works+pi-coding-agent@0.99.2+d7028e23c0a6b244\\node_modules\\@earendil-works\\pi-coding-agent\\dist\\core\\extensions\\types.d.ts",
+      "title": "dist/core/extensions/types.d.ts",
+      "claim": "InputEvent exposes text/images/source/streamingBehavior, with no designated task/generation identity or post-normalization rejection result.",
+      "accessed": "2026-10-05T15:23:55.988Z",
+      "scope": "Installed unbundled SDK declarations/source and fixture-observed AgentSession path; no provider execution.",
+      "sha256": "6c78c89ad1ffb421e81ff0ad11ceff1a635b21fd818a32aa3e87009392298d9f",
+      "support": [
+        {
+          "anchor": "export interface BeforeAgentStartEvent",
+          "line": 693
+        },
+        {
+          "anchor": "export interface InputEvent",
+          "line": 867
+        },
+        {
+          "anchor": "export type InputEventResult",
+          "line": 879
+        }
+      ]
+    },
+    {
+      "locator": "E:\\Projects\\pi-packages\\node_modules\\.bun\\@earendil-works+pi-coding-agent@0.99.2+d7028e23c0a6b244\\node_modules\\@earendil-works\\pi-coding-agent\\dist\\core\\agent-session.d.ts",
+      "title": "dist/core/agent-session.d.ts",
+      "claim": "Public readonly session.agent exposes a mutable Agent; normalization remains private and preflightResult lacks normalized content/failure. Public auto-compaction control prevents resume compaction before validation.",
+      "accessed": "2026-10-05T15:23:55.988Z",
+      "scope": "Installed unbundled SDK declarations/source and fixture-observed AgentSession path; no provider execution.",
+      "sha256": "54beba962cf8fc6591c4ff904da3be25b62f8f49b1e517521fa364dee4287a95",
+      "support": [
+        {
+          "anchor": "export interface PromptOptions",
+          "line": 165
+        },
+        {
+          "anchor": "private _normalizePromptImages",
+          "line": 487
+        },
+        {
+          "anchor": "readonly agent: Agent;",
+          "line": 209
+        },
+        {
+          "anchor": "setAutoCompactionEnabled(enabled: boolean)",
+          "line": 715
+        }
+      ]
+    },
+    {
+      "locator": "E:\\Projects\\pi-packages\\node_modules\\.bun\\@earendil-works+pi-coding-agent@0.99.2+d7028e23c0a6b244\\node_modules\\@earendil-works\\pi-coding-agent\\dist\\utils\\image-process.js",
+      "title": "dist/utils/image-process.js",
+      "claim": "Resize rejection returns ok:false; supported MIME bytes bypass decode when autoResize is disabled.",
+      "accessed": "2026-10-05T15:23:55.988Z",
+      "scope": "Installed unbundled SDK declarations/source and fixture-observed AgentSession path; no provider execution.",
+      "sha256": "275b252679b76476d7f83042a9771c77d46321b9d7a3e20e1f8365b2eff2254e",
+      "support": [
+        {
+          "anchor": "export async function processImage",
+          "line": 41
+        },
+        {
+          "anchor": "if (!resized)",
+          "line": 52
+        }
+      ]
+    },
+    {
+      "locator": "E:\\Projects\\pi-packages\\node_modules\\.bun\\@earendil-works+pi-coding-agent@0.99.2+d7028e23c0a6b244\\node_modules\\@earendil-works\\pi-coding-agent\\dist\\utils\\image-resize-core.js",
+      "title": "dist/utils/image-resize-core.js",
+      "claim": "Actual decode failure or impossible selected-model resize limit returns null.",
+      "accessed": "2026-10-05T15:23:55.988Z",
+      "scope": "Installed unbundled SDK declarations/source and fixture-observed AgentSession path; no provider execution.",
+      "sha256": "5f6f1464c21e196a5742b943a403aa843fb319c9d2ff024ca04bb809a18de261",
+      "support": [
+        {
+          "anchor": "export async function resizeImageInProcess",
+          "line": 32
+        },
+        {
+          "anchor": "return null;",
+          "line": 37
+        }
+      ]
+    },
+    {
+      "locator": "E:\\Projects\\pi-packages\\node_modules\\.bun\\@earendil-works+pi-coding-agent@0.99.2+d7028e23c0a6b244\\node_modules\\@earendil-works\\pi-coding-agent\\dist\\core\\sdk.d.ts",
+      "title": "dist/core/sdk.d.ts",
+      "claim": "SDK supports direct prompt ownership; CreateAgentSessionOptions has no prompt-normalization rejection callback.",
+      "accessed": "2026-10-05T15:23:55.988Z",
+      "scope": "Installed unbundled SDK declarations/source and fixture-observed AgentSession path; no provider execution.",
+      "sha256": "3996770d9332e2b290e7b8908dc7b24b0a99a49c9f498fc0b0771f4a5268b0c0",
+      "support": [
+        {
+          "anchor": "export interface CreateAgentSessionOptions",
+          "line": 10
+        }
+      ]
+    },
+    {
+      "locator": "E:\\Projects\\pi-packages\\node_modules\\.bun\\@earendil-works+pi-coding-agent@0.99.2+d7028e23c0a6b244\\node_modules\\@earendil-works\\pi-coding-agent\\dist\\index.d.ts",
+      "title": "dist/index.d.ts",
+      "claim": "Package root exports the SDK, AgentSessionRuntime and InteractiveMode used by this executable fixture.",
+      "accessed": "2026-10-05T15:23:55.988Z",
+      "scope": "Installed unbundled SDK declarations/source and fixture-observed AgentSession path; no provider execution.",
+      "sha256": "2e61905fd674c4b6d30376813fbd44e947a0dfd4891d391d87a94967a4b3fcc7",
+      "support": [
+        {
+          "anchor": "createAgentSession",
+          "line": 20
+        },
+        {
+          "anchor": "AgentSessionRuntime",
+          "line": 20
+        },
+        {
+          "anchor": "InteractiveMode",
+          "line": 35
+        }
+      ]
+    },
+    {
+      "locator": "E:\\Projects\\pi-packages\\node_modules\\.bun\\@earendil-works+pi-coding-agent@0.99.2+d7028e23c0a6b244\\node_modules\\@earendil-works\\pi-coding-agent\\dist\\core\\agent-session-runtime.d.ts",
+      "title": "dist/core/agent-session-runtime.d.ts",
+      "claim": "Public runtime owns replaceable sessions, rebind callbacks, new/switch session and disposal.",
+      "accessed": "2026-10-05T15:23:55.988Z",
+      "scope": "Installed unbundled SDK declarations/source and fixture-observed AgentSession path; no provider execution.",
+      "sha256": "4a18c0f51669b62a297c83334731c8bb5fed58016619a14d42edce414ff8d105",
+      "support": [
+        {
+          "anchor": "setRebindSession(",
+          "line": 58
+        },
+        {
+          "anchor": "newSession(",
+          "line": 80
+        },
+        {
+          "anchor": "switchSession(",
+          "line": 73
+        },
+        {
+          "anchor": "dispose()",
+          "line": 104
+        }
+      ]
+    },
+    {
+      "locator": "E:\\Projects\\pi-packages\\node_modules\\.bun\\@earendil-works+pi-coding-agent@0.99.2+d7028e23c0a6b244\\node_modules\\@earendil-works\\pi-coding-agent\\dist\\modes\\interactive\\interactive-mode.d.ts",
+      "title": "dist/modes/interactive/interactive-mode.d.ts",
+      "claim": "InteractiveMode accepts AgentSessionRuntime and exposes init/run; terminal integration was not executed.",
+      "accessed": "2026-10-05T15:23:55.988Z",
+      "scope": "Installed unbundled SDK declarations/source and fixture-observed AgentSession path; no provider execution.",
+      "sha256": "f0b0cfa6a277a38fc699c342355cbadc099f26e2dab155e31978dff57efc3c96",
+      "support": [
+        {
+          "anchor": "constructor(runtimeHost: AgentSessionRuntime",
+          "line": 129
+        },
+        {
+          "anchor": "init(): Promise<void>",
+          "line": 139
+        },
+        {
+          "anchor": "run(): Promise<void>",
+          "line": 148
+        }
+      ]
+    },
+    {
+      "locator": "E:\\Projects\\pi-packages\\node_modules\\.bun\\@earendil-works+pi-coding-agent@0.99.2+d7028e23c0a6b244\\node_modules\\@earendil-works\\pi-coding-agent\\dist\\modes\\interactive\\interactive-mode.js",
+      "title": "dist/modes/interactive/interactive-mode.js",
+      "claim": "Interactive mode rebinds extensions on runtime replacement, sends initial images via session.prompt, and uses the same session.prompt for later input.",
+      "accessed": "2026-10-05T15:23:55.988Z",
+      "scope": "Installed unbundled SDK declarations/source and fixture-observed AgentSession path; no provider execution.",
+      "sha256": "20637835b51c2a33f1c152d94a875d28d762bd99ba27d6679c2c538ab9028276",
+      "support": [
+        {
+          "anchor": "this.runtimeHost.setRebindSession(",
+          "line": 345
+        },
+        {
+          "anchor": "images: initialImages",
+          "line": 862
+        },
+        {
+          "anchor": "await this.session.prompt(userInput)",
+          "line": 884
+        }
+      ]
+    },
+    {
+      "locator": "E:\\Projects\\pi-packages\\node_modules\\.bun\\@earendil-works+pi-coding-agent@0.99.2+d7028e23c0a6b244\\node_modules\\@earendil-works\\pi-coding-agent\\dist\\modes\\rpc\\rpc-types.d.ts",
+      "title": "dist/modes/rpc/rpc-types.d.ts",
+      "claim": "Public RPC commands carry structured ImageContent[] and response correlation ids, not Herdr task/generation identity.",
+      "accessed": "2026-10-05T15:23:55.988Z",
+      "scope": "Installed unbundled SDK declarations/source and fixture-observed AgentSession path; no provider execution.",
+      "sha256": "68b6dc2e47a3969c09c961a40d0462473407b6786f3bd02715fa035e816e2af1",
+      "support": [
+        {
+          "anchor": "images?: ImageContent[]",
+          "line": 18
+        },
+        {
+          "anchor": "id?: string",
+          "line": 15
+        }
+      ]
+    },
+    {
+      "locator": "E:\\Projects\\pi-packages\\node_modules\\.bun\\@earendil-works+pi-coding-agent@0.99.2+d7028e23c0a6b244\\node_modules\\@earendil-works\\pi-coding-agent\\dist\\modes\\rpc\\rpc-mode.js",
+      "title": "dist/modes/rpc/rpc-mode.js",
+      "claim": "RPC forwards images into the same session.prompt and acknowledges preflight before Agent entry; errors after that acknowledgement do not become prompt error responses.",
+      "accessed": "2026-10-05T15:23:55.988Z",
+      "scope": "Installed unbundled SDK declarations/source and fixture-observed AgentSession path; no provider execution.",
+      "sha256": "631697cd35928fc827f4a423538c43ff227b8cbf63c2a2f11060616f55eba6db",
+      "support": [
+        {
+          "anchor": "case \"prompt\"",
+          "line": 298
+        },
+        {
+          "anchor": "images: command.images",
+          "line": 304
+        },
+        {
+          "anchor": "if (!preflightSucceeded)",
+          "line": 313
+        }
+      ]
+    },
+    {
+      "locator": "E:\\Projects\\pi-packages\\node_modules\\.bun\\@earendil-works+pi-coding-agent@0.99.2+d7028e23c0a6b244\\node_modules\\@earendil-works\\pi-agent-core\\dist\\agent.d.ts",
+      "title": "../pi-agent-core/dist/agent.d.ts",
+      "claim": "Public mutable prompt, transformContext, convertToLlm and streamFunction allow a real delegating SDK guard; this is not a private normalization patch.",
+      "accessed": "2026-10-05T15:23:55.988Z",
+      "scope": "Installed unbundled SDK declarations/source and fixture-observed AgentSession path; no provider execution.",
+      "sha256": "1ae9fb28e132a7d0c545c96b69bca5a69db1374695853d12921bc623709a7589",
+      "support": [
+        {
+          "anchor": "convertToLlm:",
+          "line": 41
+        },
+        {
+          "anchor": "transformContext?:",
+          "line": 10
+        },
+        {
+          "anchor": "streamFunction: StreamFn",
+          "line": 43
+        },
+        {
+          "anchor": "prompt(message: AgentMessage | AgentMessage[])",
+          "line": 116
+        },
+        {
+          "anchor": "prompt(input: string, images?: ImageContent[])",
+          "line": 117
+        }
+      ]
+    },
+    {
+      "locator": "E:\\Projects\\pi-packages\\node_modules\\.bun\\@earendil-works+pi-coding-agent@0.99.2+d7028e23c0a6b244\\node_modules\\@earendil-works\\pi-agent-core\\dist\\agent-loop.js",
+      "title": "../pi-agent-core/dist/agent-loop.js",
+      "claim": "Context transformation/conversion and request preparation precede streamFunction; an error event stream safely terminates the real Agent without executing its delegate.",
+      "accessed": "2026-10-05T15:23:55.988Z",
+      "scope": "Installed unbundled SDK declarations/source and fixture-observed AgentSession path; no provider execution.",
+      "sha256": "65def8c7f3fa01e38fe05467520efc8673c22ea8197833a3b04b29c8a60cb1e3",
+      "support": [
+        {
+          "anchor": "config.transformContext",
+          "line": 263
+        },
+        {
+          "anchor": "config.convertToLlm",
+          "line": 267
+        },
+        {
+          "anchor": "await streamFunction(",
+          "line": 271
+        }
+      ]
+    },
+    {
+      "locator": "E:\\Projects\\pi-packages\\node_modules\\.bun\\@earendil-works+pi-coding-agent@0.99.2+d7028e23c0a6b244\\node_modules\\@earendil-works\\pi-ai\\dist\\types.d.ts",
+      "title": "../pi-ai/dist/types.d.ts",
+      "claim": "The declared UserMessage timestamp carries the unique invocation marker through persisted projection copies; initial ownership is established before this marker is assigned.",
+      "accessed": "2026-10-05T15:23:55.988Z",
+      "scope": "Installed unbundled SDK declarations/source and fixture-observed AgentSession path; no provider execution.",
+      "sha256": "7e6a457a6f60029187b722456fa883d4eb6e5219f871c65bba323c1f8bb4eca2",
+      "support": [
+        {
+          "anchor": "export interface UserMessage {\n    role: \"user\";\n    content: string | (TextContent | ImageContent)[];\n    timestamp: number;",
+          "line": 367
+        }
+      ]
+    }
+  ]
+}
+
+(pass) I-SEAM preserves stock-hook evidence and verifies an owned SDK boundary offline [3540.91ms]

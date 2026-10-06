@@ -1258,6 +1258,93 @@ describe("Result settlement integrity", () => {
   });
 });
 
+describe("recovery performance", () => {
+  const timestamp = "2026-08-16T00:00:00.000Z";
+  function seed(root: string, subagentId: string, status: "completed" | "failed" | "cancelled", withResult = true) {
+    const artifactDir = join(root, "tasks", `${subagentId}-artifacts`);
+    mkdirSync(artifactDir, { recursive: true });
+    const error = status === "failed" ? "original failure" : undefined;
+    const manifestPath = join(artifactDir, "task.json");
+    writeFileSync(manifestPath, JSON.stringify({
+      version: 2, subagentId, taskSlug: subagentId, generation: 1, agent: "handler", cwd: "/repo", label: subagentId,
+      sessionFile: join(root, "tasks", `${subagentId}-g1.jsonl`), status, queuedAt: timestamp, updatedAt: timestamp,
+      ...(error ? { error } : {}), opaque: { keep: [1, null] },
+      surfaceCleanups: [{ generation: 1, status: "identity_missing", attemptedAt: timestamp, future: { keep: true } }],
+    }, null, 2));
+    const resultPath = join(artifactDir, "result-1.json");
+    if (withResult) writeFileSync(resultPath, JSON.stringify({ subagentId, generation: 1, status,
+      ...(status === "completed" ? { result: "retained result" } : {}), ...(error ? { error } : {}),
+    }));
+    return { manifestPath, resultPath };
+  }
+
+  test("unchanged terminal recovery preserves manifest bytes and timestamps without writes", async () => {
+    const root = mkdtempSync(join(tmpdir(), "subagents-recovery-performance-"));
+    const files = [seed(root, "completed", "completed"), seed(root, "failed", "failed"), seed(root, "cancelled", "cancelled"), seed(root, "synthetic", "failed", false)];
+    const before = files.map(file => readFileSync(file.manifestPath, "utf8"));
+    const notifications: CompletionNotification[] = [];
+    const { transport, calls } = fakeTransport();
+    const runtime = new SubagentRuntime(transport, handlerRegistry(), root, value => { notifications.push(value); });
+    const writes = spyOn(fs, "renameSync");
+    try {
+      for (let pass = 0; pass < 2; pass++) {
+        await runtime.recover("/repo");
+        expect(runtime.listTasks()).toHaveLength(4);
+        expect(files.map(file => readFileSync(file.manifestPath, "utf8"))).toEqual(before);
+        expect(runtime.listTasks().every(task => task.updatedAt === timestamp)).toBeTrue();
+      }
+      expect(writes.mock.calls.filter(([, path]) => String(path).endsWith("task.json"))).toHaveLength(0);
+      expect(runtime.inspect("completed").result).toBe("retained result");
+      expect(notifications).toHaveLength(8); // Replay remains eligible without a parent-branch acknowledgement.
+      expect(calls).toEqual([]);
+      writeFileSync(files[0]!.resultPath, JSON.stringify({ subagentId: "completed", generation: 1, status: "failed", error: "late Result" }));
+      seed(root, "new-task", "cancelled");
+      await runtime.recover("/repo");
+      expect(runtime.listTasks()).toHaveLength(5);
+      expect(runtime.inspect("completed")).toMatchObject({ status: "failed", error: "late Result", result: undefined });
+      const changed = JSON.parse(readFileSync(files[0]!.manifestPath, "utf8"));
+      expect(changed.updatedAt).not.toBe(timestamp);
+      expect(changed.opaque).toEqual({ keep: [1, null] });
+      expect(writes.mock.calls.filter(([, path]) => String(path) === files[0]!.manifestPath)).toHaveLength(1);
+    } finally { writes.mockRestore(); runtime.stop(); rmSync(root, { recursive: true, force: true }); }
+  });
+
+  test("no-image recovery bypasses recursive image checks but explicit removal retains them", async () => {
+    const root = mkdtempSync(join(tmpdir(), "subagents-image-discovery-performance-"));
+    seed(root, "task", "completed");
+    const runtime = new SubagentRuntime(fakeTransport().transport, handlerRegistry(), root);
+    const checks = spyOn(fs, "realpathSync");
+    try {
+      await runtime.recover("/repo");
+      expect(checks.mock.calls.filter(([path]) => String(path) === root)).toHaveLength(0);
+      await runtime.remove("task");
+      expect(checks.mock.calls.filter(([path]) => String(path) === root).length).toBeGreaterThan(0);
+    } finally { checks.mockRestore(); runtime.stop(); rmSync(root, { recursive: true, force: true }); }
+  });
+
+  test("recovery discovers an image orphan after a previous candidate-free recovery", async () => {
+    const root = mkdtempSync(join(tmpdir(), "subagents-image-late-orphan-"));
+    const file = seed(root, "task", "completed");
+    const runtime = new SubagentRuntime(fakeTransport().transport, handlerRegistry(), root);
+    const publisher = new SubagentRuntime(fakeTransport().transport, handlerRegistry(), root);
+    try {
+      await runtime.recover("/repo");
+      await publisher.recover("/repo");
+      await publisher["publishImageInput"](publisher.inspect("task"), [{ type: "image", data: "AQ==", mimeType: "image/png" }]);
+      const directory = join(dirname(file.resultPath), "image-input-1");
+      expect(existsSync(directory)).toBeTrue();
+      const before = readFileSync(file.manifestPath, "utf8");
+      const checks = spyOn(fs, "realpathSync");
+      try {
+        await runtime.recover("/repo");
+        expect(existsSync(directory)).toBeFalse();
+        expect(checks.mock.calls.filter(([path]) => String(path) === root).length).toBeGreaterThan(0);
+        expect(readFileSync(file.manifestPath, "utf8")).toBe(before);
+      } finally { checks.mockRestore(); }
+    } finally { runtime.stop(); publisher.stop(); rmSync(root, { recursive: true, force: true }); }
+  }, 30_000);
+});
+
 describe("pi-herdr-subagents runtime", () => {
   test("parses Herdr tab create identities", async () => {
     const client = createHerdrClient(async () => ({

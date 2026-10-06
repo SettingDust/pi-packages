@@ -59,7 +59,13 @@ Recovery must use the following state precedence for a valid record:
 
 Before committing a synthetic failure and again after awaited work before cleanup or notification, recovery must recheck the current generation Result and apply the first two precedence rules if one has appeared. It must not overwrite a valid Result. Within the owning runtime, concurrent launch, Result-monitor, and recovery settlement triggers for a generation must converge rather than publish competing terminal effects. These rechecks do not promise an atomic winner between independent processes or immutable first publication by independent writers.
 
-After each successful recovery, the runtime must persist the reconstructed state, start monitoring only for running tasks, and deliver any pending terminal notification. A Phase B runtime must first reconcile section 10 cleanup records for terminal generations. Recovery must not create a new pane, replace a stable task identity, alter a retained canonical slug, or overwrite a current generation with a stale Result.
+After each successful recovery, the runtime must make changed reconstructed state durable, start monitoring only for running tasks, and deliver any pending terminal notification. A Phase B runtime must first reconcile section 10 cleanup records for terminal generations. Recovery must not create a new pane, replace a stable task identity, alter a retained canonical slug, or overwrite a current generation with a stale Result.
+
+### 3.2.1 Recovery Without Redundant Writes
+
+Recovery must still discover and validate the selected disk scope on every invocation; a same-scope shortcut must not hide a new task, changed generation, or late Result. For a validated V2 terminal manifest whose owned persistent state and recognized cleanup records remain unchanged after reconciliation, recovery must preserve `updatedAt` and must not rewrite `task.json`. Loading an already matching Result into memory alone is not a new terminal transition. V1 migration, changed terminal status/error, missing cleanup intent, and pending/failed cleanup retries must still persist their required changes before effects. Unknown manifest fields remain preserved under section 3.1.
+
+This write avoidance must retain Result precedence and rechecks after awaited work, same-runtime operation coalescing, bounded surface/image cleanup retries, terminal notification replay, and the final task-update observation. It must not use notification success, prior in-memory task state, or a permanently cached Result as evidence that the on-disk task scope can be skipped. The bounded delivery and evidence are tracked in [Recovery performance Work](../works/recovery-performance/work.md).
 
 ### 3.3 Launch Failure And Durable Settlement
 

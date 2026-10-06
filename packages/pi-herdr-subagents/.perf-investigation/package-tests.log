@@ -1,0 +1,1848 @@
+bun test v1.4.2 (744846f84)
+bun : 
+所在位置 E:\Projects\pi-packages\packages\pi-herdr-subagents\.perf-investigation\run-package-tests.ps1:3 字符: 1
++ bun test *> .perf-investigation/package-tests.log
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+tests\image-input.test.ts:
+{
+  "status": "completed",
+  "stockCliStatus": "blocked",
+  "packageRoot": "E:\\Projects\\pi-packages\\node_modules\\.bun\\@earendil-works+pi-coding-agent@0.99.2+d7028e23c0a6b244\\node_modules\\@earendil-works\\pi-coding-agent",
+  "version": "0.99.2",
+  "checkedAt": "2026-10-05T15:28:33.171Z",
+  "validPredecode": [
+    1,
+    1
+  ],
+  "corruptPredecode": null,
+  "instrumentation": "stock CLI observations only: native AgentSession.prompt stops at an observation-only agent.prompt replacement. Separate sdkObservations execute original Agent.prompt with a real delegating guard and a test-only offline provider stream.",
+  "association": "InputEvent has no task/generation/designated-input identity; identical early, designated, and later interactive calls yield identical events.",
+  "blocker": "Normalization omits rejected images and still enters agent.prompt; before_agent_start is earlier, its throws are swallowed, and public preflightResult exposes only started/handled/queued, not normalization success or content. No supported fail-closed post-normalization package hook is exposed on this path.",
+  "providerCalls": 0,
+  "networkAttempts": 0,
+  "observations": [
+    {
+      "label": "ordered-g1",
+      "inputs": [
+        {
+          "keys": [
+            "images",
+            "source",
+            "streamingBehavior",
+            "text",
+            "type"
+          ],
+          "text": "I-SEAM initial task text",
+          "source": "interactive",
+          "images": 2
+        }
+      ],
+      "before": [
+        {
+          "text": "I-SEAM initial task text",
+          "images": 2
+        }
+      ],
+      "agentEntries": 1,
+      "normalized": [
+        {
+          "text": "I-SEAM initial task text",
+          "images": 2,
+          "order": [
+            0,
+            1
+          ],
+          "corruptPresent": false
+        }
+      ],
+      "errors": [],
+      "commands": 0,
+      "preflight": [
+        "designated:started"
+      ],
+      "shutdowns": 0,
+      "returned": true
+    },
+    {
+      "label": "ordered-g2",
+      "inputs": [
+        {
+          "keys": [
+            "images",
+            "source",
+            "streamingBehavior",
+            "text",
+            "type"
+          ],
+          "text": "I-SEAM initial task text",
+          "source": "interactive",
+          "images": 2
+        }
+      ],
+      "before": [
+        {
+          "text": "I-SEAM initial task text",
+          "images": 2
+        }
+      ],
+      "agentEntries": 1,
+      "normalized": [
+        {
+          "text": "I-SEAM initial task text",
+          "images": 2,
+          "order": [
+            0,
+            1
+          ],
+          "corruptPresent": false
+        }
+      ],
+      "errors": [],
+      "commands": 0,
+      "preflight": [
+        "designated:started"
+      ],
+      "shutdowns": 0,
+      "returned": true
+    },
+    {
+      "label": "early-unrelated",
+      "inputs": [
+        {
+          "keys": [
+            "images",
+            "source",
+            "streamingBehavior",
+            "text",
+            "type"
+          ],
+          "text": "I-SEAM initial task text",
+          "source": "extension",
+          "images": 0
+        },
+        {
+          "keys": [
+            "images",
+            "source",
+            "streamingBehavior",
+            "text",
+            "type"
+          ],
+          "text": "I-SEAM initial task text",
+          "source": "rpc",
+          "images": 0
+        },
+        {
+          "keys": [
+            "images",
+            "source",
+            "streamingBehavior",
+            "text",
+            "type"
+          ],
+          "text": "I-SEAM initial task text",
+          "source": "interactive",
+          "images": 0
+        },
+        {
+          "keys": [
+            "images",
+            "source",
+            "streamingBehavior",
+            "text",
+            "type"
+          ],
+          "text": "I-SEAM initial task text",
+          "source": "interactive",
+          "images": 0
+        },
+        {
+          "keys": [
+            "images",
+            "source",
+            "streamingBehavior",
+            "text",
+            "type"
+          ],
+          "text": "I-SEAM initial task text",
+          "source": "interactive",
+          "images": 0
+        },
+        {
+          "keys": [
+            "images",
+            "source",
+            "streamingBehavior",
+            "text",
+            "type"
+          ],
+          "text": "I-SEAM initial task text",
+          "source": "extension",
+          "images": 0
+        }
+      ],
+      "before": [
+        {
+          "text": "I-SEAM initial task text",
+          "images": 0
+        },
+        {
+          "text": "I-SEAM initial task text",
+          "images": 0
+        },
+        {
+          "text": "I-SEAM initial task text",
+          "images": 0
+        },
+        {
+          "text": "I-SEAM initial task text",
+          "images": 0
+        },
+        {
+          "text": "I-SEAM initial task text",
+          "images": 0
+        },
+        {
+          "text": "I-SEAM initial task text",
+          "images": 0
+        }
+      ],
+      "agentEntries": 6,
+      "normalized": [
+        {
+          "text": "I-SEAM initial task text",
+          "images": 0,
+          "order": [],
+          "corruptPresent": false
+        },
+        {
+          "text": "I-SEAM initial task text",
+          "images": 0,
+          "order": [],
+          "corruptPresent": false
+        },
+        {
+          "text": "I-SEAM initial task text",
+          "images": 0,
+          "order": [],
+          "corruptPresent": false
+        },
+        {
+          "text": "I-SEAM initial task text",
+          "images": 0,
+          "order": [],
+          "corruptPresent": false
+        },
+        {
+          "text": "I-SEAM initial task text",
+          "images": 0,
+          "order": [],
+          "corruptPresent": false
+        },
+        {
+          "text": "I-SEAM initial task text",
+          "images": 0,
+          "order": [],
+          "corruptPresent": false
+        }
+      ],
+      "errors": [],
+      "commands": 0,
+      "preflight": [
+        "early-extension:started",
+        "early-rpc:started",
+        "early-interactive:started",
+        "designated:started",
+        "later-interactive:started",
+        "completion-nudge:started"
+      ],
+      "shutdowns": 0,
+      "returned": true
+    },
+    {
+      "label": "corrupt-mixed",
+      "inputs": [
+        {
+          "keys": [
+            "images",
+            "source",
+            "streamingBehavior",
+            "text",
+            "type"
+          ],
+          "text": "I-SEAM initial task text",
+          "source": "interactive",
+          "images": 2
+        }
+      ],
+      "before": [
+        {
+          "text": "I-SEAM initial task text",
+          "images": 2
+        }
+      ],
+      "agentEntries": 1,
+      "normalized": [
+        {
+          "text": "I-SEAM initial task text\n\n[Image omitted: could not be resized below the inline image size limit.]",
+          "images": 1,
+          "order": [
+            0
+          ],
+          "corruptPresent": false
+        }
+      ],
+      "errors": [],
+      "commands": 0,
+      "preflight": [
+        "designated:started"
+      ],
+      "shutdowns": 0,
+      "returned": true
+    },
+    {
+      "label": "corrupt-only",
+      "inputs": [
+        {
+          "keys": [
+            "images",
+            "source",
+            "streamingBehavior",
+            "text",
+            "type"
+          ],
+          "text": "I-SEAM initial task text",
+          "source": "interactive",
+          "images": 1
+        }
+      ],
+      "before": [
+        {
+          "text": "I-SEAM initial task text",
+          "images": 1
+        }
+      ],
+      "agentEntries": 1,
+      "normalized": [
+        {
+          "text": "I-SEAM initial task text\n\n[Image omitted: could not be resized below the inline image size limit.]",
+          "images": 0,
+          "order": [],
+          "corruptPresent": false
+        }
+      ],
+      "errors": [],
+      "commands": 0,
+      "preflight": [
+        "designated:started"
+      ],
+      "shutdowns": 0,
+      "returned": true
+    },
+    {
+      "label": "throw-input",
+      "inputs": [
+        {
+          "keys": [
+            "images",
+            "source",
+            "streamingBehavior",
+            "text",
+            "type"
+          ],
+          "text": "I-SEAM initial task text",
+          "source": "interactive",
+          "images": 1
+        }
+      ],
+      "before": [
+        {
+          "text": "I-SEAM initial task text",
+          "images": 1
+        }
+      ],
+      "agentEntries": 1,
+      "normalized": [
+        {
+          "text": "I-SEAM initial task text\n\n[Image omitted: could not be resized below the inline image size limit.]",
+          "images": 0,
+          "order": [],
+          "corruptPresent": false
+        }
+      ],
+      "errors": [
+        "input"
+      ],
+      "commands": 0,
+      "preflight": [
+        "designated:started"
+      ],
+      "shutdowns": 0,
+      "returned": true
+    },
+    {
+      "label": "throw-before",
+      "inputs": [
+        {
+          "keys": [
+            "images",
+            "source",
+            "streamingBehavior",
+            "text",
+            "type"
+          ],
+          "text": "I-SEAM initial task text",
+          "source": "interactive",
+          "images": 1
+        }
+      ],
+      "before": [
+        {
+          "text": "I-SEAM initial task text",
+          "images": 1
+        }
+      ],
+      "agentEntries": 1,
+      "normalized": [
+        {
+          "text": "I-SEAM initial task text\n\n[Image omitted: could not be resized below the inline image size limit.]",
+          "images": 0,
+          "order": [],
+          "corruptPresent": false
+        }
+      ],
+      "errors": [
+        "before_agent_start"
+      ],
+      "commands": 0,
+      "preflight": [
+        "designated:started"
+      ],
+      "shutdowns": 0,
+      "returned": true
+    },
+    {
+      "label": "abort-before",
+      "inputs": [
+        {
+          "keys": [
+            "images",
+            "source",
+            "streamingBehavior",
+            "text",
+            "type"
+          ],
+          "text": "I-SEAM initial task text",
+          "source": "interactive",
+          "images": 1
+        }
+      ],
+      "before": [
+        {
+          "text": "I-SEAM initial task text",
+          "images": 1
+        }
+      ],
+      "agentEntries": 1,
+      "normalized": [
+        {
+          "text": "I-SEAM initial task text\n\n[Image omitted: could not be resized below the inline image size limit.]",
+          "images": 0,
+          "order": [],
+          "corruptPresent": false
+        }
+      ],
+      "errors": [],
+      "commands": 0,
+      "preflight": [
+        "designated:started"
+      ],
+      "shutdowns": 0,
+      "returned": true
+    },
+    {
+      "label": "shutdown-before",
+      "inputs": [
+        {
+          "keys": [
+            "images",
+            "source",
+            "streamingBehavior",
+            "text",
+            "type"
+          ],
+          "text": "I-SEAM initial task text",
+          "source": "interactive",
+          "images": 1
+        }
+      ],
+      "before": [
+        {
+          "text": "I-SEAM initial task text",
+          "images": 1
+        }
+      ],
+      "agentEntries": 1,
+      "normalized": [
+        {
+          "text": "I-SEAM initial task text\n\n[Image omitted: could not be resized below the inline image size limit.]",
+          "images": 0,
+          "order": [],
+          "corruptPresent": false
+        }
+      ],
+      "errors": [],
+      "commands": 0,
+      "preflight": [
+        "designated:started"
+      ],
+      "shutdowns": 1,
+      "returned": true
+    },
+    {
+      "label": "handled-early",
+      "inputs": [
+        {
+          "keys": [
+            "images",
+            "source",
+            "streamingBehavior",
+            "text",
+            "type"
+          ],
+          "text": "I-SEAM initial task text",
+          "source": "interactive",
+          "images": 1
+        }
+      ],
+      "before": [],
+      "agentEntries": 0,
+      "normalized": [],
+      "errors": [],
+      "commands": 0,
+      "preflight": [
+        "designated:handled"
+      ],
+      "shutdowns": 0,
+      "returned": true
+    },
+    {
+      "label": "late-transform",
+      "inputs": [
+        {
+          "keys": [
+            "images",
+            "source",
+            "streamingBehavior",
+            "text",
+            "type"
+          ],
+          "text": "I-SEAM initial task text",
+          "source": "interactive",
+          "images": 2
+        }
+      ],
+      "before": [
+        {
+          "text": "I-SEAM initial task text",
+          "images": 2
+        }
+      ],
+      "agentEntries": 1,
+      "normalized": [
+        {
+          "text": "I-SEAM initial task text\n\n[Image omitted: could not be resized below the inline image size limit.]",
+          "images": 1,
+          "order": [
+            0
+          ],
+          "corruptPresent": false
+        }
+      ],
+      "errors": [],
+      "commands": 0,
+      "preflight": [
+        "designated:started"
+      ],
+      "shutdowns": 0,
+      "returned": true
+    },
+    {
+      "label": "late-mutation",
+      "inputs": [
+        {
+          "keys": [
+            "images",
+            "source",
+            "streamingBehavior",
+            "text",
+            "type"
+          ],
+          "text": "I-SEAM initial task text",
+          "source": "interactive",
+          "images": 2
+        }
+      ],
+      "before": [
+        {
+          "text": "I-SEAM initial task text",
+          "images": 2
+        }
+      ],
+      "agentEntries": 1,
+      "normalized": [
+        {
+          "text": "I-SEAM initial task text\n\n[Image omitted: could not be resized below the inline image size limit.]",
+          "images": 1,
+          "order": [
+            0
+          ],
+          "corruptPresent": false
+        }
+      ],
+      "errors": [],
+      "commands": 0,
+      "preflight": [
+        "designated:started"
+      ],
+      "shutdowns": 0,
+      "returned": true
+    },
+    {
+      "label": "tight",
+      "inputs": [
+        {
+          "keys": [
+            "images",
+            "source",
+            "streamingBehavior",
+            "text",
+            "type"
+          ],
+          "text": "I-SEAM initial task text",
+          "source": "interactive",
+          "images": 2
+        }
+      ],
+      "before": [
+        {
+          "text": "I-SEAM initial task text",
+          "images": 2
+        }
+      ],
+      "agentEntries": 1,
+      "normalized": [
+        {
+          "text": "I-SEAM initial task text\n\n[Image omitted: could not be resized below the inline image size limit.]\n[Image omitted: could not be resized below the inline image size limit.]",
+          "images": 0,
+          "order": [],
+          "corruptPresent": false
+        }
+      ],
+      "errors": [],
+      "commands": 0,
+      "preflight": [
+        "designated:started"
+      ],
+      "shutdowns": 0,
+      "returned": true
+    },
+    {
+      "label": "late-profile",
+      "inputs": [
+        {
+          "keys": [
+            "images",
+            "source",
+            "streamingBehavior",
+            "text",
+            "type"
+          ],
+          "text": "I-SEAM initial task text",
+          "source": "interactive",
+          "images": 2
+        }
+      ],
+      "before": [
+        {
+          "text": "I-SEAM initial task text",
+          "images": 2
+        }
+      ],
+      "agentEntries": 1,
+      "normalized": [
+        {
+          "text": "I-SEAM initial task text\n\n[Image omitted: could not be resized below the inline image size limit.]\n[Image omitted: could not be resized below the inline image size limit.]",
+          "images": 0,
+          "order": [],
+          "corruptPresent": false
+        }
+      ],
+      "errors": [],
+      "commands": 0,
+      "preflight": [
+        "designated:started"
+      ],
+      "shutdowns": 0,
+      "returned": true
+    },
+    {
+      "label": "resize-off-corrupt",
+      "inputs": [
+        {
+          "keys": [
+            "images",
+            "source",
+            "streamingBehavior",
+            "text",
+            "type"
+          ],
+          "text": "I-SEAM initial task text",
+          "source": "interactive",
+          "images": 1
+        }
+      ],
+      "before": [
+        {
+          "text": "I-SEAM initial task text",
+          "images": 1
+        }
+      ],
+      "agentEntries": 1,
+      "normalized": [
+        {
+          "text": "I-SEAM initial task text",
+          "images": 1,
+          "order": [
+            -1
+          ],
+          "corruptPresent": true
+        }
+      ],
+      "errors": [],
+      "commands": 0,
+      "preflight": [
+        "designated:started"
+      ],
+      "shutdowns": 0,
+      "returned": true
+    },
+    {
+      "label": "command-bypass",
+      "inputs": [],
+      "before": [],
+      "agentEntries": 0,
+      "normalized": [],
+      "errors": [],
+      "commands": 1,
+      "preflight": [
+        "designated:handled"
+      ],
+      "shutdowns": 0,
+      "returned": true
+    },
+    {
+      "label": "template-expansion",
+      "inputs": [
+        {
+          "keys": [
+            "images",
+            "source",
+            "streamingBehavior",
+            "text",
+            "type"
+          ],
+          "text": "/i-seam-template argument",
+          "source": "interactive",
+          "images": 2
+        }
+      ],
+      "before": [
+        {
+          "text": "expanded argument",
+          "images": 2
+        }
+      ],
+      "agentEntries": 1,
+      "normalized": [
+        {
+          "text": "expanded argument",
+          "images": 2,
+          "order": [
+            0,
+            1
+          ],
+          "corruptPresent": false
+        }
+      ],
+      "errors": [],
+      "commands": 0,
+      "preflight": [
+        "designated:started"
+      ],
+      "shutdowns": 0,
+      "returned": true
+    }
+  ],
+  "sdkObservations": [
+    {
+      "label": "sdk-ordered-g1",
+      "task": "sdk-task",
+      "generation": 1,
+      "rejectedEarly": 4,
+      "fileReads": 1,
+      "guardedEntries": 1,
+      "realAgentEntries": 1,
+      "streamEntries": 1,
+      "offlineDelegations": 2,
+      "normalizedOrder": [
+        0,
+        1
+      ],
+      "finalOrder": [
+        0,
+        1
+      ],
+      "compactionRestored": true,
+      "continuationImages": 0
+    },
+    {
+      "label": "sdk-ordered-g2",
+      "task": "sdk-task",
+      "generation": 2,
+      "rejectedEarly": 4,
+      "fileReads": 1,
+      "guardedEntries": 1,
+      "realAgentEntries": 1,
+      "streamEntries": 1,
+      "offlineDelegations": 2,
+      "normalizedOrder": [
+        0,
+        1
+      ],
+      "finalOrder": [
+        0,
+        1
+      ],
+      "compactionRestored": true,
+      "continuationImages": 0
+    },
+    {
+      "label": "sdk-no-images",
+      "task": "sdk-task",
+      "generation": 1,
+      "rejectedEarly": 4,
+      "fileReads": 0,
+      "guardedEntries": 1,
+      "realAgentEntries": 1,
+      "streamEntries": 1,
+      "offlineDelegations": 2,
+      "normalizedOrder": [],
+      "finalOrder": [],
+      "compactionRestored": true,
+      "continuationImages": 0
+    },
+    {
+      "label": "sdk-stale-generation",
+      "task": "sdk-task",
+      "generation": 2,
+      "rejectedEarly": 4,
+      "fileReads": 1,
+      "guardedEntries": 0,
+      "realAgentEntries": 0,
+      "streamEntries": 0,
+      "offlineDelegations": 0,
+      "normalizedOrder": [],
+      "finalOrder": [],
+      "compactionRestored": true,
+      "failureStage": "generation_mismatch",
+      "error": "initial_images_rejected:generation_mismatch"
+    },
+    {
+      "label": "sdk-wrong-task",
+      "task": "sdk-task",
+      "generation": 1,
+      "rejectedEarly": 4,
+      "fileReads": 1,
+      "guardedEntries": 0,
+      "realAgentEntries": 0,
+      "streamEntries": 0,
+      "offlineDelegations": 0,
+      "normalizedOrder": [],
+      "finalOrder": [],
+      "compactionRestored": true,
+      "failureStage": "task_mismatch",
+      "error": "initial_images_rejected:task_mismatch"
+    },
+    {
+      "label": "sdk-corrupt",
+      "task": "sdk-task",
+      "generation": 1,
+      "rejectedEarly": 4,
+      "fileReads": 1,
+      "guardedEntries": 1,
+      "realAgentEntries": 0,
+      "streamEntries": 0,
+      "offlineDelegations": 0,
+      "normalizedOrder": [],
+      "finalOrder": [],
+      "compactionRestored": true,
+      "failureStage": "normalization_omitted_images",
+      "error": "initial_images_rejected:normalization_omitted_images"
+    },
+    {
+      "label": "sdk-resize-off",
+      "task": "sdk-task",
+      "generation": 1,
+      "rejectedEarly": 4,
+      "fileReads": 1,
+      "guardedEntries": 1,
+      "realAgentEntries": 0,
+      "streamEntries": 0,
+      "offlineDelegations": 0,
+      "normalizedOrder": [],
+      "finalOrder": [],
+      "compactionRestored": true,
+      "failureStage": "normalized_decode_failed",
+      "error": "initial_images_rejected:normalized_decode_failed"
+    },
+    {
+      "label": "sdk-tight",
+      "task": "sdk-task",
+      "generation": 1,
+      "rejectedEarly": 4,
+      "fileReads": 1,
+      "guardedEntries": 1,
+      "realAgentEntries": 0,
+      "streamEntries": 0,
+      "offlineDelegations": 0,
+      "normalizedOrder": [],
+      "finalOrder": [],
+      "compactionRestored": true,
+      "failureStage": "normalization_omitted_images",
+      "error": "initial_images_rejected:normalization_omitted_images"
+    },
+    {
+      "label": "sdk-late-profile",
+      "task": "sdk-task",
+      "generation": 1,
+      "rejectedEarly": 4,
+      "fileReads": 1,
+      "guardedEntries": 1,
+      "realAgentEntries": 0,
+      "streamEntries": 0,
+      "offlineDelegations": 0,
+      "normalizedOrder": [],
+      "finalOrder": [],
+      "compactionRestored": true,
+      "failureStage": "normalization_omitted_images",
+      "error": "initial_images_rejected:normalization_omitted_images"
+    },
+    {
+      "label": "sdk-late-transform",
+      "task": "sdk-task",
+      "generation": 1,
+      "rejectedEarly": 4,
+      "fileReads": 1,
+      "guardedEntries": 1,
+      "realAgentEntries": 0,
+      "streamEntries": 0,
+      "offlineDelegations": 0,
+      "normalizedOrder": [],
+      "finalOrder": [],
+      "compactionRestored": true,
+      "failureStage": "normalization_omitted_images",
+      "error": "initial_images_rejected:normalization_omitted_images"
+    },
+    {
+      "label": "sdk-late-mutation",
+      "task": "sdk-task",
+      "generation": 1,
+      "rejectedEarly": 4,
+      "fileReads": 1,
+      "guardedEntries": 1,
+      "realAgentEntries": 0,
+      "streamEntries": 0,
+      "offlineDelegations": 0,
+      "normalizedOrder": [],
+      "finalOrder": [],
+      "compactionRestored": true,
+      "failureStage": "normalization_omitted_images",
+      "error": "initial_images_rejected:normalization_omitted_images"
+    },
+    {
+      "label": "sdk-late-reorder",
+      "task": "sdk-task",
+      "generation": 1,
+      "rejectedEarly": 4,
+      "fileReads": 1,
+      "guardedEntries": 1,
+      "realAgentEntries": 0,
+      "streamEntries": 0,
+      "offlineDelegations": 0,
+      "normalizedOrder": [],
+      "finalOrder": [],
+      "compactionRestored": true,
+      "failureStage": "normalized_image_changed",
+      "error": "initial_images_rejected:normalized_image_changed"
+    },
+    {
+      "label": "sdk-input-drop",
+      "task": "sdk-task",
+      "generation": 1,
+      "rejectedEarly": 4,
+      "fileReads": 1,
+      "guardedEntries": 1,
+      "realAgentEntries": 0,
+      "streamEntries": 0,
+      "offlineDelegations": 0,
+      "normalizedOrder": [],
+      "finalOrder": [],
+      "compactionRestored": true,
+      "failureStage": "normalization_omitted_images",
+      "error": "initial_images_rejected:normalization_omitted_images"
+    },
+    {
+      "label": "sdk-context-drop",
+      "task": "sdk-task",
+      "generation": 1,
+      "rejectedEarly": 4,
+      "fileReads": 1,
+      "guardedEntries": 1,
+      "realAgentEntries": 1,
+      "streamEntries": 1,
+      "offlineDelegations": 0,
+      "normalizedOrder": [
+        0,
+        1
+      ],
+      "finalOrder": [],
+      "compactionRestored": true,
+      "failureStage": "final_context_changed",
+      "error": "initial_images_rejected:final_context_changed"
+    },
+    {
+      "label": "sdk-context-reorder",
+      "task": "sdk-task",
+      "generation": 1,
+      "rejectedEarly": 4,
+      "fileReads": 1,
+      "guardedEntries": 1,
+      "realAgentEntries": 1,
+      "streamEntries": 1,
+      "offlineDelegations": 0,
+      "normalizedOrder": [
+        0,
+        1
+      ],
+      "finalOrder": [],
+      "compactionRestored": true,
+      "failureStage": "final_context_changed",
+      "error": "initial_images_rejected:final_context_changed"
+    },
+    {
+      "label": "sdk-convert-drop",
+      "task": "sdk-task",
+      "generation": 1,
+      "rejectedEarly": 4,
+      "fileReads": 1,
+      "guardedEntries": 1,
+      "realAgentEntries": 1,
+      "streamEntries": 1,
+      "offlineDelegations": 0,
+      "normalizedOrder": [
+        0,
+        1
+      ],
+      "finalOrder": [],
+      "compactionRestored": true,
+      "failureStage": "final_context_changed",
+      "error": "initial_images_rejected:final_context_changed"
+    },
+    {
+      "label": "sdk-request-profile",
+      "task": "sdk-task",
+      "generation": 1,
+      "rejectedEarly": 4,
+      "fileReads": 1,
+      "guardedEntries": 1,
+      "realAgentEntries": 1,
+      "streamEntries": 1,
+      "offlineDelegations": 0,
+      "normalizedOrder": [
+        0,
+        1
+      ],
+      "finalOrder": [],
+      "compactionRestored": true,
+      "failureStage": "final_model_image_limits_changed",
+      "error": "initial_images_rejected:final_model_image_limits_changed"
+    },
+    {
+      "label": "sdk-request-text-only",
+      "task": "sdk-task",
+      "generation": 1,
+      "rejectedEarly": 4,
+      "fileReads": 1,
+      "guardedEntries": 1,
+      "realAgentEntries": 1,
+      "streamEntries": 1,
+      "offlineDelegations": 0,
+      "normalizedOrder": [
+        0,
+        1
+      ],
+      "finalOrder": [],
+      "compactionRestored": true,
+      "failureStage": "final_context_changed",
+      "error": "initial_images_rejected:final_context_changed"
+    },
+    {
+      "label": "sdk-handled",
+      "task": "sdk-task",
+      "generation": 1,
+      "rejectedEarly": 4,
+      "fileReads": 1,
+      "guardedEntries": 0,
+      "realAgentEntries": 0,
+      "streamEntries": 0,
+      "offlineDelegations": 0,
+      "normalizedOrder": [],
+      "finalOrder": [],
+      "compactionRestored": true,
+      "failureStage": "initial_call_not_started",
+      "error": "initial_images_rejected:initial_call_not_started"
+    }
+  ],
+  "sdkBoundary": "An exclusive, generation-checked SDK call decorates public Agent.prompt with a real guard that delegates accepted calls. Actual Pi normalization omissions, corrupt decode with resizing disabled, and input reordering fail before original Agent.prompt. A public streamFunction guard rejects late context/conversion changes and effective model image limits with an explicit error stream before any delegate, preserving Agent settlement.",
+  "interactiveBoundary": "Exported AgentSessionRuntime and InteractiveMode constructed offline; public runtime.newSession replacement and disposal executed. init/run and retained pane CLI lifecycle traced in source only; no terminal/herdr integration claimed.",
+  "rpcBoundary": "RPC prompt has structured images and response id; command handling forwards to the same AgentSession.prompt normalization. Source-only: raw RPC retains omission-and-continue behavior; it is not the SDK guard or a pane replacement.",
+  "limitations": "Initial preflight auto-compaction is temporarily suspended and restored. Fixtures prove ordered PNG inputs; the guard uses public resizeImage and conservatively rejects other normalization output not reproduced by it, so all MIME conversion variants are not established. Provider-specific payload conversion and real TTY/pane integration were not executed. File modes are requested in an isolated sandbox; Windows ACL/privacy guarantees and complete downstream transport are not established. Failed calls keep ordinary prompt entry closed; production lifecycle wiring must publish generation-scoped failure. Runtime session replacement must reinstall session-local guards.",
+  "sources": [
+    {
+      "locator": "E:\\Projects\\pi-packages\\node_modules\\.bun\\@earendil-works+pi-coding-agent@0.99.2+d7028e23c0a6b244\\node_modules\\@earendil-works\\pi-coding-agent\\dist\\core\\agent-session.js",
+      "title": "dist/core/agent-session.js",
+      "claim": "Actual normalization omissions append hints and still enter agent.prompt; the start hook precedes normalization.",
+      "accessed": "2026-10-05T15:28:33.171Z",
+      "scope": "Installed unbundled SDK declarations/source and fixture-observed AgentSession path; no provider execution.",
+      "sha256": "4da636cea504ccec903c7b39f5eb1553f4f64469408f06e5b7938c7682b131d1",
+      "support": [
+        {
+          "anchor": "async _runInputHandlers(",
+          "line": 1414
+        },
+        {
+          "anchor": "async _normalizePromptImages(",
+          "line": 1427
+        },
+        {
+          "anchor": "async prompt(text, options)",
+          "line": 1455
+        },
+        {
+          "anchor": "emitBeforeAgentStart(expandedText",
+          "line": 1529
+        },
+        {
+          "anchor": "const normalized = await this._normalizePromptImages",
+          "line": 1537
+        },
+        {
+          "anchor": "preflightResult?.(\"started\")",
+          "line": 1568
+        },
+        {
+          "anchor": "await this.agent.prompt(messages)",
+          "line": 1328
+        }
+      ]
+    },
+    {
+      "locator": "E:\\Projects\\pi-packages\\node_modules\\.bun\\@earendil-works+pi-coding-agent@0.99.2+d7028e23c0a6b244\\node_modules\\@earendil-works\\pi-coding-agent\\dist\\core\\extensions\\runner.js",
+      "title": "dist/core/extensions/runner.js",
+      "claim": "Input/start handler exceptions are caught and logged; input handled alone short-circuits before normalization.",
+      "accessed": "2026-10-05T15:28:33.171Z",
+      "scope": "Installed unbundled SDK declarations/source and fixture-observed AgentSession path; no provider execution.",
+      "sha256": "7583772d6d29a23c06496b6e0b4764ace220fb4289d5523916323642efa50306",
+      "support": [
+        {
+          "anchor": "async emitBeforeAgentStart(",
+          "line": 1115
+        },
+        {
+          "anchor": "async emitInput(",
+          "line": 1196
+        }
+      ]
+    },
+    {
+      "locator": "E:\\Projects\\pi-packages\\node_modules\\.bun\\@earendil-works+pi-coding-agent@0.99.2+d7028e23c0a6b244\\node_modules\\@earendil-works\\pi-coding-agent\\dist\\core\\extensions\\types.d.ts",
+      "title": "dist/core/extensions/types.d.ts",
+      "claim": "InputEvent exposes text/images/source/streamingBehavior, with no designated task/generation identity or post-normalization rejection result.",
+      "accessed": "2026-10-05T15:28:33.171Z",
+      "scope": "Installed unbundled SDK declarations/source and fixture-observed AgentSession path; no provider execution.",
+      "sha256": "6c78c89ad1ffb421e81ff0ad11ceff1a635b21fd818a32aa3e87009392298d9f",
+      "support": [
+        {
+          "anchor": "export interface BeforeAgentStartEvent",
+          "line": 693
+        },
+        {
+          "anchor": "export interface InputEvent",
+          "line": 867
+        },
+        {
+          "anchor": "export type InputEventResult",
+          "line": 879
+        }
+      ]
+    },
+    {
+      "locator": "E:\\Projects\\pi-packages\\node_modules\\.bun\\@earendil-works+pi-coding-agent@0.99.2+d7028e23c0a6b244\\node_modules\\@earendil-works\\pi-coding-agent\\dist\\core\\agent-session.d.ts",
+      "title": "dist/core/agent-session.d.ts",
+      "claim": "Public readonly session.agent exposes a mutable Agent; normalization remains private and preflightResult lacks normalized content/failure. Public auto-compaction control prevents resume compaction before validation.",
+      "accessed": "2026-10-05T15:28:33.171Z",
+      "scope": "Installed unbundled SDK declarations/source and fixture-observed AgentSession path; no provider execution.",
+      "sha256": "54beba962cf8fc6591c4ff904da3be25b62f8f49b1e517521fa364dee4287a95",
+      "support": [
+        {
+          "anchor": "export interface PromptOptions",
+          "line": 165
+        },
+        {
+          "anchor": "private _normalizePromptImages",
+          "line": 487
+        },
+        {
+          "anchor": "readonly agent: Agent;",
+          "line": 209
+        },
+        {
+          "anchor": "setAutoCompactionEnabled(enabled: boolean)",
+          "line": 715
+        }
+      ]
+    },
+    {
+      "locator": "E:\\Projects\\pi-packages\\node_modules\\.bun\\@earendil-works+pi-coding-agent@0.99.2+d7028e23c0a6b244\\node_modules\\@earendil-works\\pi-coding-agent\\dist\\utils\\image-process.js",
+      "title": "dist/utils/image-process.js",
+      "claim": "Resize rejection returns ok:false; supported MIME bytes bypass decode when autoResize is disabled.",
+      "accessed": "2026-10-05T15:28:33.171Z",
+      "scope": "Installed unbundled SDK declarations/source and fixture-observed AgentSession path; no provider execution.",
+      "sha256": "275b252679b76476d7f83042a9771c77d46321b9d7a3e20e1f8365b2eff2254e",
+      "support": [
+        {
+          "anchor": "export async function processImage",
+          "line": 41
+        },
+        {
+          "anchor": "if (!resized)",
+          "line": 52
+        }
+      ]
+    },
+    {
+      "locator": "E:\\Projects\\pi-packages\\node_modules\\.bun\\@earendil-works+pi-coding-agent@0.99.2+d7028e23c0a6b244\\node_modules\\@earendil-works\\pi-coding-agent\\dist\\utils\\image-resize-core.js",
+      "title": "dist/utils/image-resize-core.js",
+      "claim": "Actual decode failure or impossible selected-model resize limit returns null.",
+      "accessed": "2026-10-05T15:28:33.171Z",
+      "scope": "Installed unbundled SDK declarations/source and fixture-observed AgentSession path; no provider execution.",
+      "sha256": "5f6f1464c21e196a5742b943a403aa843fb319c9d2ff024ca04bb809a18de261",
+      "support": [
+        {
+          "anchor": "export async function resizeImageInProcess",
+          "line": 32
+        },
+        {
+          "anchor": "return null;",
+          "line": 37
+        }
+      ]
+    },
+    {
+      "locator": "E:\\Projects\\pi-packages\\node_modules\\.bun\\@earendil-works+pi-coding-agent@0.99.2+d7028e23c0a6b244\\node_modules\\@earendil-works\\pi-coding-agent\\dist\\core\\sdk.d.ts",
+      "title": "dist/core/sdk.d.ts",
+      "claim": "SDK supports direct prompt ownership; CreateAgentSessionOptions has no prompt-normalization rejection callback.",
+      "accessed": "2026-10-05T15:28:33.171Z",
+      "scope": "Installed unbundled SDK declarations/source and fixture-observed AgentSession path; no provider execution.",
+      "sha256": "3996770d9332e2b290e7b8908dc7b24b0a99a49c9f498fc0b0771f4a5268b0c0",
+      "support": [
+        {
+          "anchor": "export interface CreateAgentSessionOptions",
+          "line": 10
+        }
+      ]
+    },
+    {
+      "locator": "E:\\Projects\\pi-packages\\node_modules\\.bun\\@earendil-works+pi-coding-agent@0.99.2+d7028e23c0a6b244\\node_modules\\@earendil-works\\pi-coding-agent\\dist\\index.d.ts",
+      "title": "dist/index.d.ts",
+      "claim": "Package root exports the SDK, AgentSessionRuntime and InteractiveMode used by this executable fixture.",
+      "accessed": "2026-10-05T15:28:33.171Z",
+      "scope": "Installed unbundled SDK declarations/source and fixture-observed AgentSession path; no provider execution.",
+      "sha256": "2e61905fd674c4b6d30376813fbd44e947a0dfd4891d391d87a94967a4b3fcc7",
+      "support": [
+        {
+          "anchor": "createAgentSession",
+          "line": 20
+        },
+        {
+          "anchor": "AgentSessionRuntime",
+          "line": 20
+        },
+        {
+          "anchor": "InteractiveMode",
+          "line": 35
+        }
+      ]
+    },
+    {
+      "locator": "E:\\Projects\\pi-packages\\node_modules\\.bun\\@earendil-works+pi-coding-agent@0.99.2+d7028e23c0a6b244\\node_modules\\@earendil-works\\pi-coding-agent\\dist\\core\\agent-session-runtime.d.ts",
+      "title": "dist/core/agent-session-runtime.d.ts",
+      "claim": "Public runtime owns replaceable sessions, rebind callbacks, new/switch session and disposal.",
+      "accessed": "2026-10-05T15:28:33.171Z",
+      "scope": "Installed unbundled SDK declarations/source and fixture-observed AgentSession path; no provider execution.",
+      "sha256": "4a18c0f51669b62a297c83334731c8bb5fed58016619a14d42edce414ff8d105",
+      "support": [
+        {
+          "anchor": "setRebindSession(",
+          "line": 58
+        },
+        {
+          "anchor": "newSession(",
+          "line": 80
+        },
+        {
+          "anchor": "switchSession(",
+          "line": 73
+        },
+        {
+          "anchor": "dispose()",
+          "line": 104
+        }
+      ]
+    },
+    {
+      "locator": "E:\\Projects\\pi-packages\\node_modules\\.bun\\@earendil-works+pi-coding-agent@0.99.2+d7028e23c0a6b244\\node_modules\\@earendil-works\\pi-coding-agent\\dist\\modes\\interactive\\interactive-mode.d.ts",
+      "title": "dist/modes/interactive/interactive-mode.d.ts",
+      "claim": "InteractiveMode accepts AgentSessionRuntime and exposes init/run; terminal integration was not executed.",
+      "accessed": "2026-10-05T15:28:33.171Z",
+      "scope": "Installed unbundled SDK declarations/source and fixture-observed AgentSession path; no provider execution.",
+      "sha256": "f0b0cfa6a277a38fc699c342355cbadc099f26e2dab155e31978dff57efc3c96",
+      "support": [
+        {
+          "anchor": "constructor(runtimeHost: AgentSessionRuntime",
+          "line": 129
+        },
+        {
+          "anchor": "init(): Promise<void>",
+          "line": 139
+        },
+        {
+          "anchor": "run(): Promise<void>",
+          "line": 148
+        }
+      ]
+    },
+    {
+      "locator": "E:\\Projects\\pi-packages\\node_modules\\.bun\\@earendil-works+pi-coding-agent@0.99.2+d7028e23c0a6b244\\node_modules\\@earendil-works\\pi-coding-agent\\dist\\modes\\interactive\\interactive-mode.js",
+      "title": "dist/modes/interactive/interactive-mode.js",
+      "claim": "Interactive mode rebinds extensions on runtime replacement, sends initial images via session.prompt, and uses the same session.prompt for later input.",
+      "accessed": "2026-10-05T15:28:33.171Z",
+      "scope": "Installed unbundled SDK declarations/source and fixture-observed AgentSession path; no provider execution.",
+      "sha256": "20637835b51c2a33f1c152d94a875d28d762bd99ba27d6679c2c538ab9028276",
+      "support": [
+        {
+          "anchor": "this.runtimeHost.setRebindSession(",
+          "line": 345
+        },
+        {
+          "anchor": "images: initialImages",
+          "line": 862
+        },
+        {
+          "anchor": "await this.session.prompt(userInput)",
+          "line": 884
+        }
+      ]
+    },
+    {
+      "locator": "E:\\Projects\\pi-packages\\node_modules\\.bun\\@earendil-works+pi-coding-agent@0.99.2+d7028e23c0a6b244\\node_modules\\@earendil-works\\pi-coding-agent\\dist\\modes\\rpc\\rpc-types.d.ts",
+      "title": "dist/modes/rpc/rpc-types.d.ts",
+      "claim": "Public RPC commands carry structured ImageContent[] and response correlation ids, not Herdr task/generation identity.",
+      "accessed": "2026-10-05T15:28:33.171Z",
+      "scope": "Installed unbundled SDK declarations/source and fixture-observed AgentSession path; no provider execution.",
+      "sha256": "68b6dc2e47a3969c09c961a40d0462473407b6786f3bd02715fa035e816e2af1",
+      "support": [
+        {
+          "anchor": "images?: ImageContent[]",
+          "line": 18
+        },
+        {
+          "anchor": "id?: string",
+          "line": 15
+        }
+      ]
+    },
+    {
+      "locator": "E:\\Projects\\pi-packages\\node_modules\\.bun\\@earendil-works+pi-coding-agent@0.99.2+d7028e23c0a6b244\\node_modules\\@earendil-works\\pi-coding-agent\\dist\\modes\\rpc\\rpc-mode.js",
+      "title": "dist/modes/rpc/rpc-mode.js",
+      "claim": "RPC forwards images into the same session.prompt and acknowledges preflight before Agent entry; errors after that acknowledgement do not become prompt error responses.",
+      "accessed": "2026-10-05T15:28:33.171Z",
+      "scope": "Installed unbundled SDK declarations/source and fixture-observed AgentSession path; no provider execution.",
+      "sha256": "631697cd35928fc827f4a423538c43ff227b8cbf63c2a2f11060616f55eba6db",
+      "support": [
+        {
+          "anchor": "case \"prompt\"",
+          "line": 298
+        },
+        {
+          "anchor": "images: command.images",
+          "line": 304
+        },
+        {
+          "anchor": "if (!preflightSucceeded)",
+          "line": 313
+        }
+      ]
+    },
+    {
+      "locator": "E:\\Projects\\pi-packages\\node_modules\\.bun\\@earendil-works+pi-coding-agent@0.99.2+d7028e23c0a6b244\\node_modules\\@earendil-works\\pi-agent-core\\dist\\agent.d.ts",
+      "title": "../pi-agent-core/dist/agent.d.ts",
+      "claim": "Public mutable prompt, transformContext, convertToLlm and streamFunction allow a real delegating SDK guard; this is not a private normalization patch.",
+      "accessed": "2026-10-05T15:28:33.171Z",
+      "scope": "Installed unbundled SDK declarations/source and fixture-observed AgentSession path; no provider execution.",
+      "sha256": "1ae9fb28e132a7d0c545c96b69bca5a69db1374695853d12921bc623709a7589",
+      "support": [
+        {
+          "anchor": "convertToLlm:",
+          "line": 41
+        },
+        {
+          "anchor": "transformContext?:",
+          "line": 10
+        },
+        {
+          "anchor": "streamFunction: StreamFn",
+          "line": 43
+        },
+        {
+          "anchor": "prompt(message: AgentMessage | AgentMessage[])",
+          "line": 116
+        },
+        {
+          "anchor": "prompt(input: string, images?: ImageContent[])",
+          "line": 117
+        }
+      ]
+    },
+    {
+      "locator": "E:\\Projects\\pi-packages\\node_modules\\.bun\\@earendil-works+pi-coding-agent@0.99.2+d7028e23c0a6b244\\node_modules\\@earendil-works\\pi-agent-core\\dist\\agent-loop.js",
+      "title": "../pi-agent-core/dist/agent-loop.js",
+      "claim": "Context transformation/conversion and request preparation precede streamFunction; an error event stream safely terminates the real Agent without executing its delegate.",
+      "accessed": "2026-10-05T15:28:33.171Z",
+      "scope": "Installed unbundled SDK declarations/source and fixture-observed AgentSession path; no provider execution.",
+      "sha256": "65def8c7f3fa01e38fe05467520efc8673c22ea8197833a3b04b29c8a60cb1e3",
+      "support": [
+        {
+          "anchor": "config.transformContext",
+          "line": 263
+        },
+        {
+          "anchor": "config.convertToLlm",
+          "line": 267
+        },
+        {
+          "anchor": "await streamFunction(",
+          "line": 271
+        }
+      ]
+    },
+    {
+      "locator": "E:\\Projects\\pi-packages\\node_modules\\.bun\\@earendil-works+pi-coding-agent@0.99.2+d7028e23c0a6b244\\node_modules\\@earendil-works\\pi-ai\\dist\\types.d.ts",
+      "title": "../pi-ai/dist/types.d.ts",
+      "claim": "The declared UserMessage timestamp carries the unique invocation marker through persisted projection copies; initial ownership is established before this marker is assigned.",
+      "accessed": "2026-10-05T15:28:33.171Z",
+      "scope": "Installed unbundled SDK declarations/source and fixture-observed AgentSession path; no provider execution.",
+      "sha256": "7e6a457a6f60029187b722456fa883d4eb6e5219f871c65bba323c1f8bb4eca2",
+      "support": [
+        {
+          "anchor": "export interface UserMessage {\n    role: \"user\";\n    content: string | (TextContent | ImageContent)[];\n    timestamp: number;",
+          "line": 367
+        }
+      ]
+    }
+  ]
+}
+
+(pass) I-SEAM preserves stock-hook evidence and verifies an owned SDK boundary offline [3895.32ms]
+I_CHILD_EVIDENCE
+[{"scenario":"spawn","generation":1,"receipts":[{"mimeType":"image/png","sha256":"37e4849e434f4df718e44668b96408ae03ce5ef7955b73eb469926e8aedc881a"},{"mimeType":"image/png","sha256":"d04f1c429734cf7a8579b45294cb49f39db1627b9cacbdf324713bc0b0efdd5b"}],"normalized":[[{"mimeType":"image/png","sha256":"37e4849e434f4df718e44668b96408ae03ce5ef7955b73eb469926e8aedc881a"},{"mimeType":"image/png","sha256":"d04f1c429734cf7a8579b45294cb49f39db1627b9cacbdf324713bc0b0efdd5b"}],[],[]],"contexts":[[2],[2,0],[2,0,0]],"rawCalls":1,"entries":3,"attempts":3,"rejectedEarly":7,"duplicateRejected":true,"deleted":true,"tuiStarted":true,"model":{"provider":"i-seam-fixture","id":"ordered-images"},"providerCalls":0,"networkAttempts":0,"piVersion":"0.99.2"},{"scenario":"resume","generation":2,"receipts":[{"mimeType":"image/png","sha256":"d04f1c429734cf7a8579b45294cb49f39db1627b9cacbdf324713bc0b0efdd5b"}],"normalized":[[{"mimeType":"image/png","sha256":"d04f1c429734cf7a8579b45294cb49f39db1627b9cacbdf324713bc0b0efdd5b"}],[],[]],"contexts":[[2,0,0,1],[2,0,0,1,0],[2,0,0,1,0,0]],"rawCalls":1,"entries":3,"attempts":3,"rejectedEarly":7,"duplicateRejected":true,"deleted":true,"tuiStarted":true,"model":{"provider":"i-seam-fixture","id":"ordered-images"},"providerCalls":0,"networkAttempts":0,"piVersion":"0.99.2"},{"scenario":"corrupt","generation":1,"receipts":[{"mimeType":"image/png","sha256":"b01243d70d3a4767d854ac13a42ce3ebe41e08b809bdbb7439f4d45545dfabbc"}],"normalized":[],"contexts":[],"rawCalls":1,"entries":0,"attempts":0,"rejectedEarly":7,"duplicateRejected":true,"deleted":true,"stage":"normalization","tuiStarted":true,"model":{"provider":"i-seam-fixture","id":"ordered-images"},"providerCalls":0,"networkAttempts":0,"piVersion":"0.99.2"},{"scenario":"nonvisual","generation":1,"receipts":[],"normalized":[],"contexts":[],"rawCalls":0,"entries":0,"attempts":0,"rejectedEarly":7,"duplicateRejected":true,"deleted":true,"stage":"model_images","tuiStarted":true,"model":{"provider":"i-child-text","id":"text"},"providerCalls":0,"networkAttempts":0,"piVersion":"0.99.2"},{"scenario":"drop-input","generation":1,"receipts":[],"normalized":[],"contexts":[],"rawCalls":0,"entries":0,"attempts":0,"rejectedEarly":7,"duplicateRejected":true,"deleted":true,"stage":"normalization","tuiStarted":true,"model":{"provider":"i-seam-fixture","id":"ordered-images"},"providerCalls":0,"networkAttempts":0,"piVersion":"0.99.2"},{"scenario":"drop-context","generation":1,"receipts":[{"mimeType":"image/png","sha256":"37e4849e434f4df718e44668b96408ae03ce5ef7955b73eb469926e8aedc881a"},{"mimeType":"image/png","sha256":"d04f1c429734cf7a8579b45294cb49f39db1627b9cacbdf324713bc0b0efdd5b"}],"normalized":[[{"mimeType":"image/png","sha256":"37e4849e434f4df718e44668b96408ae03ce5ef7955b73eb469926e8aedc881a"},{"mimeType":"image/png","sha256":"d04f1c429734cf7a8579b45294cb49f39db1627b9cacbdf324713bc0b0efdd5b"}]],"contexts":[],"rawCalls":1,"entries":1,"attempts":0,"rejectedEarly":7,"duplicateRejected":true,"deleted":true,"stage":"context","tuiStarted":true,"model":{"provider":"i-seam-fixture","id":"ordered-images"},"providerCalls":0,"networkAttempts":0,"piVersion":"0.99.2"},{"scenario":"missing","generation":1,"receipts":[],"normalized":[],"contexts":[],"rawCalls":0,"entries":0,"attempts":0,"rejectedEarly":7,"duplicateRejected":true,"deleted":true,"stage":"storage","tuiStarted":true,"model":{"provider":"i-seam-fixture","id":"ordered-images"},"providerCalls":0,"networkAttempts":0,"piVersion":"0.99.2"},{"scenario":"malformed","generation":1,"receipts":[],"normalized":[],"contexts":[],"rawCalls":0,"entries":0,"attempts":0,"rejectedEarly":7,"duplicateRejected":true,"deleted":true,"stage":"envelope","tuiStarted":true,"model":{"provider":"i-seam-fixture","id":"ordered-images"},"providerCalls":0,"networkAttempts":0,"piVersion":"0.99.2"},{"scenario":"version","generation":1,"receipts":[],"normalized":[],"contexts":[],"rawCalls":0,"entries":0,"attempts":0,"rejectedEarly":7,"duplicateRejected":true,"deleted":true,"stage":"envelope","tuiStarted":true,"model":{"provider":"i-seam-fixture","id":"ordered-images"},"providerCalls":0,"networkAttempts":0,"piVersion":"0.99.2"},{"scenario":"task-identity","generation":1,"receipts":[],"normalized":[],"contexts":[],"rawCalls":0,"entries":0,"attempts":0,"rejectedEarly":7,"duplicateRejected":true,"deleted":true,"stage":"identity","tuiStarted":true,"model":{"provider":"i-seam-fixture","id":"ordered-images"},"providerCalls":0,"networkAttempts":0,"piVersion":"0.99.2"},{"scenario":"generation","generation":1,"receipts":[],"normalized":[],"contexts":[],"rawCalls":0,"entries":0,"attempts":0,"rejectedEarly":7,"duplicateRejected":true,"deleted":true,"stage":"identity","tuiStarted":true,"model":{"provider":"i-seam-fixture","id":"ordered-images"},"providerCalls":0,"networkAttempts":0,"piVersion":"0.99.2"},{"scenario":"encoding","generation":1,"receipts":[],"normalized":[],"contexts":[],"rawCalls":0,"entries":0,"attempts":0,"rejectedEarly":7,"duplicateRejected":true,"deleted":true,"stage":"encoding","tuiStarted":true,"model":{"provider":"i-seam-fixture","id":"ordered-images"},"providerCalls":0,"networkAttempts":0,"piVersion":"0.99.2"},{"scenario":"utf8","generation":1,"receipts":[],"normalized":[],"contexts":[],"rawCalls":0,"entries":0,"attempts":0,"rejectedEarly":7,"duplicateRejected":true,"deleted":true,"stage":"envelope","tuiStarted":true,"model":{"provider":"i-seam-fixture","id":"ordered-images"},"providerCalls":0,"networkAttempts":0,"piVersion":"0.99.2"},{"scenario":"marker","generation":1,"receipts":[],"normalized":[],"contexts":[],"rawCalls":0,"entries":0,"attempts":0,"rejectedEarly":0,"duplicateRejected":false,"deleted":false,"stage":"identity","tuiStarted":false,"providerCalls":0,"networkAttempts":0,"piVersion":"0.99.2"},{"scenario":"path","generation":1,"receipts":[],"normalized":[],"contexts":[],"rawCalls":0,"entries":0,"attempts":0,"rejectedEarly":0,"duplicateRejected":false,"deleted":false,"stage":"identity","tuiStarted":false,"providerCalls":0,"networkAttempts":0,"piVersion":"0.99.2"},{"scenario":"acl","generation":1,"receipts":[],"normalized":[],"contexts":[],"rawCalls":0,"entries":0,"attempts":0,"rejectedEarly":7,"duplicateRejected":true,"deleted":false,"stage":"storage","tuiStarted":true,"model":{"provider":"i-seam-fixture","id":"ordered-images"},"providerCalls":0,"networkAttempts":0,"piVersion":"0.99.2"},{"scenario":"hardlink","generation":1,"receipts":[],"normalized":[],"contexts":[],"rawCalls":0,"entries":0,"attempts":0,"rejectedEarly":7,"duplicateRejected":true,"deleted":false,"stage":"storage","tuiStarted":true,"model":{"provider":"i-seam-fixture","id":"ordered-images"},"providerCalls":0,"networkAttempts":0,"piVersion":"0.99.2"},{"scenario":"redirect","generation":1,"receipts":[],"normalized":[],"contexts":[],"rawCalls":0,"entries":0,"attempts":0,"rejectedEarly":7,"duplicateRejected":true,"deleted":false,"stage":"storage","tuiStarted":true,"model":{"provider":"i-seam-fixture","id":"ordered-images"},"providerCalls":0,"networkAttempts":0,"piVersion":"0.99.2"},{"scenario":"terminal","generation":1,"receipts":[],"normalized":[],"contexts":[],"rawCalls":0,"entries":0,"attempts":0,"rejectedEarly":7,"duplicateRejected":false,"deleted":true,"tuiStarted":true,"model":{"provider":"i-seam-fixture","id":"ordered-images"},"providerCalls":0,"networkAttempts":0,"piVersion":"0.99.2"}]
+(pass) I-CHILD actual processes consume production publication with native SDK normalization and disk resume [82622.69m
+s]
+I_CHILD_BOOTSTRAP_EVIDENCE
+[{"receipts":[[{"mimeType":"image/png","sha256":"37e4849e434f4df718e44668b96408ae03ce5ef7955b73eb469926e8aedc881a"},{"mimeType":"image/png","sha256":"d04f1c429734cf7a8579b45294cb49f39db1627b9cacbdf324713bc0b0efdd5b"}]],"context":[[2],[2]],"fixtureDelegations":2,"providerCalls":0,"networkAttempts":0,"systemPrompt":true,"childTool":true,"readTool":true},{"receipts":[[{"mimeType":"image/png","sha256":"d04f1c429734cf7a8579b45294cb49f39db1627b9cacbdf324713bc0b0efdd5b"}]],"context":[[2,1],[2,1]],"fixtureDelegations":2,"providerCalls":0,"networkAttempts":0,"systemPrompt":true,"childTool":true,"readTool":true}]
+(pass) I-CHILD executes the produced bootstrap through the default SDK entry with offline extensions [10181.12ms]
+
+tests\interrupted-launch.test.ts:
+(pass) local launch and recovery ownership > recovery waits through queued and serializes new launches [16.81ms]
+(pass) local launch and recovery ownership > recovery waits through create and serializes new launches [14.69ms]
+(pass) local launch and recovery ownership > recovery waits through running and serializes new launches [13.85ms]
+(pass) local launch and recovery ownership > recovery waits through run and serializes new launches [14.81ms]
+(pass) local launch and recovery ownership > queued failure rejects launch and retains failure before cleanup [7.09ms]
+(pass) local launch and recovery ownership > create failure rejects launch and retains failure before cleanup [5.84ms]
+(pass) local launch and recovery ownership > running failure rejects launch and retains failure before cleanup [7.27ms]
+(pass) local launch and recovery ownership > script failure rejects launch and retains failure before cleanup [10.46ms]
+(pass) local launch and recovery ownership > run failure rejects launch and retains failure before cleanup [11.12ms]
+(pass) local launch and recovery ownership > persistent queued/terminal failures retain retry intent and block destruct
+ive operations [5.59ms]
+(pass) local launch and recovery ownership > persistent running/terminal failures retain retry intent and block destruc
+tive operations [9.35ms]
+(pass) local launch and recovery ownership > cancelled join before join cannot start retained settlement retry [11.34ms
+]
+(pass) local launch and recovery ownership > cancelled join during launch wait cannot start retained settlement retry [
+10.34ms]
+(pass) local launch and recovery ownership > cancelled join during operation wait cannot start retained settlement retr
+y [11.35ms]
+(pass) local launch and recovery ownership > resumed queued admission cannot be replaced or removed before persistence 
+[16.02ms]
+(pass) local launch and recovery ownership > launch failure adopts a current Result and still rejects the original laun
+ch [10.43ms]
+(pass) local launch and recovery ownership > unwritten resumed g2 does not change durable g1 until local retry succeeds
+ [17.67ms]
+(pass) reopened V2 queued recovery > retains g1 and settles g2 with identity {} [8.29ms]
+(pass) reopened V2 queued recovery > retains g1 and settles g2 with identity {"tabId":"tab-g2","paneId":"pane-g2"} [8.8
+8ms]
+(pass) reopened V2 queued recovery > retains g1 and settles g2 with identity {"paneId":"pane-only"} [7.04ms]
+(pass) reopened V2 queued recovery > retains g1 and settles g2 with identity {"tabId":"   ","paneId":""} [7.46ms]
+(pass) reopened V2 queued recovery > existing Result {"status":"completed","result":"private"} precedes interruption [9
+.62ms]
+(pass) reopened V2 queued recovery > late Result {"status":"completed","result":"private"} precedes interruption [11.40
+ms]
+(pass) reopened V2 queued recovery > existing Result {"status":"failed","error":"child failed"} precedes interruption [
+9.02ms]
+(pass) reopened V2 queued recovery > late Result {"status":"failed","error":"child failed"} precedes interruption [14.3
+4ms]
+(pass) reopened V2 queued recovery > existing Result {"status":"cancelled"} precedes interruption [8.39ms]
+(pass) reopened V2 queued recovery > late Result {"status":"cancelled"} precedes interruption [13.94ms]
+(pass) reopened V2 queued recovery > existing Result {"status":"completed","generation":1,"result":"stale"} precedes in
+terruption [11.82ms]
+(pass) reopened V2 queued recovery > late Result {"status":"completed","generation":1,"result":"stale"} precedes interr
+uption [10.06ms]
+(pass) reopened V2 queued recovery > existing Result {"status":"running"} precedes interruption [12.41ms]
+(pass) reopened V2 queued recovery > late Result {"status":"running"} precedes interruption [13.74ms]
+(pass) reopened V2 queued recovery > existing Result {"status":"completed","result":7} precedes interruption [8.75ms]
+(pass) reopened V2 queued recovery > late Result {"status":"completed","result":7} precedes interruption [10.27ms]
+(pass) reopened V2 queued recovery > existing Result "{broken" precedes interruption [8.41ms]
+(pass) reopened V2 queued recovery > late Result "{broken" precedes interruption [9.43ms]
+(pass) reopened V2 queued recovery > launch and removal wait while recovery rebuilds its scope [15.54ms]
+(pass) reopened V2 queued recovery > failed terminal write remains pending until later recovery without early effects [
+11.00ms]
+(pass) reopened V2 queued recovery > pending intent retries cleanup only once in a recovery invocation [11.24ms]
+(pass) reopened V2 queued recovery > Result arriving during close is durable before notification [11.40ms]
+(pass) reopened V2 queued recovery > cleanup outcome write failure is explicit and retry does not close twice [11.63ms]
+
+tests\lifecycle-migration.test.ts:
+(pass) queue admission > persists queued before exposure, then persists running before its invalidation [13.06ms]
+(pass) V1 lifecycle migration > maps starting with a retained pane to V2 running using the compatibility start [6.72ms]
+(pass) V1 lifecycle migration > settles starting migration from Result before pane evidence [9.54ms]
+(pass) V1 lifecycle migration > rejects a malformed Result from a V1 running record and preserves identity through the 
+recovery rewrite [12.70ms]
+(pass) V1 lifecycle migration > ignores a V1 canonical record whose ID and slug disagree without rewriting retained fil
+es [3.30ms]
+(pass) V1 lifecycle migration > maps missing and failed pane verification to the existing failure reasons [20.86ms]
+(pass) V1 lifecycle migration > migrates V1 running and terminal records and rejects invalid V2 lifecycle fields [35.51
+ms]
+(pass) V1 lifecycle migration > preserves distinct V2 lifecycle timestamps during recovery [6.96ms]
+
+tests\pane-child.test.ts:
+(pass) subagent_done shows the entire Result by default, expanded, after completion, and at narrow widths [5.88ms]
+(pass) subagent_done renders current partial argument snapshots and only a title for non-strings [1.36ms]
+(pass) subagent_done strips supported terminal sequences from display while persisting the raw Result [3.41ms]
+(pass) nudges one unfinished turn and deduplicates repeated agent_end events [1.57ms]
+(pass) clears pending nudges for child lifecycle activity [1.07ms]
+(pass) resumes continuation after active input starts another unfinished turn [0.91ms]
+(pass) preserves active and pre-barrier input decisions [2.70ms]
+(pass) consumes every settling input and shares one completion attempt [3.53ms]
+(pass) consumes settled input before shutdown returns and preserves the first Result [2.68ms]
+(pass) propagates a shared write failure, restores active, and accepts one retry [2.98ms]
+(pass) propagates rename failure and permits active retry [3.81ms]
+(pass) subagent_done clears nudges and atomically records the Result [3.75ms]
+(pass) image failure control shares the completion barrier and keeps first successful Result [4.56ms]
+(pass) image failure preserves an already published authoritative Result [4.07ms]
+(pass) image failure persists a safe stage and shutdown closes image activity [4.45ms]
+(pass) I-CLEANUP child consumption and read failure delete only the expected payload [6387.61ms]
+(pass) I-CLEANUP child completion and shutdown clean pending input, preserve the winning Result [3014.18ms]
+(pass) I-CLEANUP child delete failure reports safely, preserves Result, and retries at shutdown [1912.14ms]
+(pass) I-CLEANUP shutdown during a pending open prevents attachment and cleans the orphan [1576.85ms]
+
+tests\progress-widget.test.ts:
+(pass) Dust-inspired progress status Component > renders deterministic queued/running progress, sanitizes identity, and
+ excludes terminal rows [9.77ms]
+(pass) Dust-inspired progress status Component > clamps invalid and future timestamps and caps progress at six rows plu
+s overflow [0.45ms]
+(pass) Dust-inspired progress status Component > renders exact Nerd Font and ASCII summary maps from the same snapshot 
+[0.18ms]
+(pass) Dust-inspired progress status Component > owns one unref'd refresh timer and isolates requestRender failures [0.
+15ms]
+(pass) Dust-inspired progress status Component > isolates theme and render input failures [0.08ms]
+
+tests\renderer.test.ts:
+(pass) subagent_spawn image call renderer never reads payload through Pi partial/expanded/narrow rendering [10.81ms]
+(pass) subagent_resume image call renderer never reads payload through Pi partial/expanded/narrow rendering [5.22ms]
+(pass) renders named-Agent spawn and join actions [12.87ms]
+
+tests\runtime.test.ts:
+(pass) recovery performance > unchanged terminal recovery preserves manifest bytes and timestamps without writes [23.18
+ms]
+(pass) recovery performance > no-image recovery bypasses recursive image checks but explicit removal retains them [9.87
+ms]
+(pass) recovery performance > recovery discovers an image orphan after a previous candidate-free recovery [1136.72ms]
+(pass) pi-herdr-subagents runtime > parses Herdr tab create identities [0.59ms]
+(pass) pi-herdr-subagents runtime > positively verifies retained panes [0.21ms]
+(pass) pi-herdr-subagents runtime > launches Pi through an exact-arguments Node bootstrap [92.26ms]
+(pass) pi-herdr-subagents runtime > resume preserves parent-session identity, while steer, cancel, and remove own lifec
+ycle [31.07ms]
+(pass) pi-herdr-subagents runtime > executes the named-Agent spawn tool under the parent session [22.78ms]
+(pass) pi-herdr-subagents runtime > successive ready-branch spawn calls return two active identities before either comp
+letion [1014.83ms]
+(pass) pi-herdr-subagents runtime > registered Agent launches and resumes with generic completion instructions and opaq
+ue results [18.05ms]
+(pass) pi-herdr-subagents runtime > requires the requested Agent in its registry [0.54ms]
+(pass) pi-herdr-subagents runtime > does not reuse persisted task artifacts after runtime reconstruction [21.26ms]
+(pass) pi-herdr-subagents runtime > recovers a running pane without relaunching it [8.34ms]
+(pass) pi-herdr-subagents runtime > recovers a terminal Result before checking the retained pane [10.67ms]
+(pass) pi-herdr-subagents runtime > preserves unknown top-level manifest values across V1 migration and V2 rewrites [23
+.21ms]
+(pass) pi-herdr-subagents runtime > persists pane_closed when a running task's pane is missing [22.16ms]
+(pass) pi-herdr-subagents runtime > rebinds a join that overlaps recovery and observes a recovered terminal state [11.8
+2ms]
+(pass) pi-herdr-subagents runtime > recovers only the current generation and rejects a mismatched Result [26.88ms]
+(pass) pi-herdr-subagents runtime > recovery is idempotent and scoped to the current parent session [18.62ms]
+(pass) pi-herdr-subagents runtime > actively settles completed and failed Results without join or inspect [1033.57ms]
+(pass) pi-herdr-subagents runtime > notifies cancellation and an unexpectedly closed pane [540.93ms]
+(pass) pi-herdr-subagents runtime > notifies launch failure before spawn rejects [5.25ms]
+(pass) pi-herdr-subagents runtime > replays a missed notification on every recovery until the parent branch observes it
+ [12.12ms]
+(pass) pi-herdr-subagents runtime > session startup backfills missed notifications and honors parent-session markers [2
+3.10ms]
+(pass) pi-herdr-subagents runtime > injects a summary-only Pi completion message that triggers the parent [531.05ms]
+(pass) retained-session launch submission > exact argv, independent tabs, no readiness calls or artifact mutation [21.0
+7ms]
+(pass) retained-session launch submission > create failure and submission rollback preserve state and primary error [17
+.37ms]
+(pass) /subagent-open command wiring > registers on the parent extension only [0.34ms]
+(pass) /subagent-open command wiring > guards non-TUI and missing parent session before picker creation [12.62ms]
+(pass) /subagent-open command wiring > cancel is side-effect-free and selection rows stay metadata-only [12.86ms]
+(pass) /subagent-open command wiring > passes only the bound selection key to JIT launch [17.98ms]
+(pass) /subagent-open command wiring > README documents current retained-session open without excluded claims [0.32ms]
+(pass) passes pane commands as one quoted PowerShell invocation [0.23ms]
+(pass) submits each exact steer payload through one pane run argv [0.19ms]
+(pass) discovers package Agents from pi.agents directories [2.49ms]
+(pass) runtime task observation > projects private task state into defensive snapshots and emits synchronous updates [1
+4.56ms]
+(pass) runtime task observation > resume, cancellation, and launch failure all invalidate after their state changes [21
+.64ms]
+(pass) runtime task observation > successful recovery emits exactly once after the final scope, including empty and rep
+eated scopes [17.26ms]
+(pass) parent running-task widget > renders a progress Component above the editor without polling or Result APIs [1.36m
+s]
+(pass) parent running-task widget > isolates an initial render failure from later refresh, completion delivery, and joi
+n [0.26ms]
+(pass) parent running-task widget > isolates an update refresh failure and permits the next update [0.12ms]
+(pass) parent running-task widget > isolates an empty-state clear failure and permits a later render [0.13ms]
+(pass) parent running-task widget > honors summary placement, Nerd Font capability, and off [0.40ms]
+(pass) parent running-task widget > routes default settings warnings to the current Context and releases it after recov
+ery failure [0.30ms]
+(pass) parent running-task widget > shutdown clears, unsubscribes, releases the Context, and stops after a clear failur
+e [0.16ms]
+(pass) aborting join leaves the running task unchanged until explicit cancellation [11.66ms]
+(pass) passes the join tool AbortSignal to the runtime wait [5.28ms]
+(pass) captures the parent workspace once and preserves create arguments [0.28ms]
+(pass) defers missing and invalid workspace rejection until createTab [0.16ms]
+(pass) rejects a mismatched response and closes only its explicit root pane [0.21ms]
+(pass) classifies unsupported create contracts and keeps unrelated command failures unchanged [0.33ms]
+(pass) preserves the primary mismatch token when rejected-pane cleanup fails [0.17ms]
+(pass) propagates a missing parent workspace through spawn without a fallback launch [4.36ms]
+(pass) classifies a successful malformed tab-create response as an unsupported contract without cleanup [0.38ms]
+(pass) retains every workspace create rejection without a pane run [18.38ms]
+(pass) recovery retains an existing pane while resumed creation uses the new transport target [22.31ms]
+(pass) steer forwards a running message and guards unknown or terminal tasks [33.62ms]
+(pass) steer transport rejection leaves the task and notifications unchanged [4.84ms]
+(pass) durable terminal notification delivery red seams > R5 startup notification must not trigger a parent turn [0.46m
+s]
+(pass) durable terminal notification delivery red seams > R6 agent_end is not an idle boundary [0.56ms]
+(pass) durable terminal notification delivery red seams > F8 keeps delivery active through repeated agent_end and non-i
+dle settlement [0.28ms]
+(pass) durable terminal notification delivery red seams > R7 an already-idle terminal source flushes through a current-
+branch scan [0.12ms]
+(pass) durable terminal notification delivery red seams > R8 concurrent safe flushes send once, then an absent marker i
+s retryable [0.28ms]
+(pass) review #27 notification regressions > R1 ignores a matching marker from an abandoned branch [0.15ms]
+(pass) review #27 notification regressions > R2 ignores schema-less, unsupported, and malformed markers [0.22ms]
+(pass) review #27 notification regressions > R3 requires status in the current-branch correlation [0.20ms]
+(pass) review #27 notification regressions > R4 retries after send returns without branch visibility [0.13ms]
+(pass) review #27 notification regressions > F12 replays an absent append after restart [0.17ms]
+(pass) review #27 notification regressions > F13 keeps a failed scan retryable [0.16ms]
+(pass) review #27 notification regressions > isolates a pending notification across sessions with a reused correlation 
+[0.25ms]
+(pass) F9 message_end does not acknowledge or flush a pending notification [0.13ms]
+(pass) F13 retries after send failure without changing task delivery state [0.14ms]
+(pass) F16 delivers two generations independently [0.21ms]
+(pass) wrong ID, wrong generation, and display-only markers do not acknowledge [0.45ms]
+(pass) terminal statuses retain independent delivery correlation [0.40ms]
+(pass) late prior-session settlements are discarded when the Result appears after an epoch switch [80.81ms]
+(pass) Phase B terminal surface cleanup > translates accepted-tab close and classifies tab_not_found [0.46ms]
+(pass) Phase B terminal surface cleanup > persists completed, failed, and cancelled outcomes before one close and retai
+ns artifacts [33.33ms]
+(pass) Phase B terminal surface cleanup > keeps inspect non-blocking, aborts only one join wait, and isolates close fai
+lure [10.75ms]
+(pass) Phase B terminal surface cleanup > retries once per recovery, preserves opaque and nested unknown data, then sta
+ys idempotent [22.84ms]
+(pass) Phase B terminal surface cleanup > retries failed prior generations without changing the resumed generation [23.
+40ms]
+(pass) Phase B terminal surface cleanup > classifies never-created and identity-missing terminal generations without a 
+close [16.44ms]
+(pass) Phase B terminal surface cleanup > closes accepted launch failures and active removals by tab, never pane [29.42
+ms]
+(pass) Phase B terminal surface cleanup > blocks removal while actionable cleanup keeps failing, then deletes retained 
+files after retry succeeds [23.51ms]
+(pass) Phase B terminal surface cleanup > selects one fail-safe canonical duplicate per generation without rewriting th
+e others [60.94ms]
+(pass) Phase B terminal surface cleanup > validates cleanup timestamps, status identities/errors, and the 160-character
+ diagnostic boundary [266.27ms]
+(pass) Phase B terminal surface cleanup > normalizes close diagnostics at the exact 160/161-character boundary [18.42ms
+]
+(pass) Phase B terminal surface cleanup > blocks duplicate cleanup removal after one failed close and preserves all ret
+ained evidence [16.28ms]
+(pass) Phase B launch and running-generation overlap > waits for accepted launch ownership before concurrent cancellati
+on [19.31ms]
+(pass) Phase B launch and running-generation overlap > retries prior-generation cleanup while the current generation re
+mains running [22.85ms]
+(pass) coalesces recovery, resume, and remove with an in-flight terminal cleanup [65.05ms]
+(pass) explicit spawn model validation > rejects malformed explicit models before slug, agent, filesystem, and transpor
+t effects [1.02ms]
+(pass) explicit spawn model validation > uses exact first-slash registry order and rejects unavailable snapshots [0.14m
+s]
+(pass) explicit spawn model validation > emits separate initial model and thinking flags [10.51ms]
+(pass) maps typed validation failures to JSON content and details without lifecycle effects [0.84ms]
+(pass) omitted model preserves the default path without registry access [7.11ms]
+(pass) covers every present non-string model class and malformed boundary without registry access [0.71ms]
+(pass) accepts the exact 256-byte reference and rejects the 257-byte reference before registry access [0.16ms]
+(pass) classifies every registry failure through spawn with a complete zero-effect ledger [25.97ms]
+(pass) proves every non-registry rejection category has the complete zero-effect ledger [2.29ms]
+(pass) known unconfigured auth stops before catalog access and has zero spawn effects [0.60ms]
+(pass) primitive registries fail closed before catalog or availability access [3.41ms]
+(pass) does not cache invocation snapshots and excludes scoped model fixtures [0.26ms]
+(pass) covers provider/auth/catalog precedence, exact case, and later slash identity [0.16ms]
+(pass) invalid model dominates invalid slug and missing Agent with a complete zero-effect ledger [0.74ms]
+(pass) maps missing fifth context and optional registry through the same typed adapter contract [0.94ms]
+(pass) passes empty and invalid thinking unchanged while model-less thinking emits no flags [38.90ms]
+(pass) resume preserves the persisted generation-2 combined argv [22.89ms]
+(pass) clamps a valid but unsupported thinking level at the upstream capability boundary [0.38ms]
+(pass) Pi 0.84.2 parser warns and leaves invalid thinking unset [0.45ms]
+(pass) I-VALIDATE image admission > omitted, undefined and empty images retain runtime and tool text launches [126.51ms
+]
+(pass) I-VALIDATE image admission > invalid direct and bypassed-tool spawn inputs leave the complete admission ledger u
+nchanged [14.01ms]
+(pass) I-VALIDATE image admission > invalid direct and bypassed-tool resume inputs preserve generation, manifest, sessi
+on and Result bytes [42.40ms]
+(pass) I-VALIDATE image admission > inaccessible images properties are safe and model errors precede any image access [
+19.71ms]
+(pass) I-VALIDATE image admission > single and multiple spawn images reach the private seam as distinct ordered field s
+napshots [16.41ms]
+(pass) I-VALIDATE image admission > resume snapshots precede awaited operations and preserve fresh single/multiple tool
+ inputs [75.47ms]
+(pass) I-VALIDATE image admission > resume carries the admitted snapshot through recovery re-entry [19.77ms]
+(pass) I-VALIDATE image admission > model rejection and image snapshot happen before an outstanding spawn recovery wait
+ [5.54ms]
+(pass) I-VALIDATE image admission > production nonempty requests publish images and select the owned SDK child launch [
+801.49ms]
+(pass) I-VALIDATE image admission > resume retains unknown/active/overlap guards before the private image seam and neve
+r reads a registry [21.31ms]
+(pass) I-VALIDATE image admission > registered schemas expose optional upstream image shape while runtime survives sche
+ma mutation [25.66ms]
+(pass) I-TRANSPORT private publication and binding > atomic publication hides partial writes and retains the first orde
+red snapshot through launch [711.51ms]
+(pass) I-TRANSPORT private publication and binding > concurrent tasks and fresh resumed generations bind independent co
+mplete envelopes [1634.00ms]
+(pass) I-TRANSPORT private publication and binding > omitted and empty launches do no image I/O or expectation, even wi
+th an old envelope [35.98ms]
+(pass) I-TRANSPORT private publication and binding > real host access controls keep the directory and envelope private 
+[708.04ms]
+(pass) I-TRANSPORT private publication and binding > storage rejects cross-task/generation paths, invalid identities an
+d ancestor redirects [27.70ms]
+(pass) I-TRANSPORT private publication and binding > existing generation storage is never adopted, overwritten, or remo
+ved [5.34ms]
+(pass) I-TRANSPORT private publication and binding > create, write, publish and post-rename faults clean only their own
+ed files with safe stage errors [1326.85ms]
+(pass) I-TRANSPORT private publication and binding > permission setup failure is explicit and leaves no payload [20.73m
+s]
+(pass) I-TRANSPORT private publication and binding > create-surface, bootstrap-write and run failures clean published e
+nvelopes and redact public errors [1083.35ms]
+Image input cleanup failed for task generation 1.
+(pass) I-TRANSPORT private publication and binding > cleanup deletion failure keeps the safe primary launch error and i
+ts separate diagnostic [380.42ms]
+Image input cleanup failed for task generation 1.
+(pass) I-TRANSPORT private publication and binding > a redirected directory between publication and launch is refused a
+nd cleanup never follows it [427.58ms]
+(pass) I-TRANSPORT private publication and binding > post-publication task redirection retains bounded join settlement 
+and cleanup intent [412.52ms]
+(pass) I-TRANSPORT private publication and binding > post-publication task redirection retains bounded recover settleme
+nt and cleanup intent [368.36ms]
+(pass) I-TRANSPORT private publication and binding > post-publication scope redirection retains bounded join settlement
+ and cleanup intent [372.03ms]
+(pass) I-TRANSPORT private publication and binding > post-publication scope redirection retains bounded recover settlem
+ent and cleanup intent [390.33ms]
+(pass) I-TRANSPORT private publication and binding > spawn refuses a redirected scope before filesystem task reservatio
+n [4.65ms]
+(pass) I-TRANSPORT private publication and binding > failed resume cleans only its new generation and preserves previou
+s artifacts [773.66ms]
+Image input cleanup failed for task generation 1.
+Image input cleanup failed for task generation 1.
+(pass) I-TRANSPORT private publication and binding > regular directory and file replacements are refused by filesystem 
+identity [787.24ms]
+Image input cleanup failed for task generation 1.
+(pass) I-TRANSPORT private publication and binding > hardlink redirection is refused before launch and leaves the forei
+gn link untouched [353.28ms]
+(pass) I-TRANSPORT private publication and binding > complete Herdr argv, launch scripts, prompt and tool outputs conta
+in only a non-payload expectation [701.42ms]
+(pass) I-CLEANUP generation lifecycle > settle and cancel clean exactly their generation, preserve Results and unrelate
+d active tasks [2246.79ms]
+(pass) I-CLEANUP generation lifecycle > successive image and text resumes isolate each fresh payload and reject stale c
+leanup callbacks [1070.26ms]
+(pass) I-CLEANUP generation lifecycle > restart retains live input and cleans classified terminal/interrupted orphans w
+ithout replay [10817.82ms]
+(pass) I-CLEANUP generation lifecycle > deletion failure preserves primary outcome and retries once on recovery, resume
+ or remove [1741.13ms]
+(pass) I-CLEANUP generation lifecycle > recovery removes private prior-generation temporaries and preserves the live cu
+rrent generation [2111.34ms]
+(pass) I-CLEANUP generation lifecycle > cleanup refuses redirections, hardlinks, foreign additions and future-generatio
+n payloads [2678.60ms]
+(pass) preserves seeded task and scope bytes across the registry rejection matrix [25.75ms]
+
+tests\settings.test.ts:
+(pass) SubagentSettingsStore > uses defaults for a missing file and normalizes valid and legacy values [2.99ms]
+(pass) SubagentSettingsStore > warns and falls back without allowing warning failures to escape [3.26ms]
+(pass) SubagentSettingsStore > warns for invalid legacy layout even when widgetMode is valid [1.62ms]
+(pass) SubagentSettingsStore > cleans a temporary file when atomic replacement fails [3.89ms]
+(pass) SubagentSettingsStore > atomically saves normalized fields while preserving unrelated parsed values [13.75ms]
+
+tests\task-derived-id.test.ts:
+(pass) task-derived subagent IDs > validates exact slugs before filesystem or Herdr side effects [27.39ms]
+(pass) task-derived subagent IDs > reserves base then ordered suffixes across artifacts and sessions [18.56ms]
+(pass) task-derived subagent IDs > classifies exhaustion and filesystem failures without opening a tab or pane [50.92ms
+]
+(pass) task-derived subagent IDs > persists final canonical identity, recovers canonical and legacy records, and reuses
+ after removal [53.28ms]
+(pass) task-derived subagent IDs > exposes stable missing-slug errors through the spawn tool [1.30ms]
+(pass) legacy numeric tasks recover, resume, and remove without renaming [43.27ms]
+(pass) reserves unique IDs from separate processes racing on one artifact directory [632.04ms]
+(pass) completion notification recovery accepts only supported current-branch correlations [0.88ms]
+
+ 239 pass
+ 0 fail
+ 8243 expect() calls
+Ran 239 tests across 9 files. [149.61s]

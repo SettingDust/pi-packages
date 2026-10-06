@@ -1,0 +1,13 @@
+**No blockers found in the supplied performance changes**, subject to the static-review limits below.
+
+- **Unchanged V2 recovery:** `recoverScope` still rescans disk on every invocation and preserves `updatedAt` when terminal status/error match. `settle` compares reconstructed task state while removing only transient `result`; loading matching Result text therefore does not force the initial manifest write. Cleanup state remains part of that comparison.
+
+- **Persistence before recovery effects:** `settle` applies the current Result and prepares cleanup intent before deciding whether to persist. Changed status/error or cleanup records trigger persistence before surface cleanup, image cleanup, or notification. V1 recovery unconditionally takes the persistence path. The skip does not bypass the subsequent Result reconciliations.
+
+- **Retries and replay:** `prepareRecoveryCleanups` re-arms recognized pending/failed cleanup records and refreshes their attempt timestamp; `runPendingCleanups` remains awaited. Existing settlement coalescing/retry entry points remain in place. `notifyTerminal` does not mark successful delivery as durably acknowledged, and notifier failure remains eligible for later recovery replay.
+
+- **Unknown data:** Unchanged manifests remain untouched. Required writes still merge `manifestUnknown` into the V2 record, and reconstructed `surfaceCleanups` are cloned rather than omitted from comparison.
+
+- **Image cleanup safety:** `cleanupImageInputs` checks the artifact directory before name discovery. Retained cleanup owners participate even when their directory is absent. Candidates, retained owners, and explicit removal reach full scope/ancestor validation before image deletion; explicit removal cannot take the candidate-free success shortcut. Active current-generation input remains retained. Discovery is repeated, so a later orphan is not hidden by cached absence. `cleanupImages` retains bounded deletion, allowed-name checks, permissions/link checks, and directory/file identity rechecks.
+
+**Remaining limits:** No tools were run or files edited; the reported 239 passing tests are supporting evidence, not independently verified here. Some delegated internals remain absent鈥攏otably `applyCurrentResult`, `prepareCleanup`, `runCleanup`, `retrySettlement`, manifest validation, removal, and retained cleanup callbacks鈥攕o their complete behavior cannot be certified from this packet. The shown filesystem checks also do not establish atomic protection against hostile concurrent path replacement, and this review does not extend the documented single-owning-runtime guarantee to competing processes.
