@@ -346,7 +346,17 @@ function hasOnlyKeys(value: Record<string, unknown>, keys: string[]): boolean {
 }
 
 function resolved(handoff: Handoff, candidate: CandidateEntry): ResolvedInvocation {
-  return { status: "resolved", prompt: Bun.YAML.stringify(handoff), model: `${candidate.provider}/${candidate.modelId}`, thinking: candidate.thinking };
+  const mapping = {
+    objective: handoff.objective,
+    primarySkill: handoff.primarySkill,
+    companionSkills: handoff.companionSkills,
+    context: handoff.context.map((item) => "ref" in item
+      ? { ref: item.ref, purpose: item.purpose }
+      : { inline: item.inline, purpose: item.purpose }),
+    constraints: handoff.constraints ?? [],
+    deliverables: handoff.deliverables ?? [],
+  };
+  return { status: "resolved", prompt: Bun.YAML.stringify(mapping), model: `${candidate.provider}/${candidate.modelId}`, thinking: candidate.thinking };
 }
 
 function validateCapabilities(reasoning: unknown, impact: unknown, kind: "request" | "candidate"):

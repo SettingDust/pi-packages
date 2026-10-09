@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test";
-import { mkdtempSync, writeFileSync } from "node:fs";
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
@@ -89,27 +89,96 @@ test("renders named-Agent spawn and join actions", async () => {
   const registry = new AgentRegistry();
   registry.setFiles([{ path: "/handler.md", content: "---\nname: handler\n---\nHandler" }]);
   const root = mkdtempSync(join(tmpdir(), "subagent-renderer-"));
-  const tools = createSubagentTools(new SubagentRuntime(transport, registry, root), "/repo") as any[];
+  const parentSessionFile = join(root, "parent.jsonl");
+  const runtime = new SubagentRuntime(transport, registry);
+  const tools = createSubagentTools(runtime, "/repo", parentSessionFile) as any[];
   const spawn = tools.find(tool => tool.name === "subagent_spawn")!;
   const joinTool = tools.find(tool => tool.name === "subagent_join")!;
   const spawnArgs = { agent: "handler", prompt: "Do the work", label: "Implement renderer", taskSlug: "implement-renderer" };
 
   expect(render(spawn.renderCall(spawnArgs, theme))).toBe("subagent spawn  handler · Implement renderer");
   const spawned = await spawn.execute("spawn-1", spawnArgs);
-  expect(render(spawn.renderResult(spawned, {}, theme))).toBe(" Started Implement renderer\n  implement-renderer");
+  expect(render(spawn.renderResult(spawned, {}, theme))).toBe(" Implement renderer running\n  Result unavailable · result_not_delivered · full Result not returned");
 
-  const task = spawned.details;
+  const task = runtime.inspect(spawned.details.subagentId);
   writeFileSync(task.resultPath, JSON.stringify({
     subagentId: task.subagentId,
     generation: task.generation,
     status: "completed",
     result: "status: completed\nsummary: done\nreport: renderer works",
-  }));
+  }), { mode: 0o600 });
 
   expect(render(joinTool.renderCall({ subagentId: task.subagentId }, theme))).toBe("subagent join  implement-renderer");
   let partial: unknown;
-  const joined = await joinTool.execute("join-1", { subagentId: task.subagentId }, undefined, (update: unknown) => { partial = update; });
-  expect(render(joinTool.renderResult(partial, { isPartial: true }, theme))).toBe(" Implement renderer running\n   waiting for result");
-  expect(render(joinTool.renderResult(joined, {}, theme))).toBe(" Implement renderer completed");
-  expect(render(joinTool.renderResult(joined, { expanded: true }, theme))).toContain("status: completed\nsummary: done\nreport: renderer works");
+  try {
+    const joined = await joinTool.execute("join-1", { subagentId: task.subagentId }, undefined, (update: unknown) => { partial = update; }, { cwd: "/repo", sessionManager: { getSessionFile: () => parentSessionFile } });
+    expect(render(joinTool.renderResult(partial, { isPartial: true }, theme))).toBe(" Implement renderer running\n   waiting for result");
+    // Raw Herdr transport is not Caller delivery. This fixture supplies the full projection explicitly.
+    expect(render(joinTool.renderResult(joined, { expanded: true }, theme))).not.toContain("report: renderer works");
+    const original = "status: completed\nsummary: done\nreport: renderer works";
+    expect(joined.details.result).toBe(original);
+    const details = { ...joined.details, resultDelivery: { kind: "full", originalBytes: Buffer.byteLength(original), fullResultReturned: true } };
+    delete details.resultSource;
+    const projected = { content: [{ type: "text", text: JSON.stringify(details) }], details };
+    expect(render(joinTool.renderResult(projected, {}, theme))).toContain("Full Result delivered");
+    expect(render(joinTool.renderResult(projected, { expanded: true }, theme))).toContain(original);
+  } finally { runtime.stop(); rmSync(root, { recursive: true, force: true }); }
 });
+
+for (const name of ["subagent_join", "subagent_inspect", "subagent_spawn", "subagent_resume", "subagent_cancel", "subagent_steer"]) {
+  test(`${name} renders only delivered full/summary/unavailable through installed Pi composition`, () => {
+    const registry = new AgentRegistry();
+    registry.setFiles([{ path: "/handler.md", content: "---\nname: handler\n---\nHandler" }]);
+    const runtime = new SubagentRuntime({} as HerdrTransport, registry);
+    runtime.inspect = () => { throw new Error("renderer must not read runtime cache"); };
+    const tool = createSubagentTools(runtime, "/repo").find(tool => tool.name === name)! as any;
+    const marker = "HIDDEN_LONG_BODY_MARKER";
+    const original = "status: partial\nsummary: done\nreport: short evidence";
+    const base = { subagentId: "render-task", generation: 2, agent: "handler", label: "safe label", status: "completed" };
+    const path = "/fixture/render-task-artifacts/result-2.json";
+    const summary = '  Existing summary "quotes" 中文\\path\nsecond line  ';
+    const full = { ...base, result: original, resultPath: path, resultDelivery: { kind: "full", originalBytes: Buffer.byteLength(original), fullResultReturned: true } };
+    const navigation = { ...base, resultSummary: summary, resultPath: path, resultDelivery: { kind: "summary", originalBytes: 16385, fullResultReturned: false } };
+    const unavailable = { ...base, resultDelivery: { kind: "unavailable", fullResultReturned: false, code: "result_access_unavailable" } };
+    const cases = [full, navigation, unavailable, { ...base, result: marker.repeat(1000) },
+      { ...navigation, result: marker }, { ...full, result: marker.repeat(1000) },
+      { ...full, resultDelivery: { kind: "full", originalBytes: 999, fullResultReturned: true } },
+      { ...navigation, resultDelivery: { kind: "summary", originalBytes: 16385, fullResultReturned: true } },
+      { ...unavailable, result: marker, resultSummary: marker }, { ...base, agent: undefined, result: marker }];
+    for (const details of cases) {
+      const before = JSON.stringify(details);
+      const value = { content: [{ type: "text", text: marker }], details };
+      for (const expanded of [false, true]) {
+        const text = render(tool.renderResult(value, { expanded }, theme));
+        expect(text).not.toContain(marker);
+        if (details === navigation) {
+          expect(text).toContain(summary.trimEnd());
+          expect(text).toContain(path);
+          expect(text).toContain("16385 UTF-8 bytes");
+          expect(text).toContain("full Result not returned");
+          expect(text).toContain("ordinary read");
+          expect(text).toContain("completely decode result");
+        }
+        if (details === full && expanded) expect(text).toContain(original);
+        if (details === unavailable) expect(text).toContain("result_access_unavailable");
+        const component = new ToolExecutionComponent(name, "consumer", { subagentId: base.subagentId, agent: "handler", label: base.label }, {}, tool, { requestRender() {} }, "/repo");
+        component.setExpanded(expanded);
+        component.updateResult(value, false);
+        for (const width of [12, 40, 120]) {
+          const lines = component.render(width).map(stripTerminalSequences);
+          expect(lines.join("\n")).not.toContain(marker);
+          for (const line of lines) expect(visibleWidth(line)).toBeLessThanOrEqual(width);
+        }
+        const progress = render(tool.renderResult({ ...value, details: { ...base, result: marker, resultDelivery: full.resultDelivery } }, { expanded, isPartial: true }, theme));
+        expect(progress).not.toContain(marker);
+        expect(progress).not.toContain("Full Result delivered");
+      }
+      expect(JSON.stringify(details)).toBe(before);
+    }
+    expect(render(tool.renderResult({ content: [{ type: "text", text: marker }] }, { expanded: true }, theme))).not.toContain(marker);
+    const longSummary = { ...navigation, resultSummary: "长".repeat(6000) + "SUMMARY_END" };
+    expect(render(tool.renderResult({ details: longSummary }, {}, theme))).toContain("SUMMARY_END");
+    const plain = { ...base, agent: "reviewer", result: "opaque non-Handler original" };
+    expect(render(tool.renderResult({ details: plain }, { expanded: true }, theme))).toContain(plain.result);
+  });
+}

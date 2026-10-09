@@ -319,7 +319,10 @@ describe("built-in Skill library", () => {
       for (const clause of clauses) expect(body).toContain(clause);
     }
     const cleanupOrder = [
-      "obtain the full Result through the backend's supported retrieval path",
+      "Before first adoption of summary navigation, ordinary `read` must obtain the complete existing compact JSON envelope",
+      "completely decode its `result` and read status, summary, report, artifacts and limitations",
+      "Correlate existing `subagentId/generation/status/error` with the known task, selected outcome and current caller context",
+      "Already visible complete Results still require full reading and correlation before adoption",
       "updates Todo/Waves with the actual",
       "checks completion predicates, and releases dependencies only when their required predicates hold",
       "Cleanup 1 - Checkpoint.",

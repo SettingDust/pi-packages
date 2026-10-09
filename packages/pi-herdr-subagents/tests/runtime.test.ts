@@ -8,7 +8,7 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import type { ImageContent } from "@earendil-works/pi-ai";
 import { createHerdrClient } from "@settingdust/pi-herdr";
-import activateSubagents, { AgentRegistry, SubagentRuntime, createHerdrTransport, createSubagentTools, paneChildExtensionPath, validateExplicitSpawnModel, type CompletionNotification, type HerdrTransport, type SubagentTask } from "../src/index.js";
+import activateSubagents, { AgentRegistry, SubagentRuntime, createHerdrTransport, createSubagentTools, createSubagentStatusWidget, paneChildExtensionPath, validateExplicitSpawnModel, type CompletionNotification, type HerdrTransport, type SubagentTask } from "../src/index.js";
 import { resultPublisher } from "../src/result-publication.js";
 
 function fakeTransport(paneExists: boolean | (() => boolean) = true) {
@@ -1466,6 +1466,16 @@ describe("pi-herdr-subagents runtime", () => {
     expect(tools[0]!.description).not.toMatch(/Harness|Router|Resolver|resolve_delegation|Handler|YAML|next environment action/);
     expect(tools.find(tool => tool.name === "subagent_inspect")!.description).toContain("do not poll this tool while waiting");
     expect(tools.find(tool => tool.name === "subagent_join")!.description).toContain("Caller cancellation, including ESC, stops only this wait");
+    for (const name of ["subagent_join", "subagent_inspect"]) {
+      const tool = tools.find(tool => tool.name === name)!;
+      const schema = tool.parameters as { properties: Record<string, unknown>; required: string[] };
+      expect(Object.keys(schema.properties)).toEqual(name === "subagent_join" ? ["subagentId", "generation"] : ["subagentId"]);
+      expect(schema.required).toEqual(["subagentId"]);
+      expect(tool.description).toContain("ordinary read");
+      expect(tool.description).toContain("resultPath");
+      expect(tool.description).toContain("before adoption");
+      expect(tool.description).not.toContain("read its full Result");
+    }
 
     const invoke = (params: Record<string, string>) => (tools[0]!.execute as any)("call-1", params, undefined, undefined, { modelRegistry: modelRegistry("test/model") });
     const callerWrapper = (params: Record<string, string>) => invoke(params);
@@ -1538,9 +1548,13 @@ describe("pi-herdr-subagents runtime", () => {
           subagentId: branch.taskSlug, generation: 1, label: branch.taskSlug, status: "running",
           tabId: `tab-${branch.taskSlug}`, paneId: `pane-${branch.taskSlug}`,
           sessionFile: join(root, "tasks", `${branch.taskSlug}-g1.jsonl`),
-          resultPath: join(root, "tasks", `${branch.taskSlug}-artifacts`, "result-1.json"),
         });
-        tasks.push(task);
+        expect(task).not.toHaveProperty("resultPath");
+        expect(task).not.toHaveProperty("result");
+        // The fixture owns publication paths; active Caller snapshots must not issue them.
+        const internal = runtime.inspect(task.subagentId);
+        expect(internal.resultPath).toBe(join(root, "tasks", `${branch.taskSlug}-artifacts`, "result-1.json"));
+        tasks.push(internal);
         expect(runtime.listTasks().map(({ status }) => status)).toEqual(tasks.map(() => "running"));
         expect(tasks.every(value => !existsSync(value.resultPath))).toBeTrue();
         expect(notifications).toEqual([]);
@@ -2288,7 +2302,7 @@ describe("runtime task observation", () => {
     runtime.stop();
   });
 
-  test("resume, cancellation, and launch failure all invalidate after their state changes", async () => {
+  test("resume and cancellation invalidate after their state changes", async () => {
     const root = mkdtempSync(join(tmpdir(), "subagents-observation-mutations-"));
     const { transport } = fakeTransport();
     const runtime = new SubagentRuntime(transport, handlerRegistry(), root);
@@ -2304,7 +2318,10 @@ describe("runtime task observation", () => {
     const beforeCancel = updates;
     await runtime.cancel(second.subagentId);
     expect(updates).toBeGreaterThan(beforeCancel);
+    runtime.stop();
+  });
 
+  test("launch failure invalidates after its state changes", async () => {
     const failingTransport = fakeTransport().transport;
     failingTransport.createTab = async () => { throw new Error("launch unavailable"); };
     const failing = new SubagentRuntime(failingTransport, handlerRegistry(), mkdtempSync(join(tmpdir(), "subagents-observation-launch-")));
@@ -2312,7 +2329,6 @@ describe("runtime task observation", () => {
     failing.onTaskUpdate(() => { failedUpdates++; });
     await expect(failing.spawn({ agent: "handler", cwd: "/repo", prompt: "fail", label: "launch", taskSlug: "task",})).rejects.toThrow("launch unavailable");
     expect(failedUpdates).toBe(2);
-    runtime.stop();
     failing.stop();
   });
 
@@ -3547,7 +3563,7 @@ describe("Phase B terminal surface cleanup", () => {
     expect(existsSync(dirname(task.resultPath))).toBeFalse();
   });
 
-  test("selects one fail-safe canonical duplicate per generation without rewriting the others", async () => {
+  describe("selects one fail-safe canonical duplicate per generation without rewriting the others", () => {
     const attemptedAt = "2026-01-01T00:00:00.000Z";
     const record = (status: "pending" | "failed" | "closed" | "already_closed", marker: string) => ({
       generation: 1,
@@ -3565,7 +3581,8 @@ describe("Phase B terminal surface cleanup", () => {
       { name: "final-final", entries: [record("closed", "first"), record("already_closed", "second")], updatedIndex: undefined, closes: 0 },
     ] as const;
 
-    for (const testCase of cases) {
+    // Each independent native-ACL fixture has its own unchanged default test deadline.
+    for (const testCase of cases) test(testCase.name, async () => {
       const root = mkdtempSync(join(tmpdir(), `subagents-cleanup-duplicates-${testCase.name}-`));
       const original = new SubagentRuntime(fakeTransport().transport, handlerRegistry(), root);
       const task = await original.spawn({ agent: "handler", cwd: "/repo", prompt: "work", label: testCase.name, taskSlug: "task" });
@@ -3592,7 +3609,7 @@ describe("Phase B terminal surface cleanup", () => {
         expect(persisted.surfaceCleanups[testCase.updatedIndex]).toMatchObject({ status: "closed", opaque: testCase.entries[testCase.updatedIndex].opaque });
       }
       rebuilt.stop();
-    }
+    });
   });
 
   test("validates cleanup timestamps, status identities/errors, and the 160-character diagnostic boundary", async () => {
@@ -3643,7 +3660,7 @@ describe("Phase B terminal surface cleanup", () => {
       }
       rebuilt.stop();
     }
-  });
+  }, 30_000); // Windows private source-owner allocation performs native ACL work per case.
 
   test("normalizes close diagnostics at the exact 160/161-character boundary", async () => {
     for (const length of [160, 161]) {
@@ -4321,20 +4338,23 @@ describe("I-VALIDATE image admission", () => {
           : await f.runtime.spawn({ ...input, ...supplied });
         expect(task).toMatchObject({ generation: 1, status: "running" });
         expect(task).not.toHaveProperty("images");
-        writeFileSync(task.resultPath, JSON.stringify({ subagentId: task.subagentId, generation: 1, status: "completed", result: "done" }));
+        if (toolCall) expect(task).not.toHaveProperty("resultPath");
+        // The fake provider publishes through its owned runtime state, not a model-facing Result ref.
+        writeFileSync(f.runtime.inspect(task.subagentId).resultPath, JSON.stringify({ subagentId: task.subagentId, generation: 1, status: "completed", result: "done" }));
         await f.runtime.join(task.subagentId);
         const resumed: SubagentTask = toolCall
           ? (await (tools[1]!.execute as any)("resume", { subagentId: task.subagentId, prompt: "again", ...supplied })).details
           : await f.runtime.resume(task.subagentId, "again", supplied.images);
         expect(resumed).toMatchObject({ generation: 2, sessionFile: task.sessionFile, status: "running" });
         expect(resumed).not.toHaveProperty("images");
-        expect(readdirSync(dirname(resumed.resultPath)).sort()).toEqual(["launch-1.cjs", "launch-1.ps1", "launch-2.cjs", "launch-2.ps1", "result-1.json", "task.json"]);
+        if (toolCall) expect(resumed).not.toHaveProperty("resultPath");
+        expect(readdirSync(dirname(f.runtime.inspect(resumed.subagentId).resultPath)).sort()).toEqual(["launch-1.cjs", "launch-1.ps1", "launch-2.cjs", "launch-2.ps1", "result-1.json", "task.json"]);
         const launches = f.calls.filter(call => (call as any).op === "create") as Array<{ input: { env: Record<string, string> } }>;
         expect(launches).toHaveLength(2);
         for (const launch of launches) expect(Object.keys(launch.input.env).sort()).toEqual(["PI_HERDR_SUBAGENT_GENERATION", "PI_HERDR_SUBAGENT_ID", "PI_HERDR_SUBAGENT_RESULT_PATH"]);
       }
     }
-  });
+  }, 30_000); // Windows private source-owner allocation performs native ACL work per case.
 
   test("invalid direct and bypassed-tool spawn inputs leave the complete admission ledger unchanged", async () => {
     const f = fixture();
@@ -4563,7 +4583,7 @@ describe("I-TRANSPORT private publication and binding", () => {
   function watch<T extends { mockRestore(): void }>(spy: T): T { spies.push(spy); return spy; }
   function fixture(): {
     root: string; notifications: CompletionNotification[]; updates: SubagentTask[][];
-    calls: unknown[]; transport: HerdrTransport; runtime: SubagentRuntime;
+    calls: unknown[]; transport: HerdrTransport; runtime: SubagentRuntime; pending: Promise<unknown>[];
   } {
     const root = mkdtempSync(join(tmpdir(), "subagents-image-transport-"));
     const notifications: CompletionNotification[] = [];
@@ -4571,9 +4591,26 @@ describe("I-TRANSPORT private publication and binding", () => {
     const { calls, transport } = fakeTransport();
     const runtime = new SubagentRuntime(transport, handlerRegistry(), root, value => { notifications.push(value); });
     runtime.onTaskUpdate(() => { updates.push(runtime.listTasks().map(task => runtime.inspect(task.subagentId))); });
-    const f = { root, notifications, updates, calls, transport, runtime };
+    const f = { root, notifications, updates, calls, transport, runtime, pending: [] as Promise<unknown>[] };
     fixtures.push(f);
     return f;
+  }
+  function track<T>(f: ReturnType<typeof fixture>, operation: Promise<T>): Promise<T> {
+    f.pending.push(operation);
+    return operation;
+  }
+  async function dispose(f: ReturnType<typeof fixture>): Promise<void> {
+    // stop() aborts monitors, not a test body or a launch awaiting transport.
+    f.runtime.stop();
+    const foreground = await Promise.allSettled(f.pending.splice(0));
+    f.runtime.stop(); // A drained body may have started another generation's monitor.
+    const background = await Promise.allSettled([
+      ...f.runtime["launches"].values(), ...f.runtime["settlements"].values(), ...f.runtime["cleanups"].values(),
+    ]);
+    f.runtime.stop();
+    rmSync(f.root, { recursive: true, force: true });
+    const errors = [...foreground, ...background].flatMap(value => value.status === "rejected" ? [value.reason] : []);
+    if (errors.length) throw new AggregateError(errors, "Fixture operations failed.");
   }
   function scopeTask(f: ReturnType<typeof fixture>, subagentId = "task", generation = 1) {
     const scope = join(f.root, "tasks");
@@ -4624,12 +4661,11 @@ describe("I-TRANSPORT private publication and binding", () => {
     expect(result.stderr).toBe("");
     return result.stdout;
   }
-  afterEach(() => {
+  afterEach(async () => {
+    const outcomes = await Promise.allSettled(fixtures.splice(0).map(dispose));
     for (const spy of spies.splice(0).reverse()) spy.mockRestore();
-    for (const f of fixtures.splice(0)) {
-      f.runtime.stop();
-      rmSync(f.root, { recursive: true, force: true });
-    }
+    const errors = outcomes.flatMap(value => value.status === "rejected" ? [value.reason] : []);
+    if (errors.length) throw new AggregateError(errors, "Fixture teardown failed.");
   });
 
   test("atomic publication hides partial writes and retains the first ordered snapshot through launch", async () => {
@@ -4668,32 +4704,83 @@ describe("I-TRANSPORT private publication and binding", () => {
     inspectLaunch(f, launched);
   });
 
+  test("fixture teardown drains a pending launch and its resumed body before deleting storage", async () => {
+    const f = fixture();
+    const entered = Promise.withResolvers<void>();
+    const release = Promise.withResolvers<void>();
+    const create = f.transport.createTab.bind(f.transport);
+    f.transport.createTab = async value => {
+      entered.resolve();
+      await release.promise;
+      return create(value);
+    };
+    const pending = track(f, (async () => {
+      const first = await f.runtime.spawn({ ...input, images });
+      await complete(f, first);
+      const next = await f.runtime.resume(first.subagentId, input.prompt, images);
+      await complete(f, next);
+      expect(existsSync(directory(first))).toBeFalse();
+      expect(existsSync(directory(next))).toBeFalse();
+      return f.runtime.inspect(next.subagentId);
+    })());
+    await entered.promise;
+    const disposing = dispose(f);
+    const settled = Promise.all([pending, disposing]);
+    try {
+      await Promise.resolve();
+      expect(existsSync(f.root)).toBeTrue();
+      expect(f.runtime["launches"].size).toBe(1);
+      expect(f.calls).toEqual([]);
+    } finally {
+      release.resolve();
+      await settled;
+    }
+    expect(await pending).toMatchObject({ status: "completed", error: undefined });
+    expect(existsSync(f.root)).toBeFalse();
+    for (const key of ["launches", "settlements", "cleanups", "monitors", "pendingSettlements"] as const) {
+      expect(f.runtime[key].size).toBe(0);
+    }
+    expect(f.notifications).toHaveLength(2);
+  });
+
+  test("fixture teardown reports an outstanding operation rejection rather than swallowing it", async () => {
+    const f = fixture();
+    const release = Promise.withResolvers<void>();
+    track(f, release.promise);
+    const disposing = dispose(f);
+    release.reject(fault);
+    await expect(disposing).rejects.toMatchObject({ message: "Fixture operations failed.", errors: [fault] });
+    expect(existsSync(f.root)).toBeFalse();
+  });
+
   test("concurrent tasks and fresh resumed generations bind independent complete envelopes", async () => {
     const f = fixture();
-    const launchEnvelopes: unknown[] = [];
-    const createTab = f.transport.createTab.bind(f.transport);
-    f.transport.createTab = async value => {
-      expect(value.env!.PI_HERDR_SUBAGENT_IMAGE_INPUT).toBe("1");
-      const task = { resultPath: value.env!.PI_HERDR_SUBAGENT_RESULT_PATH!, generation: Number(value.env!.PI_HERDR_SUBAGENT_GENERATION) };
-      const observed = envelope(task);
-      expect(observed.subagentId).toBe(value.env!.PI_HERDR_SUBAGENT_ID);
-      expect(observed.generation).toBe(task.generation);
-      launchEnvelopes.push(observed);
-      return createTab(value);
-    };
-    const first = await Promise.all(["alpha", "bravo"].map((taskSlug, index) => f.runtime.spawn({ ...input, taskSlug, images: [images[index]!] })));
-    for (const task of first) await complete(f, task);
-    const next = await Promise.all(first.map((task, index) => f.runtime.resume(task.subagentId, input.prompt, [images[1 - index]!])));
-    expect(new Set([...first, ...next].map(payload)).size).toBe(4);
-    for (let index = 0; index < first.length; index++) {
-      expect(envelope(next[index]!)).toEqual({ version: 1, subagentId: first[index]!.subagentId, generation: 2, images: [images[1 - index]!] });
-      expect(existsSync(directory(first[index]!))).toBeFalse(); // Terminal leftovers belong to I-CLEANUP.
-      expect(next[index]!.sessionFile).toBe(first[index]!.sessionFile);
-    }
-    expect(launchEnvelopes).toHaveLength(4);
-    for (const task of next) inspectLaunch(f, task);
-    assertPrivatePublicText(f.notifications, [...first, ...next]);
-  });
+    await track(f, (async () => {
+      const launchEnvelopes: unknown[] = [];
+      const createTab = f.transport.createTab.bind(f.transport);
+      f.transport.createTab = async value => {
+        expect(value.env!.PI_HERDR_SUBAGENT_IMAGE_INPUT).toBe("1");
+        const task = { resultPath: value.env!.PI_HERDR_SUBAGENT_RESULT_PATH!, generation: Number(value.env!.PI_HERDR_SUBAGENT_GENERATION) };
+        const observed = envelope(task);
+        expect(observed.subagentId).toBe(value.env!.PI_HERDR_SUBAGENT_ID);
+        expect(observed.generation).toBe(task.generation);
+        launchEnvelopes.push(observed);
+        return createTab(value);
+      };
+      const first = await Promise.all(["alpha", "bravo"].map((taskSlug, index) => f.runtime.spawn({ ...input, taskSlug, images: [images[index]!] })));
+      for (const task of first) await complete(f, task);
+      const next = await Promise.all(first.map((task, index) => f.runtime.resume(task.subagentId, input.prompt, [images[1 - index]!])));
+      expect(new Set([...first, ...next].map(payload)).size).toBe(4);
+      for (let index = 0; index < first.length; index++) {
+        expect(envelope(next[index]!)).toEqual({ version: 1, subagentId: first[index]!.subagentId, generation: 2, images: [images[1 - index]!] });
+        expect(existsSync(directory(first[index]!))).toBeFalse(); // Terminal leftovers belong to I-CLEANUP.
+        expect(next[index]!.sessionFile).toBe(first[index]!.sessionFile);
+      }
+      expect(launchEnvelopes).toHaveLength(4);
+      for (const task of next) inspectLaunch(f, task);
+      assertPrivatePublicText(f.notifications, [...first, ...next]);
+    })());
+  }, process.platform === "win32" ? 10_000 : undefined); // Seven native ACL launches measured 5.23s; allow Windows scheduling headroom.
 
   test("omitted and empty launches do no image I/O or expectation, even with an old envelope", async () => {
     const f = fixture();
@@ -4703,7 +4790,9 @@ describe("I-TRANSPORT private publication and binding", () => {
     const publish = watch(spyOn(f.runtime as any, "publishImageInput"));
     const open = watch(spyOn(fsPromises, "open").mockRejectedValue(fault));
     const tools = createSubagentTools(f.runtime, input.cwd);
-    const first = (await (tools[0]!.execute as any)("spawn", input)).details as SubagentTask;
+    const spawned = await (tools[0]!.execute as any)("spawn", input);
+    expect(spawned.details).not.toHaveProperty("resultPath");
+    const first = f.runtime.inspect(spawned.details.subagentId);
     await complete(f, first);
     const pendingGeneration = { ...first, generation: 2 };
     mkdirSync(directory(pendingGeneration));
@@ -4713,7 +4802,9 @@ describe("I-TRANSPORT private publication and binding", () => {
       if (String(path).endsWith("envelope.json")) throw fault;
       return read(path, options);
     }) as typeof fs.readFileSync));
-    const next = (await (tools[1]!.execute as any)("resume", { subagentId: first.subagentId, prompt: input.prompt, images: [] })).details as SubagentTask;
+    const resumed = await (tools[1]!.execute as any)("resume", { subagentId: first.subagentId, prompt: input.prompt, images: [] });
+    expect(resumed.details).not.toHaveProperty("resultPath");
+    const next = f.runtime.inspect(resumed.details.subagentId);
     expect(publish).not.toHaveBeenCalled();
     expect(open).not.toHaveBeenCalled();
     imageReads.mockRestore();
@@ -4880,7 +4971,7 @@ describe("I-TRANSPORT private publication and binding", () => {
       }
       for (const spy of spies.splice(0).reverse()) spy.mockRestore();
     }
-  });
+  }, 30_000); // Native Windows ACL work is real, even with a fake transport.
 
   test("cleanup deletion failure keeps the safe primary launch error and its separate diagnostic", async () => {
     const f = fixture();
@@ -5154,7 +5245,8 @@ describe("I-TRANSPORT private publication and binding", () => {
     f.transport.run = actual.run;
     const tools = createSubagentTools(f.runtime, input.cwd);
     const spawned = await (tools[0]!.execute as any)("spawn", { ...input, images, model: "test/model", thinking: "high" }, undefined, undefined, { modelRegistry: modelRegistry("test/model") });
-    const task = spawned.details as SubagentTask;
+    expect(spawned.details).not.toHaveProperty("resultPath");
+    const task = f.runtime.inspect(spawned.details.subagentId);
     const args = inspectLaunch(f, task);
     expect(args).toContain("test/model");
     expect(args.slice(args.indexOf("--model"), -1)).toEqual(["--model", "test/model", "--thinking", "high"]);
@@ -5166,9 +5258,11 @@ describe("I-TRANSPORT private publication and binding", () => {
     const joined = await (tools[3]!.execute as any)("join", { subagentId: task.subagentId });
     assertPrivatePublicText([joined, f.notifications, readFileSync(task.resultPath, "utf8")], [task]);
     const resumed = await (tools[1]!.execute as any)("resume", { subagentId: task.subagentId, prompt: input.prompt, images: [images[1]!] });
-    const resumedArgs = inspectLaunch(f, resumed.details);
+    expect(resumed.details).not.toHaveProperty("resultPath");
+    const resumedTask = f.runtime.inspect(resumed.details.subagentId);
+    const resumedArgs = inspectLaunch(f, resumedTask);
     expect(resumedArgs.slice(resumedArgs.indexOf("--model"), -1)).toEqual(["--model", "test/model:high"]);
-    assertPrivatePublicText([herdrArgs, resumed], [task, resumed.details]);
+    assertPrivatePublicText([herdrArgs, resumed], [task, resumedTask]);
   });
 });
 
@@ -5385,6 +5479,344 @@ function snapshotSpawnState(runtime: SubagentRuntime, root: string) {
     cleanups: [...internals.cleanups.keys()],
   };
 }
+
+describe("I-SOURCE trusted opaque Result issuance", () => {
+  const originals = ["opaque—not a Harness document\r\n  ", "status: completed\nsummary: exact\nreport: |\n  " + "长\\\"\t".repeat(6000)];
+  const roots: string[] = [];
+  const runtimes: SubagentRuntime[] = [];
+  const spies: { mockRestore(): void }[] = [];
+  afterEach(() => {
+    for (const spy of spies.splice(0).reverse()) spy.mockRestore();
+    for (const runtime of runtimes.splice(0)) runtime.stop();
+    for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true });
+  });
+
+  async function fixture(original = originals[0]!, image = false) {
+    const root = mkdtempSync(join(tmpdir(), "subagents-source-")); roots.push(root);
+    const parentSessionFile = join(root, "parent.jsonl");
+    const cwd = "/repo";
+    const { calls, transport } = fakeTransport();
+    const notifications: CompletionNotification[] = [];
+    const runtime = new SubagentRuntime(transport, handlerRegistry(), undefined, value => { notifications.push(value); });
+    runtimes.push(runtime);
+    const active = await runtime.spawn({ agent: "handler", cwd, parentSessionFile, prompt: "work", label: "source", taskSlug: "source",
+      ...(image ? { images: [{ type: "image" as const, mimeType: "image/png", data: "AQ==" }] } : {}) });
+    writeFileSync(active.resultPath, JSON.stringify({ subagentId: active.subagentId, generation: active.generation, status: "completed", result: original }), { mode: 0o600 });
+    await runtime.join(active.subagentId); runtime.stop();
+    const task = runtime.inspect(active.subagentId);
+    const scope = dirname(task.sessionFile);
+    const artifact = dirname(task.resultPath);
+    const manifest = join(artifact, "task.json");
+    const ctx = { cwd, sessionManager: { getSessionFile: () => parentSessionFile } };
+    const tools = createSubagentTools(runtime, cwd, parentSessionFile);
+    const call = (name: string, params: object = { subagentId: task.subagentId }, update?: (value: any) => void, context: any = ctx) =>
+      (tools.find(tool => tool.name === name)!.execute as any)("source-call", params, undefined, update, context);
+    return { root, cwd, parentSessionFile, runtime, task, scope, artifact, manifest, ctx, call, original, calls, notifications };
+  }
+
+  function rejected(value: any, original: string, path: string) {
+    expect(value.details.resultDelivery).toMatchObject({ kind: "unavailable", fullResultReturned: false });
+    expect(value.details).not.toHaveProperty("result");
+    expect(value.details).not.toHaveProperty("resultPath");
+    expect(value.details).not.toHaveProperty("resultSource");
+    expect(JSON.stringify(value)).not.toContain(original);
+    expect(JSON.stringify(value)).not.toContain(path.replaceAll("\\", "\\\\"));
+    expect(JSON.parse(value.content[0].text)).toEqual(value.details);
+  }
+
+  function ledger(f: Awaited<ReturnType<typeof fixture>>) {
+    return {
+      ...snapshotSpawnState(f.runtime, f.root), calls: structuredClone(f.calls), notifications: structuredClone(f.notifications),
+      pending: [...(f.runtime as any).pendingSettlements.keys()], images: [...(f.runtime as any).imageCleanups.keys()],
+      removals: [...(f.runtime as any).removals.keys()], epoch: (f.runtime as any).monitorEpoch,
+    };
+  }
+
+  test("current and restored caches issue exact fresh opaque evidence through join, inspect and cancel", async () => {
+    for (const original of originals) {
+      const f = await fixture(original);
+      for (const name of ["subagent_join", "subagent_inspect", "subagent_cancel"]) {
+        const value = await f.call(name, { subagentId: f.task.subagentId, message: "no active turn" });
+        expect(value.details.result).toBe(original);
+        expect(value.details.resultPath).toBe(f.task.resultPath);
+        expect(value.details.resultSource).toEqual({ scopeIdentity: f.scope, parentSessionFile: f.parentSessionFile });
+        expect(JSON.parse(value.content[0].text)).toEqual(value.details);
+        expect(value.details).not.toHaveProperty("resultSummary");
+      }
+      await f.runtime.recover(f.cwd, f.parentSessionFile); f.runtime.stop();
+      const envelope = JSON.parse(readFileSync(f.task.resultPath, "utf8"));
+      // JSON layout/key escaping is not a change to the decoded original.
+      writeFileSync(f.task.resultPath, JSON.stringify(envelope, null, 2).replaceAll("result", "\\u0072esult"));
+      const before = ledger(f);
+      const restored = await f.call("subagent_join");
+      expect(restored.details.result).toBe(original);
+      expect(restored.details.resultSource.scopeIdentity).toBe(f.scope);
+      expect(ledger(f)).toEqual(before);
+      writeFileSync(f.task.resultPath, JSON.stringify({ ...envelope, result: original.replace(/^./, "X") }));
+      const stale = ledger(f);
+      rejected(await f.call("subagent_join"), original, f.task.resultPath);
+      expect(ledger(f)).toEqual(stale);
+    }
+  }, 120_000); // Repeated fresh native ACL probes; no permission cache replaces them.
+
+  test("every join update is lifecycle-only before final opaque delivery", async () => {
+    const marker = "CONSUMER_PRIVATE_LONG_REPORT";
+    const f = await fixture(marker + originals[1]);
+    const observations = f.runtime.listTasks();
+    expect(observations).toHaveLength(1);
+    expect(f.notifications).toHaveLength(1);
+    for (const observation of [...observations, ...f.notifications]) {
+      for (const key of ["result", "resultSummary", "resultPath", "resultSource", "sessionFile"]) expect(observation).not.toHaveProperty(key);
+      expect(JSON.stringify(observation)).not.toContain(marker);
+    }
+    for (const mode of ["progress", "summary"] as const) {
+      const widget = createSubagentStatusWidget(observations, { mode, useNerdFont: false, clock: Date.now, tui: { requestRender() {} } });
+      for (const width of [12, 40, 120]) expect(widget.render(width).join("\n")).not.toContain(marker);
+      widget.dispose();
+    }
+    const inspect = f.runtime.inspect.bind(f.runtime);
+    let inspections = 0;
+    spies.push(spyOn(f.runtime, "inspect").mockImplementation(id => {
+      const value = inspect(id);
+      return ++inspections === 2 ? { ...value, result: undefined, resultSummary: "unsafe summary", resultSource: { scopeIdentity: "unsafe scope" } } : value;
+    }));
+    const updates: any[] = [];
+    const result = await f.call("subagent_join", undefined, value => updates.push(value));
+    expect(updates.length).toBeGreaterThan(0);
+    for (const update of updates) {
+      rejected(update, f.original, f.task.resultPath);
+      expect(update.details.resultDelivery.code).toBe("result_not_delivered");
+      expect(update.details).not.toHaveProperty("resultSummary");
+      expect(JSON.stringify(update)).not.toContain(marker);
+    }
+    expect(result.details.result).toBe(f.original);
+  }, 30_000);
+
+  test("fresh issuance refuses cache disagreement, absent/malformed/foreign sources, and preserves all state", async () => {
+    const f = await fixture();
+    const saved = new Map([[f.task.resultPath, readFileSync(f.task.resultPath)], [f.manifest, readFileSync(f.manifest)]]);
+    const envelope = JSON.parse(saved.get(f.task.resultPath)!.toString());
+    const manifest = JSON.parse(saved.get(f.manifest)!.toString());
+    const cases: [string, string | undefined][] = [
+      [f.task.resultPath, undefined], [f.task.resultPath, "{"], [f.task.resultPath, "null"], [f.task.resultPath, "[]"],
+      [f.task.resultPath, JSON.stringify({ ...envelope, result: f.original.replace(/^./, "X") })],
+      [f.task.resultPath, JSON.stringify({ ...envelope, subagentId: "foreign" })],
+      [f.task.resultPath, JSON.stringify({ ...envelope, generation: 2 })],
+      [f.task.resultPath, JSON.stringify({ ...envelope, status: "running" })],
+      [f.task.resultPath, JSON.stringify({ ...envelope, result: {} })],
+      [f.task.resultPath, JSON.stringify({ ...envelope, error: "foreign private diagnostic" })],
+      [f.manifest, undefined], [f.manifest, "{"], [f.manifest, "null"],
+      ...[{ subagentId: "foreign" }, { generation: 2 }, { agent: "other" }, { cwd: "/other" },
+        { sessionFile: join(f.root, "foreign.jsonl") }, { status: "failed" }, { taskSlug: "foreign" }, { model: "foreign/model" }]
+        .map(change => [f.manifest, JSON.stringify({ ...manifest, ...change })] as [string, string]),
+    ];
+    for (const [path, bytes] of cases) {
+      if (bytes === undefined) rmSync(path); else writeFileSync(path, bytes);
+      const before = ledger(f);
+      rejected(await f.call("subagent_inspect"), f.original, f.task.resultPath);
+      expect(ledger(f)).toEqual(before);
+      writeFileSync(path, saved.get(path)! , { mode: 0o600 });
+    }
+    // A same-length cache disagreement is not rescued by the unchanged source.
+    const owned = (f.runtime as any).tasks.get(f.task.subagentId);
+    owned.result = f.original.replace(/^./, "X");
+    const before = ledger(f);
+    for (const name of ["subagent_inspect", "subagent_join", "subagent_cancel"]) {
+      rejected(await f.call(name), f.original, f.task.resultPath);
+    }
+    expect(ledger(f)).toEqual(before);
+  }, 60_000);
+
+  test("valid temporary and foreign hardlinks are refused without publication takeover or deletion", async () => {
+    const f = await fixture();
+    for (const file of [f.task.resultPath, f.manifest]) {
+      const temporary = file === f.task.resultPath ? `${file}.${process.pid}-12345678-1234-4234-8234-123456789abc.tmp` : join(f.artifact, "manifest-link");
+      fs.linkSync(file, temporary);
+      const before = ledger(f);
+      const stat = fs.statSync(file);
+      rejected(await f.call("subagent_inspect"), f.original, f.task.resultPath);
+      expect(fs.statSync(file).nlink).toBe(2);
+      expect(fs.statSync(temporary).ino).toBe(stat.ino);
+      expect(ledger(f)).toEqual(before);
+      rmSync(temporary);
+    }
+    const foreign = join(f.root, "foreign-result.json"); fs.linkSync(f.task.resultPath, foreign);
+    const before = ledger(f);
+    rejected(await f.call("subagent_inspect"), f.original, f.task.resultPath);
+    expect(ledger(f)).toEqual(before);
+    expect(readFileSync(foreign)).toEqual(readFileSync(f.task.resultPath));
+  }, 30_000);
+
+  test("private-access failure on each source owner is fail-closed and never repaired", async () => {
+    const f = await fixture();
+    const original = childProcess.spawnSync;
+    for (const path of [f.scope, f.artifact, f.manifest, f.task.resultPath]) {
+      let hits = 0;
+      if (process.platform === "win32") {
+        spies.push(spyOn(childProcess, "spawnSync").mockImplementation((command: any, args?: any, options?: any) => {
+          if (command === "powershell.exe" && String(options?.input).includes("GetAccessControl") && String(options.input).includes(`'${Buffer.from(path).toString("base64")}'`) ) {
+            hits++; return { status: 1, stdout: "", stderr: "foreign private ACL diagnostic" } as any;
+          }
+          return original(command, args, options);
+        }));
+      } else fs.chmodSync(path, fs.statSync(path).isDirectory() ? 0o755 : 0o644);
+      const before = ledger(f);
+      rejected(await f.call("subagent_inspect"), f.original, f.task.resultPath);
+      expect(ledger(f)).toEqual(before);
+      if (process.platform === "win32") { expect(hits).toBeGreaterThan(0); spies.pop()!.mockRestore(); }
+      else { expect(fs.statSync(path).mode & 0o077).not.toBe(0); fs.chmodSync(path, fs.statSync(path).isDirectory() ? 0o700 : 0o600); }
+    }
+  }, 30_000);
+
+  test("leaf/task/scope redirection never issues foreign files or cleans the redirected target", async () => {
+    const f = await fixture();
+    for (const path of [f.task.resultPath, f.manifest, f.artifact, f.scope]) {
+      const directory = fs.statSync(path).isDirectory();
+      const held = `${path}-held`;
+      fs.renameSync(path, held);
+      // A directory junction needs no symlink privilege on Windows.
+      try { fs.symlinkSync(held, path, directory ? "junction" : "file"); }
+      catch (error) {
+        fs.renameSync(held, path);
+        // Actual leaf symlinks may require Windows privilege; existing mock-handle tests cover leaf substitution.
+        if (process.platform === "win32" && (error as any).code === "EPERM") continue;
+        throw error;
+      }
+      const before = { result: readFileSync(f.task.resultPath), manifest: readFileSync(f.manifest), calls: [...f.calls], notifications: [...f.notifications] };
+      rejected(await f.call("subagent_inspect"), f.original, f.task.resultPath);
+      expect(readFileSync(f.task.resultPath)).toEqual(before.result);
+      expect(readFileSync(f.manifest)).toEqual(before.manifest);
+      expect(f.calls).toEqual(before.calls); expect(f.notifications).toEqual(before.notifications);
+      expect(fs.lstatSync(path).isSymbolicLink()).toBeTrue();
+      fs.unlinkSync(path); fs.renameSync(held, path);
+    }
+  }, 30_000);
+
+  test("scope, owner, generation, recovery and Router changes across the tool await cannot issue stale evidence", async () => {
+    const f = await fixture();
+    const owned = (f.runtime as any).tasks.get(f.task.subagentId);
+    const originalInspect = f.runtime.inspect.bind(f.runtime);
+    const resultBytes = readFileSync(f.task.resultPath);
+    const cases = [
+      () => { (f.runtime as any).activeTasksDir = join(f.root, "foreign-scope"); },
+      () => { (f.runtime as any).tasks.set(f.task.subagentId, { ...owned }); },
+      () => { owned.generation++; },
+      () => { (f.runtime as any).recovery = Promise.resolve(); },
+      () => { f.ctx.sessionManager.getSessionFile = () => join(f.root, "foreign.jsonl"); },
+      () => { f.ctx.cwd = "/other"; },
+      () => { writeFileSync(f.task.resultPath, JSON.stringify({ subagentId: f.task.subagentId, generation: 1, status: "completed", result: f.original.replace(/^./, "X") })); },
+    ];
+    for (const change of cases) {
+      let reads = 0;
+      let afterChange: ReturnType<typeof ledger> | undefined;
+      spies.push(spyOn(f.runtime, "inspect").mockImplementation(id => {
+        const snapshot = originalInspect(id);
+        if (++reads === 2) queueMicrotask(() => { change(); afterChange = ledger(f); }); // before wrapper resumes
+        return snapshot;
+      }));
+      rejected(await f.call("subagent_inspect"), f.original, f.task.resultPath);
+      if (!afterChange) throw new Error("Fixture microtask did not run before issuance");
+      expect(ledger(f)).toEqual(afterChange);
+      spies.pop()!.mockRestore();
+      owned.generation = 1; (f.runtime as any).tasks.set(f.task.subagentId, owned);
+      (f.runtime as any).activeTasksDir = f.scope; (f.runtime as any).recovery = undefined;
+      f.ctx.cwd = f.cwd; f.ctx.sessionManager.getSessionFile = () => f.parentSessionFile;
+      writeFileSync(f.task.resultPath, resultBytes);
+    }
+  }, 30_000);
+
+  test("all immediate-terminal management adapters use the same source boundary", async () => {
+    for (const name of ["spawn", "resume", "steer"] as const) {
+      const f = await fixture();
+      let absent = false;
+      const resume = f.runtime.resume.bind(f.runtime);
+      spies.push(spyOn(f.runtime, name).mockImplementation(async (id: any, prompt?: any, images?: any) => {
+        if (name === "resume") {
+          // Real resume lineage and settlement; fake child completion, never a provider.
+          const next = await resume(id, prompt, images);
+          writeFileSync(next.resultPath, JSON.stringify({ subagentId: next.subagentId, generation: next.generation, status: "completed", result: f.original }), { mode: 0o600 });
+          await f.runtime.join(id); f.runtime.stop();
+          Object.assign(next, f.runtime.inspect(id)); // Keep invocation-local predecessor evidence.
+          if (absent) rmSync(next.resultPath);
+          return next;
+        }
+        // Adapter-return fixtures for fast terminal spawn/steer only.
+        if (absent) rmSync(f.task.resultPath);
+        return f.runtime.inspect(f.task.subagentId);
+      }));
+      const params = { subagentId: f.task.subagentId, agent: "handler", prompt: "work", message: "work" };
+      const valid = await f.call(`subagent_${name}`, params);
+      expect(valid.details.result).toBe(f.original);
+      expect(valid.details.resultSource.scopeIdentity).toBe(f.scope);
+      absent = true;
+      rejected(await f.call(`subagent_${name}`, params), f.original, f.runtime.inspect(f.task.subagentId).resultPath);
+      spies.pop()!.mockRestore();
+      const removed = await f.call("subagent_remove");
+      expect(removed.details).toEqual({ status: "removed" });
+      expect(JSON.stringify(removed)).not.toContain(f.original);
+      expect(removed.details).not.toHaveProperty("resultPath");
+    }
+  }, 60_000);
+
+  test("resume cannot issue a replacement incarnation adopted during its await", async () => {
+    const f = await fixture();
+    const resume = f.runtime.resume.bind(f.runtime);
+    spies.push(spyOn(f.runtime, "resume").mockImplementation(async (id, prompt, images) => {
+      await f.runtime.recover(f.cwd, f.parentSessionFile);
+      const next = await resume(id, prompt, images);
+      writeFileSync(next.resultPath, JSON.stringify({ subagentId: id, generation: next.generation, status: "completed", result: f.original }), { mode: 0o600 });
+      await f.runtime.join(id); f.runtime.stop();
+      Object.assign(next, f.runtime.inspect(id));
+      return next;
+    }));
+    const result = await f.call("subagent_resume", { subagentId: f.task.subagentId, prompt: "work" });
+    rejected(result, f.original, f.runtime.inspect(f.task.subagentId).resultPath);
+    expect(result.details.resultDelivery.code).toBe("result_identity_mismatch");
+  }, 30_000);
+
+  test("a substituted file handle is rejected before foreign bytes can become source evidence", async () => {
+    const f = await fixture();
+    const foreign = join(f.root, "foreign.json");
+    writeFileSync(foreign, "foreign-private-original", { mode: 0o600 });
+    const originalOpen = fs.openSync;
+    spies.push(spyOn(fs, "openSync").mockImplementation((path: any, flags: any, mode?: any) =>
+      originalOpen(path === f.task.resultPath ? foreign : path, flags, mode)));
+    const before = ledger(f);
+    const value = await f.call("subagent_inspect");
+    rejected(value, f.original, f.task.resultPath);
+    expect(JSON.stringify(value)).not.toContain("foreign-private-original");
+    expect(ledger(f)).toEqual(before);
+  }, 30_000);
+
+  test("active snapshots cannot issue an already-published file before its original is established", async () => {
+    const f = await fixture();
+    expect(JSON.parse(readFileSync(f.task.resultPath, "utf8")).result).toBe(f.original);
+    const owned = (f.runtime as any).tasks.get(f.task.subagentId);
+    owned.status = "running";
+    owned.result = undefined;
+    const before = ledger(f);
+    const value = await f.call("subagent_inspect");
+    rejected(value, f.original, f.task.resultPath);
+    expect(value.details.resultDelivery.code).toBe("result_not_delivered");
+    expect(value.details.label).toBe(f.task.label);
+    expect(Object.hasOwn(value.details, "resultPath")).toBeFalse();
+    expect(ledger(f)).toEqual(before);
+  }, 30_000);
+
+  test("opaque issuance does not consume, repair or expose private image storage", async () => {
+    const f = await fixture(originals[0], true);
+    const imageDirectory = join(f.artifact, "image-input-1");
+    // Legitimate terminal settlement already cleaned its own image; an orphan is not issuance's responsibility.
+    mkdirSync(imageDirectory, { mode: 0o700 });
+    writeFileSync(join(imageDirectory, "envelope.json"), "private orphan AQ==", { mode: 0o600 });
+    const before = ledger(f);
+    const result = await f.call("subagent_inspect");
+    expect(result.details.result).toBe(f.original);
+    expect(JSON.stringify(result)).not.toContain("AQ==");
+    expect(ledger(f)).toEqual(before);
+    expect(existsSync(imageDirectory)).toBeTrue();
+  }, 30_000);
+});
 
 test("preserves seeded task and scope bytes across the registry rejection matrix", async () => {
   const { calls, transport } = fakeTransport();

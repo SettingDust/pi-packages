@@ -405,22 +405,25 @@ function cleanupResultTemporary(path: string, file: number, expected: Stats): vo
   unlinkSync(temporary);
 }
 
-function readTaskArtifact(path: string, result = false): string | undefined {
+function readTaskArtifact(path: string, result = false, privateAccess = false): string | undefined {
   let file: number | undefined;
   try {
     const expected = lstatSync(path, { throwIfNoEntry: false });
     if (!expected) return;
     const check = (stat: Stats) => {
       if (!stat.isFile() || stat.isSymbolicLink() || stat.nlink !== 1
-        || stat.dev !== expected.dev || stat.ino !== expected.ino) throw new Error();
+        || stat.dev !== expected.dev || stat.ino !== expected.ino
+        || (privateAccess && (stat.size !== expected.size || stat.mtimeMs !== expected.mtimeMs || stat.ctimeMs !== expected.ctimeMs))) throw new Error();
     };
     if (!expected.isFile() || expected.isSymbolicLink()) throw new Error();
     if (relative(resolve(path), realpathSync(path)) !== "") throw new Error();
+    if (privateAccess) checkImageAccess(path, false);
     file = openSync(path, constants.O_RDONLY | (constants.O_NOFOLLOW ?? 0));
     if (result && expected.nlink === 2) cleanupResultTemporary(path, file, expected);
     check(fstatSync(file));
     const bytes = readFileSync(file, "utf8");
     check(fstatSync(file));
+    if (privateAccess) checkImageAccess(path, false);
     check(lstatSync(path));
     return bytes;
   } catch { throw new ImageInputError("storage"); }
@@ -434,7 +437,7 @@ async function writeAtomic(path: string, value: unknown, check = () => {}, commi
   const temporary = `${path}.${process.pid}-${randomUUID()}.tmp`;
   try {
     check();
-    await writeFile(temporary, JSON.stringify(value));
+    await writeFile(temporary, JSON.stringify(value), { mode: 0o600 });
     check();
     commit();
     renameSync(temporary, path);
@@ -783,7 +786,7 @@ export class SubagentRuntime {
     if (isActiveStatus(old.status) || this.tasks.get(subagentId) !== old
       || this.launches.has(`${subagentId}:${old.generation + 1}`)) throw new Error("Cannot resume an active subagent");
     this.cleanupImageInputs(old); // One bounded retry before the next generation owns its own input.
-    return this.start({
+    const next = await this.start({
       subagentId: old.subagentId,
       taskSlug: old.taskSlug,
       generation: old.generation + 1,
@@ -799,6 +802,8 @@ export class SubagentRuntime {
       surfaceCleanups: cloneJson(old.surfaceCleanups),
       images: snapshot,
     });
+    Object.defineProperty(next, snapshotPreviousOwner, { value: old });
+    return next;
   }
 
   private tasksDir(cwd: string, parentSessionFile?: string): string {
@@ -823,14 +828,19 @@ export class SubagentRuntime {
   }
 
   private reserveSubagentId(tasksDir: string, taskSlug: string): { subagentId: string; artifactDir: string } {
-    try { mkdirSync(tasksDir, { recursive: true, mode: 0o700 }); }
-    catch (error) { throw new TaskIdAllocationError("filesystem_reservation_failed", error); }
+    try {
+      const existing = existsSync(tasksDir);
+      mkdirSync(tasksDir, { recursive: true, mode: 0o700 });
+      // Initial allocation only: issuance must never repair an existing scope's access.
+      if (!existing) protectImageDirectory(tasksDir);
+    } catch (error) { throw new TaskIdAllocationError("filesystem_reservation_failed", error); }
     for (let suffix = 1; suffix <= 100; suffix++) {
       const subagentId = suffix === 1 ? taskSlug : `${taskSlug}-${suffix}`;
       if (existsSync(join(tasksDir, `${subagentId}-g1.jsonl`)) || existsSync(join(tasksDir, `${subagentId}-artifacts`))) continue;
       const artifactDir = join(tasksDir, `${subagentId}-artifacts`);
       try {
         mkdirSync(artifactDir, { mode: 0o700 });
+        protectImageDirectory(artifactDir);
         return { subagentId, artifactDir };
       } catch (error) {
         if ((error as { code?: unknown }).code === "EEXIST") continue;
@@ -1059,6 +1069,68 @@ export class SubagentRuntime {
   }
 
   inspect(id: string): SubagentTask { return snapshotTask(this.get(id)); }
+
+  // Final transport boundary only. No lifecycle readResult/takeover, waits or writes.
+  issueResult(snapshot: TaskSnapshot, cwd: string, parentSessionFile?: string, expected?: TaskSnapshot, resumed = false) {
+    if (snapshot.agent !== "handler") return snapshot;
+    const unavailable = (code: string) => ({
+      subagentId: snapshot.subagentId, generation: snapshot.generation, agent: snapshot.agent, status: snapshot.status,
+      resultDelivery: { kind: "unavailable", fullResultReturned: false, code },
+    });
+    const scope = resolve(this.tasksDir(cwd, parentSessionFile));
+    const task = this.tasks.get(snapshot.subagentId);
+    const current = () => {
+      if (this.recovery || !task || this.tasks.get(snapshot.subagentId) !== task || snapshot[snapshotOwner] !== task
+        || this.activeTasksDir !== scope || resolve(task.cwd) !== resolve(cwd)) return "result_scope_mismatch";
+      if (task.generation !== snapshot.generation
+        || (expected && (snapshot.subagentId !== expected.subagentId || snapshot.generation !== expected.generation + (resumed ? 1 : 0)
+          || expected[snapshotOwner] !== (resumed ? snapshot[snapshotPreviousOwner] : task)))
+        || task.resultPath !== snapshot.resultPath || task.sessionFile !== snapshot.sessionFile || task.status !== snapshot.status
+        || task.result !== snapshot.result || task.error !== snapshot.error) return "result_identity_mismatch";
+    };
+    const mismatch = current();
+    if (mismatch) return unavailable(mismatch);
+    if (isActiveStatus(snapshot.status)) {
+      const { result: _result, resultPath: _resultPath, ...lifecycle } = snapshot;
+      return { ...lifecycle, resultDelivery: { kind: "unavailable", fullResultReturned: false, code: "result_not_delivered" } };
+    }
+    try {
+      const artifactDir = join(scope, `${snapshot.subagentId}-artifacts`);
+      if (snapshot.resultPath !== join(artifactDir, `result-${snapshot.generation}.json`)) return unavailable("result_identity_mismatch");
+      const directories = [scope, artifactDir].map(path => {
+        const stat = checkedImageDirectory(path);
+        checkImageAccess(path, true);
+        return { path, stat };
+      });
+      const manifest = this.readTaskRecord(join(artifactDir, "task.json"), scope, artifactDir, snapshot.subagentId, true);
+      if (!manifest || manifest.generation !== snapshot.generation || manifest.agent !== snapshot.agent
+        || resolve(manifest.cwd) !== resolve(cwd) || manifest.sessionFile !== snapshot.sessionFile || manifest.status !== snapshot.status
+        || manifest.error !== snapshot.error || manifest.taskSlug !== snapshot.taskSlug
+        || manifest.model !== snapshot.model || manifest.thinking !== snapshot.thinking) return unavailable("invalid_task_manifest");
+      const bytes = readTaskArtifact(snapshot.resultPath, false, true);
+      if (bytes === undefined) return unavailable("result_unavailable");
+      const envelope = parseResult(bytes, snapshot);
+      if (!envelope.valid) return unavailable(envelope.error);
+      if (envelope.status !== snapshot.status || envelope.error !== snapshot.error) return unavailable("result_identity_mismatch");
+      if (typeof envelope.result !== "string") return unavailable("result_unavailable");
+      if (envelope.result !== snapshot.result || (!resumed && expected?.result !== undefined && expected.result !== envelope.result)) {
+        return unavailable("result_original_mismatch");
+      }
+      if (JSON.stringify(manifest) !== JSON.stringify(this.readTaskRecord(join(artifactDir, "task.json"), scope, artifactDir, snapshot.subagentId, true))) {
+        return unavailable("invalid_task_manifest");
+      }
+      for (const { path, stat } of directories) {
+        const after = checkedImageDirectory(path);
+        checkImageAccess(path, true);
+        if (after.dev !== stat.dev || after.ino !== stat.ino) return unavailable("invalid_task_storage");
+      }
+      const changed = current(); // Recheck even synchronous access probes may re-enter the runtime.
+      if (changed) return unavailable(changed);
+      return { ...snapshot, resultSource: { scopeIdentity: scope, ...(parentSessionFile ? { parentSessionFile } : {}) } };
+    } catch (error) {
+      return unavailable(error instanceof ImageInputError ? "invalid_task_storage" : "result_access_unavailable");
+    }
+  }
 
   async join(id: string, generation = this.get(id).generation, signal?: AbortSignal): Promise<SubagentTask> {
     signal?.throwIfAborted();
@@ -1562,11 +1634,11 @@ export class SubagentRuntime {
     };
   }
 
-  private readTaskRecord(path: string, tasksDir: string, artifactDir: string, subagentId: string): TaskRecord | undefined {
+  private readTaskRecord(path: string, tasksDir: string, artifactDir: string, subagentId: string, privateAccess = false): TaskRecord | undefined {
     try { checkedImageDirectory(artifactDir, false); }
     catch { throw new ImageInputError("storage"); }
     try {
-      const bytes = readTaskArtifact(path);
+      const bytes = readTaskArtifact(path, false, privateAccess);
       if (bytes === undefined) return;
       const value = JSON.parse(bytes) as Json;
       const legacy = isLegacySubagentId(subagentId);
@@ -1614,13 +1686,7 @@ export class SubagentRuntime {
     | { valid: false; error: string } {
     this.checkResultStorage(task); // Storage failure must throw before invalid-Result handling or settlement intent.
     try {
-      const value = JSON.parse(readTaskArtifact(task.resultPath, true) ?? "") as Json;
-      if (value.subagentId !== task.subagentId || value.generation !== task.generation) return { valid: false, error: "result_identity_mismatch" };
-      if (!isTerminalStatus(value.status)) return { valid: false, error: "invalid_result_status" };
-      if (value.status === "completed" && typeof value.result !== "string") return { valid: false, error: "invalid_result" };
-      if (value.result !== undefined && typeof value.result !== "string") return { valid: false, error: "invalid_result" };
-      if (value.error !== undefined && typeof value.error !== "string") return { valid: false, error: "invalid_result" };
-      return { valid: true, status: value.status, result: value.result as string | undefined, error: value.error as string | undefined };
+      return parseResult(readTaskArtifact(task.resultPath, true), task);
     } catch (error) {
       if (error instanceof ImageInputError) throw error;
       return { valid: false, error: "invalid_result" };
@@ -1632,8 +1698,30 @@ function cloneJson<T>(value: T): T {
   return value === undefined ? value : structuredClone(value);
 }
 
-function snapshotTask(task: SubagentTask): SubagentTask {
-  return { ...task, ...(task.surfaceCleanups ? { surfaceCleanups: cloneJson(task.surfaceCleanups) } : {}) };
+// Invocation-local object identity, never serialized, persisted or registered as a reference.
+const snapshotOwner = Symbol("task owner");
+const snapshotPreviousOwner = Symbol("task predecessor");
+type TaskSnapshot = SubagentTask & { [snapshotOwner]?: SubagentTask; [snapshotPreviousOwner]?: SubagentTask };
+
+function snapshotTask(task: SubagentTask): TaskSnapshot {
+  const snapshot = { ...task, ...(task.surfaceCleanups ? { surfaceCleanups: cloneJson(task.surfaceCleanups) } : {}) };
+  Object.defineProperty(snapshot, snapshotOwner, { value: task });
+  return snapshot;
+}
+
+function parseResult(bytes: string | undefined, task: SubagentTask):
+  | { valid: true; status: Exclude<TaskStatus, ActiveTaskStatus>; result?: string; error?: string }
+  | { valid: false; error: string } {
+  try {
+    const value = JSON.parse(bytes ?? "") as Json;
+    if (!value || typeof value !== "object" || Array.isArray(value)) return { valid: false, error: "invalid_result" };
+    if (value.subagentId !== task.subagentId || value.generation !== task.generation) return { valid: false, error: "result_identity_mismatch" };
+    if (!isTerminalStatus(value.status)) return { valid: false, error: "invalid_result_status" };
+    if (value.status === "completed" && typeof value.result !== "string") return { valid: false, error: "invalid_result" };
+    if (value.result !== undefined && typeof value.result !== "string") return { valid: false, error: "invalid_result" };
+    if (value.error !== undefined && typeof value.error !== "string") return { valid: false, error: "invalid_result" };
+    return { valid: true, status: value.status, result: value.result as string | undefined, error: value.error as string | undefined };
+  } catch { return { valid: false, error: "invalid_result" }; }
 }
 
 function parseCleanupRecord(value: unknown): SurfaceCleanupRecord | undefined {
@@ -1790,13 +1878,11 @@ function title(theme: ThemeLike | undefined, action: string): string {
   return `${paint(theme, "toolTitle", name)} ${paint(theme, "toolTitle", action)}`;
 }
 
-function taskFrom(result: ToolResult): SubagentTask | undefined {
-  const details = result.details as Partial<SubagentTask> | undefined;
-  return details && typeof details.subagentId === "string" && typeof details.status === "string" ? details as SubagentTask : undefined;
-}
+type DisplayTask = Partial<SubagentTask> & { resultSummary?: string; resultDelivery?: { kind?: string; originalBytes?: number; fullResultReturned?: boolean; code?: string } };
 
-function fallback(result: ToolResult): string {
-  return result.content?.find(part => part.type === "text")?.text || "Subagent action failed.";
+function taskFrom(result: ToolResult): DisplayTask | undefined {
+  const details = result.details as DisplayTask | undefined;
+  return details && typeof details.subagentId === "string" && typeof details.status === "string" ? details : undefined;
 }
 
 function callIdentity(args: unknown, key: "agent" | "label" | "subagentId"): string {
@@ -1818,10 +1904,10 @@ function renderResumeCall(args: unknown, theme?: ThemeLike): Text {
   return new Text(`${title(theme, "resume")}${identity ? paint(theme, "dim", `  ${identity}`) : ""}`, 0, 0);
 }
 
-function renderSpawnResult(result: ToolResult, _options: unknown, theme?: ThemeLike): Text {
+function renderSpawnResult(result: ToolResult, options: { expanded?: boolean; isPartial?: boolean } = {}, theme?: ThemeLike): Text {
   const task = taskFrom(result);
-  if (!task) return new Text(fallback(result), 0, 0);
-  return new Text(`${paint(theme, "success", "")} Started ${paint(theme, "text", task.label)}\n${paint(theme, "muted", `  ${task.subagentId}`)}`, 0, 0);
+  if (!task || isTerminalStatus(task.status) || task.resultDelivery) return renderJoinResult(result, options, theme);
+  return new Text(`${paint(theme, "success", "")} Started ${paint(theme, "text", task.label ?? task.subagentId ?? "subagent")}\n${paint(theme, "muted", `  ${task.subagentId}`)}`, 0, 0);
 }
 
 function renderJoinCall(args: unknown, theme?: ThemeLike): Text {
@@ -1832,19 +1918,37 @@ function renderJoinCall(args: unknown, theme?: ThemeLike): Text {
 
 function renderJoinResult(result: ToolResult, options: { expanded?: boolean; isPartial?: boolean } = {}, theme?: ThemeLike): Text {
   const task = taskFrom(result);
-  if (!task) return new Text(fallback(result), 0, 0);
+  if (!task) return new Text("Subagent Result unavailable (no associated snapshot).", 0, 0);
   const marker = task.status === "completed" ? paint(theme, "success", "") : task.status === "running" ? paint(theme, "warning", "") : paint(theme, "error", "");
   const statusColor = task.status === "completed" ? "success" : task.status === "running" ? "warning" : "error";
-  const lines = [`${marker} ${paint(theme, "text", task.label)} ${paint(theme, statusColor, task.status)}`];
-  if (options.expanded) {
-    lines.push(paint(theme, "muted", `  ${task.subagentId} · generation ${task.generation}`));
-    if (task.result) lines.push(`  ${paint(theme, "dim", task.result)}`);
-    else if (task.error) lines.push(`  ${paint(theme, "error", task.error)}`);
-  } else if (options.isPartial && task.status === "running") {
+  const display = (text: string) => stripTerminalSequences(text).replace(/\r\n?/g, "\n").replace(/\t/g, "   ").replace(/[\u0000-\u0008\u000b-\u001f\u007f-\u009f]/g, "");
+  const lines = [`${marker} ${paint(theme, "text", display(task.label ?? task.subagentId ?? "subagent"))} ${paint(theme, statusColor, task.status ?? "unknown")}`];
+  if (options.expanded) lines.push(paint(theme, "muted", `  ${task.subagentId} · generation ${task.generation}`));
+  if (options.isPartial && task.status === "running") {
     lines.push(paint(theme, "dim", "   waiting for result"));
-  } else if (task.status !== "completed" && task.error) {
-    lines.push(`  ${paint(theme, "error", task.error)}`);
+  } else if (task.agent === "handler" || task.resultDelivery) {
+    // Render only Caller-delivered fields; expansion never reads runtime/cache or raw content.
+    const delivery = task.resultDelivery;
+    const bytes = delivery?.originalBytes;
+    const sized = typeof bytes === "number" && Number.isInteger(bytes) && bytes >= 0;
+    const path = typeof task.resultPath === "string" && task.resultPath.length > 0;
+    if (!options.isPartial && isTerminalStatus(task.status) && delivery?.kind === "full" && delivery.fullResultReturned === true
+      && sized && bytes <= 16384 && path && task.resultSummary === undefined && typeof task.result === "string" && Buffer.byteLength(task.result, "utf8") === bytes) {
+      lines.push(paint(theme, "muted", `  Full Result delivered · ${bytes} UTF-8 bytes (not adoption)`));
+      if (options.expanded) lines.push(paint(theme, "dim", display(task.result)));
+    } else if (!options.isPartial && isTerminalStatus(task.status) && delivery?.kind === "summary" && delivery.fullResultReturned === false
+      && sized && bytes > 16384 && path && task.result === undefined && typeof task.resultSummary === "string" && task.resultSummary.trim()) {
+      lines.push(paint(theme, "warning", `  Summary only · ${bytes} UTF-8 bytes · full Result not returned`));
+      lines.push(paint(theme, "dim", display(task.resultSummary)), paint(theme, "muted", display(task.resultPath!)));
+      lines.push("  Use ordinary read on this JSON envelope; completely decode result and correlate task/generation before adoption.");
+    } else {
+      const code = delivery?.kind === "unavailable" && delivery.fullResultReturned === false && typeof delivery.code === "string" ? display(delivery.code) : "result_not_delivered";
+      lines.push(paint(theme, "warning", `  Result unavailable · ${code} · full Result not returned`));
+    }
+  } else if (options.expanded && task.agent && task.result) {
+    lines.push(`  ${paint(theme, "dim", display(task.result))}`);
   }
+  if (task.error && (options.expanded || task.status !== "completed")) lines.push(`  ${paint(theme, "error", display(task.error))}`);
   return new Text(lines.join("\n"), 0, 0);
 }
 
@@ -1856,13 +1960,37 @@ export function createSubagentTools(runtime: SubagentRuntime, cwd: string, paren
   const tool = (name: string, description: string, parameters: any, execute: (params: any, update: ToolUpdate | undefined, signal: AbortSignal | undefined, ctx: ExtensionContext | undefined) => Promise<unknown>, renderer: Record<string, unknown> = {}) => defineTool({
     name, label: name, description, parameters, ...renderer,
     async execute(_id, params, signal, onUpdate, ctx) {
-      const details = await execute(params, value => onUpdate?.(result(value)), signal, ctx);
+      const callerCurrent = () => {
+        try { return !!ctx && ctx.cwd === cwd && ctx.sessionManager.getSessionFile() === parentSessionFile; }
+        catch { return false; }
+      };
+      const callerWasCurrent = callerCurrent();
+      const taskId = params && typeof params === "object" && "subagentId" in params ? params.subagentId : undefined;
+      const expected = typeof taskId === "string" ? runtime.inspect(taskId) : undefined;
+      const details = await execute(params, value => {
+        // Progress is lifecycle-only; never publish a Result/reference before final validation.
+        const { result: original, resultPath: _path, resultSource: _source, resultSummary: _summary, ...lifecycle } = value as Json;
+        onUpdate?.(result({ ...lifecycle, ...(original !== undefined || lifecycle.agent === "handler" ? {
+          resultDelivery: { kind: "unavailable", fullResultReturned: false, code: "result_not_delivered" },
+        } : {}) }));
+      }, signal, ctx);
+      signal?.throwIfAborted();
+      if (details && typeof details === "object" && "subagentId" in details && "agent" in details) {
+        const snapshot = details as TaskSnapshot;
+        const associated = runtime.issueResult(snapshot, cwd, parentSessionFile, expected, name === "subagent_resume");
+        if (snapshot.agent === "handler" && (isTerminalStatus(snapshot.status) || snapshot.result !== undefined)
+          && (!callerWasCurrent || !callerCurrent())) {
+          return result({ subagentId: snapshot.subagentId, generation: snapshot.generation, agent: snapshot.agent, status: snapshot.status,
+            resultDelivery: { kind: "unavailable", fullResultReturned: false, code: "result_scope_mismatch" } });
+        }
+        return result(associated);
+      }
       return result(details);
     },
   });
   return [
     // Optional avoids schema rejection so missing values use the stable runtime error contract.
-    tool("subagent_spawn", "Start one background subagent without waiting for completion. Select a registered agent and provide prompt, label, taskSlug, and optional exact model/thinking settings. taskSlug is required and must be a caller-provided canonical task identity. Call directly or through a caller-owned tool wrapper using the same inputs. The parent receives a terminal completion notification without the full result text. When the effective registered tool contract and available resources permit it, you may successively launch independent, authorized, nonconflicting tasks, then wait for terminal notifications instead of polling or routinely calling inspect or join. Use subagent_inspect for an explicit non-blocking snapshot and subagent_join after a terminal notification, or when an immediate full result wait is explicitly necessary.", Type.Object({ agent: StringEnum(runtime.agentNames()), prompt: Type.String({ minLength: 1 }), label: Type.String({ minLength: 1 }), taskSlug: Type.Optional(Type.String()), model: Type.Optional(Type.String()), thinking: Type.Optional(Type.String()), images: imagesSchema }), async (params, _update, _signal, ctx) => {
+    tool("subagent_spawn", "Start one background subagent without waiting for completion. Select a registered agent and provide prompt, label, taskSlug, and optional exact model/thinking settings. taskSlug is required and must be a caller-provided canonical task identity. Call directly or through a caller-owned tool wrapper using the same inputs. The parent receives a terminal completion notification without the full result text. When the effective registered tool contract and available resources permit it, you may successively launch independent, authorized, nonconflicting tasks, then wait for terminal notifications instead of polling or routinely calling inspect or join. Use subagent_inspect for an explicit non-blocking snapshot and subagent_join after a terminal notification, or when an immediate Result wait is explicitly necessary. One join returns the caller's full/summary/unavailable projection; summary navigation uses ordinary read of the existing JSON resultPath and complete result decoding before adoption.", Type.Object({ agent: StringEnum(runtime.agentNames()), prompt: Type.String({ minLength: 1 }), label: Type.String({ minLength: 1 }), taskSlug: Type.Optional(Type.String()), model: Type.Optional(Type.String()), thinking: Type.Optional(Type.String()), images: imagesSchema }), async (params, _update, _signal, ctx) => {
       try { return await runtime.spawn({
         agent: params.agent, prompt: params.prompt, label: params.label, taskSlug: params.taskSlug,
         model: params.model, thinking: params.thinking, cwd, parentSessionFile,
@@ -1873,11 +2001,11 @@ export function createSubagentTools(runtime: SubagentRuntime, cwd: string, paren
         return { code: error.code, detail: error.detail, ...(error.operation ? { operation: error.operation } : {}) };
       }
     }, { renderCall: renderSpawnCall, renderResult: renderSpawnResult }),
-    tool("subagent_resume", "Resume a completed or failed subagent.", Type.Object({ subagentId: Type.String(), prompt: Type.String({ minLength: 1 }), images: imagesSchema }), params => runtime.resume(params.subagentId, params.prompt, readImages(params)), { renderCall: renderResumeCall }),
-    tool("subagent_inspect", "Return a non-blocking subagent snapshot for an explicit status check; do not poll this tool while waiting. Prefer the terminal completion notification, then use subagent_join for the full Result.", Type.Object({ subagentId: Type.String() }), params => Promise.resolve(runtime.inspect(params.subagentId))),
-    tool("subagent_join", "Wait for a subagent and read its full Result. Use after a terminal completion notification, or when an explicit immediate Result wait is necessary; do not use it for routine polling. Caller cancellation, including ESC, stops only this wait and does not cancel the subagent; use subagent_cancel to cancel it.", Type.Object({ subagentId: Type.String(), generation: Type.Optional(Type.Number()) }), async (params, update, signal) => { update?.(runtime.inspect(params.subagentId)); return runtime.join(params.subagentId, params.generation, signal); }, { renderCall: renderJoinCall, renderResult: renderJoinResult }),
-    tool("subagent_steer", "Send a message to a running subagent.", Type.Object({ subagentId: Type.String(), message: Type.String({ minLength: 1 }) }), params => runtime.steer(params.subagentId, params.message)),
-    tool("subagent_cancel", "Best-effort cancel a running subagent.", Type.Object({ subagentId: Type.String() }), params => runtime.cancel(params.subagentId)),
+    tool("subagent_resume", "Resume a completed or failed subagent.", Type.Object({ subagentId: Type.String(), prompt: Type.String({ minLength: 1 }), images: imagesSchema }), params => runtime.resume(params.subagentId, params.prompt, readImages(params)), { renderCall: renderResumeCall, renderResult: renderJoinResult }),
+    tool("subagent_inspect", "Return a non-blocking subagent snapshot for an explicit status check; do not poll this tool while waiting. Prefer the terminal completion notification, then one subagent_join. Available terminal Results use the same caller full/summary/unavailable projection; inspect is not a full-reading bypass. For summary navigation, ordinary read of the existing JSON resultPath and complete result decoding are required before adoption.", Type.Object({ subagentId: Type.String() }), params => Promise.resolve(runtime.inspect(params.subagentId)), { renderResult: renderJoinResult }),
+    tool("subagent_join", "Wait for a subagent and return one caller-projected Result: full at <=16384 decoded UTF-8 bytes, otherwise the existing summary and resultPath, or unavailable. For summary navigation, use ordinary read of that existing JSON envelope and completely decode result; correlate task/generation and read all evidence before adoption. Incomplete or uncertain evidence permits no adoption. There is no second join mode or inspect full-reading branch. Use after a terminal completion notification, or when an explicit immediate Result wait is necessary; do not use it for routine polling. Caller cancellation, including ESC, stops only this wait and does not cancel the subagent; use subagent_cancel to cancel it.", Type.Object({ subagentId: Type.String(), generation: Type.Optional(Type.Number()) }), async (params, update, signal) => { update?.(runtime.inspect(params.subagentId)); return runtime.join(params.subagentId, params.generation, signal); }, { renderCall: renderJoinCall, renderResult: renderJoinResult }),
+    tool("subagent_steer", "Send a message to a running subagent.", Type.Object({ subagentId: Type.String(), message: Type.String({ minLength: 1 }) }), params => runtime.steer(params.subagentId, params.message), { renderResult: renderJoinResult }),
+    tool("subagent_cancel", "Best-effort cancel a running subagent.", Type.Object({ subagentId: Type.String() }), params => runtime.cancel(params.subagentId), { renderResult: renderJoinResult }),
     tool("subagent_remove", "Close and remove a subagent and its artifacts.", Type.Object({ subagentId: Type.String() }), async params => { await runtime.remove(params.subagentId); return { status: "removed" }; }),
   ];
 }
@@ -2108,7 +2236,7 @@ export default function subagentsExtension(pi: ExtensionAPI, dependencies: {
       try {
         pi.sendMessage({
           customType: completionMessageType,
-          content: `Subagent terminal notification: ${JSON.stringify(notification)}. Call subagent_join to read the full Result.`,
+          content: `Subagent terminal notification: ${JSON.stringify(notification)}. Call subagent_join once for projected delivery. If summary-only, use ordinary read of its existing JSON resultPath, completely decode result and correlate task/generation before adoption. A notification or backend terminal status is not full Result evidence.`,
           display: true,
           details: { schema: `${completionMessageType}/v1`, ...notification },
         }, { triggerTurn, deliverAs: "followUp" });

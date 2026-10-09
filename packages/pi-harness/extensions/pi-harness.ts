@@ -6,11 +6,14 @@ import {
   type BeforeAgentStartEvent,
   type ExtensionAPI,
   type ExtensionContext,
+  type Skill,
+  type ToolResultEvent,
+  type ToolResultEventResult,
 } from "@earendil-works/pi-coding-agent";
 import { stripTerminalSequences, Text, truncateToWidth } from "@earendil-works/pi-tui";
 import { loadHarnessCandidates, type HarnessCandidates } from "../src/config.js";
 import { runHarnessConfig } from "../src/config-command.js";
-import { dispatchDelegation, type DelegationResponse, type SkillSummary } from "../src/index.js";
+import { dispatchDelegation, parseHandlerResult, type DelegationResponse, type SkillSummary } from "../src/index.js";
 
 const resolverName = "resolve_delegation";
 
@@ -23,6 +26,7 @@ export default function activateHarness(
   configure: ConfigRunner = runHarnessConfig,
 ): void {
   pi.registerTool({ ...createResolverTool([], loadCandidates), defaultActive: false });
+  pi.on("tool_result", projectHandlerToolResult);
 
   pi.registerCommand("harness", {
     description: "Configure Pi Harness Candidates",
@@ -45,8 +49,101 @@ export default function activateHarness(
     const candidates = currentCandidates(ctx, loadCandidates);
     refreshResolver(pi, skills, candidates, loadCandidates);
 
-    return { systemPrompt: routerPrompt(event, candidates) };
+    return { systemPrompt: routerPrompt(skills, candidates) };
   });
+}
+
+const resultTools = new Set(["subagent_spawn", "subagent_resume", "subagent_inspect", "subagent_join", "subagent_steer", "subagent_cancel"]);
+const lifecycleStrings = ["subagentId", "agent", "status", "taskSlug", "cwd", "label", "model", "thinking", "sessionFile", "tabId", "paneId", "createdAt", "queuedAt", "startedAt", "updatedAt", "error"];
+const snapshotKeys = new Set([...lifecycleStrings, "generation", "surfaceCleanups", "result", "resultPath", "resultSource", "resultSummary", "resultDelivery"]);
+
+function deliveryUnavailable(code: string, lifecycle: Record<string, unknown> = {}) {
+  return { ...lifecycle, resultDelivery: { kind: "unavailable", fullResultReturned: false, code } };
+}
+
+function projectHandlerToolResult(event: ToolResultEvent, ctx: ExtensionContext): ToolResultEventResult | undefined {
+  if (!resultTools.has(event.toolName)) return;
+  // Keep the replacement layout outside projection: even serialization failures must remove every raw text block.
+  let layout: Array<(typeof event.content)[number] | null> = [null];
+  try {
+    let textSeen = false;
+    layout = event.content.flatMap((block) => {
+      if (block.type !== "text") return [block];
+      if (textSeen) return [];
+      textSeen = true;
+      return [null];
+    });
+    if (!textSeen) layout.unshift(null);
+    const task = displayRecord(event.details);
+    const text = event.content.filter((block) => block.type === "text");
+    let projected: Record<string, unknown>;
+    const associated = task && typeof task.subagentId === "string" && task.subagentId.length > 0
+      && Number.isInteger(task.generation) && Number(task.generation) > 0
+      && typeof task.agent === "string" && task.agent.length > 0
+      && typeof task.status === "string" && ["queued", "running", "completed", "failed", "cancelled"].includes(task.status)
+      && (event.toolName === "subagent_spawn" ? event.input.agent === task.agent : event.input.subagentId === task.subagentId)
+      && (event.input.generation === undefined || event.input.generation === task.generation);
+    const synchronized = task && text.length === 1 && JSON.stringify(JSON.parse(text[0].text)) === JSON.stringify(task);
+    if (!associated || !synchronized) {
+      projected = deliveryUnavailable("result_identity_mismatch");
+    } else if (task.agent !== "handler" && task.resultSource === undefined && task.resultDelivery === undefined) {
+      return; // Identity comes from the actual management snapshot and matching call, never a missing agent field.
+    } else if (task.agent !== "handler" || Object.keys(task).some((key) => !snapshotKeys.has(key))) {
+      projected = deliveryUnavailable("invalid_result_projection");
+    } else {
+      const lifecycle: Record<string, unknown> = { generation: task.generation };
+      for (const key of lifecycleStrings) if (typeof task[key] === "string") lifecycle[key] = task[key];
+      if (Array.isArray(task.surfaceCleanups)) lifecycle.surfaceCleanups = task.surfaceCleanups.map((entry) => {
+        const cleanup = displayRecord(entry);
+        return cleanup ? Object.fromEntries(Object.entries(cleanup).filter(([key, value]) =>
+          key === "generation" ? Number.isInteger(value) : ["tabId", "paneId", "status", "attemptedAt", "error"].includes(key) && typeof value === "string")) : {};
+      });
+      projected = projectHandlerSnapshot(task, lifecycle, ctx);
+    }
+    const serialized = JSON.stringify(projected);
+    return { content: layout.map((block) => block ?? { type: "text", text: serialized }), details: projected };
+  } catch {
+    // Pi catches hook exceptions and retains the earlier output; never let raw Result text take that path.
+    return {
+      content: layout.map((block) => block ?? { type: "text", text: '{"resultDelivery":{"kind":"unavailable","fullResultReturned":false,"code":"result_projection_failed"}}' }),
+      details: deliveryUnavailable("result_projection_failed"),
+    };
+  }
+}
+
+function projectHandlerSnapshot(task: Record<string, unknown>, lifecycle: Record<string, unknown>, ctx: ExtensionContext): Record<string, unknown> {
+  const unavailable = (code: string) => deliveryUnavailable(code, lifecycle);
+  const delivery = displayRecord(task.resultDelivery);
+  const bytesValid = (value: unknown): value is number => typeof value === "number" && Number.isInteger(value) && value >= 0;
+  const pathValid = typeof task.resultPath === "string" && task.resultPath.length > 0;
+  if (task.resultDelivery !== undefined) {
+    if (!delivery || task.resultSource !== undefined
+      || Object.keys(delivery).some((key) => !["kind", "originalBytes", "fullResultReturned", "code"].includes(key))) return unavailable("invalid_result_projection");
+    if (delivery.kind === "unavailable" && delivery.fullResultReturned === false && typeof delivery.code === "string" && delivery.code.trim()
+      && task.result === undefined && task.resultSummary === undefined
+      && (delivery.originalBytes === undefined || bytesValid(delivery.originalBytes))
+      && (task.resultPath === undefined || pathValid)) return task;
+    if (task.cwd !== ctx.cwd || !["completed", "failed", "cancelled"].includes(String(task.status)) || !pathValid || delivery.code !== undefined) return unavailable("invalid_result_projection");
+    if (delivery.kind === "summary" && delivery.fullResultReturned === false && bytesValid(delivery.originalBytes) && delivery.originalBytes > 16384
+      && task.result === undefined && typeof task.resultSummary === "string" && task.resultSummary.trim()) return task;
+    if (delivery.kind === "full" && delivery.fullResultReturned === true && bytesValid(delivery.originalBytes) && delivery.originalBytes <= 16384
+      && task.resultSummary === undefined && typeof task.result === "string" && Buffer.byteLength(task.result, "utf8") === delivery.originalBytes
+      && parseHandlerResult(task.result).valid) return task;
+    return unavailable("invalid_result_projection");
+  }
+  const source = displayRecord(task.resultSource);
+  if (!source || typeof source.scopeIdentity !== "string" || !source.scopeIdentity
+    || Object.keys(source).some((key) => !["scopeIdentity", "parentSessionFile"].includes(key))
+    || source.parentSessionFile !== ctx.sessionManager.getSessionFile() || task.cwd !== ctx.cwd) return unavailable("result_scope_mismatch");
+  if (!["completed", "failed", "cancelled"].includes(String(task.status)) || !pathValid || typeof task.result !== "string"
+    || task.resultSummary !== undefined) return unavailable("result_unavailable");
+  const parsed = parseHandlerResult(task.result);
+  if (!parsed.valid) return unavailable("invalid_handler_result");
+  if (!parsed.result.summary.trim()) return unavailable("summary_unavailable");
+  const originalBytes = Buffer.byteLength(task.result, "utf8");
+  return originalBytes <= 16384
+    ? { ...lifecycle, resultPath: task.resultPath, result: task.result, resultDelivery: { kind: "full", originalBytes, fullResultReturned: true } }
+    : { ...lifecycle, resultPath: task.resultPath, resultSummary: parsed.result.summary, resultDelivery: { kind: "summary", originalBytes, fullResultReturned: false } };
 }
 
 function refreshResolver(
@@ -208,10 +305,10 @@ function resolverText(lines: string[], expanded: boolean) {
   };
 }
 
-function visibleSkills(event: BeforeAgentStartEvent): SkillSummary[] {
+function visibleSkills(event: BeforeAgentStartEvent): Skill[] {
   return (event.systemPromptOptions.skills ?? [])
     .filter((skill) => !skill.disableModelInvocation)
-    .map(({ name, description }) => ({ name, description }));
+    .sort((a, b) => a.name < b.name ? -1 : a.name > b.name ? 1 : 0);
 }
 
 function currentCandidates(
@@ -221,8 +318,7 @@ function currentCandidates(
   return loadCandidates(ctx.cwd, ctx.isProjectTrusted());
 }
 
-function routerPrompt(event: BeforeAgentStartEvent, candidates: HarnessCandidates): string {
-  const loadedSkills = (event.systemPromptOptions.skills ?? []).filter((skill) => !skill.disableModelInvocation);
+function routerPrompt(loadedSkills: Skill[], candidates: HarnessCandidates): string {
   const candidateStatus = candidates.status === "blocked"
     ? `Pi Harness configuration error: ${candidates.message}`
     : candidates.candidates.length > 0
@@ -241,7 +337,7 @@ Phase 2 - Select executable work. Retain the correspondence and dependencies of 
 
 Phase 3 - Resolve and delegate the selected outcome. When authority is missing, false, materially incomplete, or subject to an important unresolved coverage question, use spec-driven-development through normal Skill loading as primary, companion, or a conditionally required method. Settled evidence permits direct entry to a narrow owning writer without waiving assessment, authority, or authorization duties. SDD is not the exclusive ADR entrance or a mandatory reload at every stage or Handler call. The Router consumes available evidence; missing domain evidence requires one delegated authority-assessment outcome, not Router domain reading or assessment. A Handler returns material unsettled choices as evidence and gaps for Router-owned communication; methods serve only its current predicate, without user questioning, dispatch, independent authority-writing/planning outcomes, continuation, or Result/Waves/Todo progression. After applying the loaded strategy, select one domain primary Skill and optional companion Skills for this Handoff only, then assign the least sufficient finite non-negative reasoning and impact requirements from the concrete work before calling resolve_delegation. Treat reasoning and impact as independent axes: never combine them into a total score, weighted score, priority, or phase level. Judge the concrete objective, ambiguity, reasoning needed for correctness, verification burden, and actual consequence. Common reasoning guidance is 0 for mechanical work with clear boundaries and low ambiguity; 1 for a small settled implementation or check, simple state reconciliation, or simple documentation reconciliation; 2 for ordinary Plan/Waves work, independent review, or multi-file impact analysis; and 3 for final review involving architecture, security, migration, authority conflict, a complex root cause, or unusually difficult uncertainty. Ordinary Plan/Waves and independent review work normally require at least reasoning 2 because of the concrete reasoning and verification burden, not because of a Skill name, document type, or planning/review phase; a simple mechanical reconciliation may remain 1. Common impact guidance is 0 for local, reversible work without external impact; 1 for a consequence bounded to one module; 2 for cross-module or materially behavior/compatibility-affecting work; and 3 for high-consequence, hard-to-reverse, or security, data, or external-system risk. Planning or review does not automatically increase impact. The 0..3 values are common guidance, not a protocol range or upper bound; any finite non-negative integer is valid. These examples are not mappings to Skill names, document types, research phases, or implementation phases; make a fresh request from the concrete work. Provide the smallest sufficient Handoff context. Never put reasoning or impact inside Handoff. Use exactly two closed admission paths: standalone with basis and verification for authorized non-tuple work, and planned with the exact Work/Plan/Waves authority tuple for graph-bound work. Choose between these paths from the complete effects, applicable authorization, and whether graph-bound tuple prerequisites, gates, readiness, conflicts, or implementation-scope confirmation are actually required. Do not send path "atomic" or path "preparation". If the effective runtime lacks standalone, report a pre-launch admission block without fallback or a fabricated tuple. For authorized non-tuple work supply standalone basis and focused verification; when those graph-bound conditions are required, supply only the exact planned Work/Plan/Waves selectors. Labels such as coordination-heavy, architectural, security, migration, durable, or otherwise material alone do not force planned or select a path. Keep Handoff fields limited to objective, primarySkill, optional companionSkills, context, constraints, and deliverables; keep Handoff and admission shapes closed; never supply receipt, digest, reviewer, session, or acceptance data. Complete all reads, compatibility checks, and pre-action Todo projection before resolve; include resource and authorization checks. Supply the compatible registered delegate in delegate: { name, params }; Resolver binds the invocation and calls it within resolve_delegation once. Resolver performs only closed structural, readable-reference, planned tuple/current-byte, and protected-binding checks; it does not classify effects, infer permission, choose an alternate tool, fabricate a tuple, or fallback. Do not issue a second launch after its response for the same outcome, reconstruct the prompt, or replace the resolved model/thinking. Any later independent outcome requires its own permitted resolve_delegation call. Only after an active launch, and only when the effective registered delegate tool contract and resources permit another same-turn launch, may the Router prepare another independent ready branch. An effective end-turn requirement wins over the Skill, prompt, source code, or historical overlap evidence. Derive one concise canonical ASCII taskSlug from the concrete Handoff objective and settled execution context: 3-48 lowercase letters or digits separated by single hyphens, without the reserved subagent- prefix. For subagent_spawn, supply delegate.name: "subagent_spawn" and delegate.params containing taskSlug and a separate human-readable label. Do not supply agent, prompt, model, or thinking in delegate.params: Resolver binds agent: "handler" and the exact resolved prompt, model, and thinking without local selection, fallback, substitution, rewrite, or another Registry read. taskSlug is a delegate startup field, not a Handoff or admission field. Never pass a Handler path or body, invent a backend, or execute the Handler's work yourself. If resolution or delegate capability fails, report the block without spawning. Resolver returns resolution and exactly one raw launch return or error after an attempt; it does not interpret Handler Results or manage Todos. Interpret launch evidence yourself under the effective delegate contract; a resolved response alone does not establish an active launch or successful work.
 
-Phase 4 - Receive and project Results. When a preparation Result or accepted authority is complete, project it truthfully but require a later substantive implementation disclosure and explicit current-user confirmation before any planned implementation; do not execute a prepared plan or release its dependencies automatically. A summary notification is not a full Result: retrieve it via the effective backend's supported path before correlating or projecting it; wait for notifications rather than routine polling. When a terminal Handler Result is already visible in the current Router context, read the complete Result, including its status, summary, report, and artifacts, and correlate it to the selected outcome. Visibility is input to Router judgment only; it does not prescribe or trigger a follow-up action. Immediately project completed, partial, blocked, or failed truthfully in the existing Todo; preserve completed, partial, blocked, and failed as distinct Handler Result input semantics, not fixed workflow-control instructions, using the closest truthful native status plus existing descriptive or message surfaces where needed. Never mark partial, blocked, or failed as completed. An observable equivalent duplicate notification is idempotent: do not update the Todo twice or release a dependency twice. If malformed, conflicting, or uncorrelatable, preserve the first semantic state, leave status and dependencies unchanged, and report the conflict. If Result context is missing, incomplete, malformed, or structurally ambiguous, fail closed: do not invent fields, status, identity, or outcome; do not dispatch or claim completion based on it. On restart or replay, reapply only when available identity and visible state make that safe; otherwise retain the Todo and report the limitation. When a Handler terminates without an adoptable Result, read the complete failure evidence and, only after confirming terminal execution, stable subagentId/generation, unchanged boundary and authority, replay safety, and no need for renewed authorization, prefer resuming that same execution. Never resume an active execution or one with a terminal Result; never silently replay completed durable side effects or independent outcomes. Otherwise make a fresh decision from the evidence. After projecting each Result, make a fresh Router-owned decision before releasing dependents or scheduling work that depends on it; release only satisfied dependencies. Only completed plus required evidence satisfies an item predicate by default; partial, failed, blocked, or insufficient evidence leaves it unsatisfied. Verify a Wave gate separately from item completion: every item listed in that Wave must satisfy its completion predicate and the gate's stated verification must pass before releasing only its explicitly dependent work. An adoptable Result and sufficient evidence are required; do not infer gate release from terminal status, Wave numbering, document order, or Todo completion alone.
+Phase 4 - Receive and project Results. When a preparation Result or accepted authority is complete, project it truthfully but require a later substantive implementation disclosure and explicit current-user confirmation before any planned implementation; do not execute a prepared plan or release its dependencies automatically. Wait for terminal notifications rather than routine polling. Under the Herdr contract, call subagent_join once with its existing subagentId and optional generation: full delivery contains the exact decoded original at <=16384 UTF-8 bytes; summary delivery contains only the unchanged existing HandlerResult.summary and exact resultPath; unavailable establishes no full Result. Ordinary terminal inspect uses the same projection, not a full-reading branch. For summary delivery, use ordinary read of that exact existing compact JSON envelope, obtain its complete content and completely decode its result string before first adoption. Read the entire decoded Handler Result, including status, summary, report, artifacts and limitations; correlate existing envelope subagentId/generation/status/error with the known task, selected outcome and current caller context. The envelope has no scope or Handoff field; do not invent one. A summary, ref, byte count, metadata, renderer, or backend completed status is not adoption evidence. Native read failure, truncation, an oversized single physical JSON line, incomplete decoding, visible source conflict or uncertain association means no adoption and no dependency release; preserve the first semantic state and actual failure without inventing a Handler status. Line offsets cannot recover the remainder of an oversized physical line. result_access_unavailable is a delivery-layer refusal, not a prohibition on ordinary file read: an already known and authorized existing reference may still be read, but readability alone proves neither trusted issuance nor association. Do not guess paths, change permissions, use a dedicated/bypass tool, issue a second join for full output, or substitute an inspect full-reading branch to erase a delivery failure. Ordinary reads have Host/OS permissions, not per-read Herdr ACL/identity/continuity checks, automatic path revocation, same-snapshot or equal-length replacement detection guarantees. When a complete terminal Handler Result is already visible in the current Router context, read it in full and correlate it to the selected outcome before adoption; later excerpts must retain that established association and material limitations. Visibility is input to Router judgment only; it does not prescribe or trigger a follow-up action. Immediately project completed, partial, blocked, or failed truthfully in the existing Todo; preserve completed, partial, blocked, and failed as distinct Handler Result input semantics, not fixed workflow-control instructions, using the closest truthful native status plus existing descriptive or message surfaces where needed. Never mark partial, blocked, or failed as completed. An observable equivalent duplicate notification is idempotent: do not update the Todo twice or release a dependency twice. If malformed, conflicting, or uncorrelatable, preserve the first semantic state, leave status and dependencies unchanged, and report the conflict. If Result context is missing, incomplete, malformed, or structurally ambiguous, fail closed: do not invent fields, status, identity, or outcome; do not dispatch or claim completion based on it. On restart or replay, reapply only when available identity and visible state make that safe; otherwise retain the Todo and report the limitation. When a Handler terminates without an adoptable Result, read the complete failure evidence and, only after confirming terminal execution, stable subagentId/generation, unchanged boundary and authority, replay safety, and no need for renewed authorization, prefer resuming that same execution. Never resume an active execution or one with a terminal Result; never silently replay completed durable side effects or independent outcomes. Otherwise make a fresh decision from the evidence. After projecting each Result, make a fresh Router-owned decision before releasing dependents or scheduling work that depends on it; release only satisfied dependencies. Only completed plus required evidence satisfies an item predicate by default; partial, failed, blocked, or insufficient evidence leaves it unsatisfied. Verify a Wave gate separately from item completion: every item listed in that Wave must satisfy its completion predicate and the gate's stated verification must pass before releasing only its explicitly dependent work. An adoptable Result and sufficient evidence are required; do not infer gate release from terminal status, Wave numbering, document order, or Todo completion alone.
 
 Todo cleanup (Router only):
 
