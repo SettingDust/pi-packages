@@ -178,6 +178,39 @@ describe("deterministic loaded Skill display", () => {
     } finally { rmSync(root, { recursive: true, force: true }); }
   });
 
+  test("normal Router prompt carries clear questions without weakening required confirmation", async () => {
+    const prompt = await harness().prompt([skill("implement")]);
+    const start = prompt.indexOf("For user-facing questions, explanations, and options you write");
+    const end = prompt.indexOf("First decide only", start);
+    expect(start).toBeGreaterThan(prompt.indexOf("You may respond directly only"));
+    expect(end).toBeGreaterThan(start);
+    expect(prompt.match(/For user-facing questions, explanations, and options you write/g)).toHaveLength(1);
+    const communication = prompt.slice(start, end);
+    // Q1-Q4: generated instruction coverage only, not actual model compliance.
+    for (const phrase of [
+      "including ask content",
+      "first state the actual problem and its connection to the user's goal, then why this step is needed now and why a user decision is needed",
+      "Explain practical choice effects; recommend only with supporting evidence, otherwise state uncertainty without inventing advice",
+      "Explain necessary unfamiliar terms before decision use",
+      "Internal identifiers, stage names, and status codes must not replace the problem explanation or be the question's subject",
+      "use them only afterward as supplementary tracking evidence",
+      "Retain important risks, backend execution identity, and necessary evidence",
+      "this rule does not hide tool-generated metadata",
+      "Briefly refer to already clear context instead of repeating background or imposing a fixed long template",
+      "Do not repackage routine steps within confirmed scope as choice or approval questions",
+      "still explain substantive permission, scope, risk, or important tradeoff decisions and obtain required confirmation before the affected action",
+      "grant no authorization and change no roles, admission, or execution/confirmation flow",
+      "new output obligations are not behavior-neutral maintenance",
+    ]) expect(communication).toContain(phrase);
+    for (const phrase of [
+      "Obtain explicit current-user confirmation of that disclosed implementation scope",
+      "Inside confirmed scope, refine Waves items, implement, repair defects, and verify across bounded Handler outcomes without per-item approval",
+      "confirm the affected portion before executing it",
+      "separate action-executor authorization boundary",
+      "do not perform project-domain work yourself",
+    ]) expect(prompt).toContain(phrase);
+  });
+
   test("Router and strategy require complete ordinary-read decoding and fail closed before adoption", async () => {
     const prompt = await harness().prompt([skill("implement")]);
     const strategy = await Bun.file(join(import.meta.dir, "../skills/delegation-strategy/SKILL.md")).text();
@@ -193,7 +226,7 @@ describe("deterministic loaded Skill display", () => {
     }
     const source = await Bun.file(join(import.meta.dir, "../extensions/pi-harness.ts")).text();
     const hash = (text: string) => new Bun.CryptoHasher("sha256").update(text).digest("hex");
-    expect(hash(source.slice(source.indexOf('  return `You are'), source.indexOf("Phase 4 - Receive")))).toBe("34c86bcf0beb9414d3cc4c7571c4ce802ebaf6630bfdcac1dad4bbd24919e9f3");
+    expect(hash(source.slice(source.indexOf('  return `You are'), source.indexOf("Phase 4 - Receive")))).toBe("471c183a0af29ec081c18a294bce34b7e6ecf7ff407747e3d77f4c2da2978ab3");
     expect(hash(source.slice(source.indexOf("Todo cleanup (Router only):")))).toBe("dae23f120ff7af06f95dd1fecfe9fa19c4dc6ba9a8556a9ef313f8e48d026077");
   });
 
@@ -207,7 +240,7 @@ describe("deterministic loaded Skill display", () => {
     const source = await Bun.file(join(import.meta.dir, "../extensions/pi-harness.ts")).text();
     const instructionStart = source.indexOf('return `You are the Pi Harness Router.') + 'return `'.length;
     const instruction = source.slice(instructionStart, source.indexOf("${candidateStatus}", instructionStart));
-    expect(new Bun.CryptoHasher("sha256").update(instruction).digest("hex")).toBe("1b62ccb92c7b9271152b5d885699c637705ed91de91b59325095409c085bd229");
+    expect(new Bun.CryptoHasher("sha256").update(instruction).digest("hex")).toBe("32111a3d87466022b8527a1f1da141df8fccd72fa67068ff07c2c3d7b6aa6efd");
     const handler = await Bun.file(join(import.meta.dir, "../agents/handler.md")).arrayBuffer();
     expect(new Bun.CryptoHasher("sha256").update(handler).digest("hex")).toBe("aade068cd4557a8ab54d9bce9f7b57896cf909858570245239300041b563c518");
     const herdr = await Bun.file(join(import.meta.dir, "../../pi-herdr-subagents/src/index.ts")).text();

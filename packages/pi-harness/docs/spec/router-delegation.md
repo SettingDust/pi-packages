@@ -150,6 +150,14 @@ This section governs requirement-to-implementation work. The Router owns communi
 
 **C10. Behavior-neutral maintenance.** Small maintenance preserving already-authoritative behavior may proceed under existing explicit authorization without a new Spec or implementation-plan confirmation. Verify unchanged behavior with focused checks and report the result. Material changes in behavior, scope, architecture, dependency, or risk follow C1-C4 or C6 within a confirmed plan; material ambiguity requires clarification before work. Standalone admission under section 2 establishes only legality, not that authorization exists. C8-C10 do not themselves grant permission, establish a new approval round, or confirm an overview or implementation plan.
 
+### Clear user-facing questions
+
+For Router-authored user-facing questions, explanations, and options, including caller-authored `ask` content, the Router must first state the actual problem and its relationship to the user's goal, then explain why this step is needed now and why a user decision is needed. It must explain the practical effects of the offered choices and give a recommendation when supported by evidence; otherwise it must state the uncertainty rather than invent a recommendation. When the context already makes the connection clear, a brief reference is sufficient; this contract requires neither a rigid long template nor repeated background.
+
+The Router must explain necessary unfamiliar terms before using them to frame a decision. Internal identifiers, stage names, and status codes must not substitute for the actual problem or serve as the question's subject; necessary identifiers may supplement the explanation afterward for traceability. Clear expression must retain important risks, backend execution identity, and necessary tracking evidence. This contract governs content the Router writes, not tool-generated metadata; it does not require metadata hiding, tool-schema or UI changes, or evidence removal.
+
+Under C5, routine steps within already confirmed scope must not be repackaged as repeated choice or approval questions; ordinary progress need not become a question. Substantive permission, scope, risk, or important tradeoff decisions must still explain their effects and obtain the confirmation required by C4, C6, and the applicable action-executor boundary. These expression obligations do not grant authorization, change roles or admission, alter execution/confirmation flow, or create a new confirmation mechanism; they do not qualify new output behavior as C10 behavior-neutral maintenance.
+
 ### Visible authority assessment
 
 Under [ADR-0010](../adr/0010-visible-authority-assessment-and-conditional-sdd.md#decision), before deriving a dependent implementation plan for a durable behavior change or accepted architectural or governance change, the Router must visibly account for each of PRD, ADR, and Spec. An existing coordination explanation or bounded assessment Result must state each family's action, owning boundary, existing or intended path, and one sentence giving an evidence-backed reason. Non-applicability must be explained rather than omitted.
@@ -224,6 +232,17 @@ Validate these against a conversation/delegation trace; they specify expected de
 | S22 | Two ready Wave items have overlapping writes or uncertain conflict | Serialize against current state or block; no parallel release by document order alone. |
 | S23 | Unfinished historical Tasks plan is selected | Explicit Work/Plan/Waves migration and applicable confirmation precede new planned implementation. |
 
+
+### Clear-question acceptance scenarios
+
+These representative conditions require conversation evidence of Router-authored presentation, including `ask` content where used. Local documentation checks establish this contract only; static prompt assertions establish rule presence, not actual model compliance. They supplement, not replace, C4-C6 and S7-S10.
+
+| ID | Situation | Observable condition |
+| --- | --- | --- |
+| Q1 | A question would otherwise be framed by an unfamiliar term, internal item number, stage name, or status code | Router first explains the actual problem and goal connection, why it matters now and why the user must decide; necessary terminology is explained before decision use. Identifiers appear only as supplementary tracking evidence after the explanation, not as its substitute or the question's subject. Important risks, backend identity, and necessary evidence remain available; automatic tool metadata is not hidden by this rule. |
+| Q2 | A routine check, item refinement, or in-scope repair is already covered by confirmed scope | Router proceeds under C5 without asking the user to choose or reapprove the routine step. Any progress explanation may be brief and does not manufacture a new decision or repeat settled background. |
+| Q3 | A real permission or scope change, material risk, or important tradeoff needs a user decision | Router explains the actual issue, goal connection, current necessity, decision reason, and practical choice effects, retaining important risks; required confirmation precedes the affected action under C4/C6 or its action-executor boundary. Simpler wording does not imply authorization or bypass admission. |
+| Q4 | Choices have an evidence-backed preference, or the evidence is insufficient | Router explains practical effects and recommends the supported choice, or states the uncertainty without fabricating advice. Clear existing context permits a brief connection rather than a fixed long template. |
 
 ### Authority-assessment acceptance scenarios
 
