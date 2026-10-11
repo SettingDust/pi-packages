@@ -405,7 +405,25 @@ function cleanupResultTemporary(path: string, file: number, expected: Stats): vo
   unlinkSync(temporary);
 }
 
-function readTaskArtifact(path: string, result = false, privateAccess = false): string | undefined {
+// Result issuance keeps source integrity checks, not image/private-account admission.
+function checkResultSource(path: string, directory: boolean): void {
+  const stat = lstatSync(path);
+  if (stat.isSymbolicLink() || (directory ? !stat.isDirectory() : !stat.isFile())
+    || (!directory && stat.nlink !== 1) || relative(resolve(path), realpathSync(path)) !== "") throw new Error();
+  if (process.platform !== "win32") return;
+  const script = [
+    "$ErrorActionPreference = 'Stop'", "try {",
+    "$path = [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('" + Buffer.from(path, "utf8").toString("base64") + "'))",
+    "if ([IO.File]::GetAttributes($path) -band [IO.FileAttributes]::ReparsePoint) { throw 'redirected' }",
+    "[Console]::Out.Write('regular')", "} catch { exit 1 }", "exit 0", "",
+  ].join("\n");
+  const result = spawnSync("powershell.exe", ["-NoLogo", "-NoProfile", "-NonInteractive", "-Command", "Invoke-Expression ([Console]::In.ReadToEnd())"], {
+    input: script, encoding: "utf8", windowsHide: true, timeout: 10000,
+  });
+  if (result.error || result.status !== 0 || result.stdout.trim() !== "regular") throw new Error();
+}
+
+function readTaskArtifact(path: string, result = false, issuing = false): string | undefined {
   let file: number | undefined;
   try {
     const expected = lstatSync(path, { throwIfNoEntry: false });
@@ -413,17 +431,17 @@ function readTaskArtifact(path: string, result = false, privateAccess = false): 
     const check = (stat: Stats) => {
       if (!stat.isFile() || stat.isSymbolicLink() || stat.nlink !== 1
         || stat.dev !== expected.dev || stat.ino !== expected.ino
-        || (privateAccess && (stat.size !== expected.size || stat.mtimeMs !== expected.mtimeMs || stat.ctimeMs !== expected.ctimeMs))) throw new Error();
+        || (issuing && (stat.size !== expected.size || stat.mtimeMs !== expected.mtimeMs || stat.ctimeMs !== expected.ctimeMs))) throw new Error();
     };
     if (!expected.isFile() || expected.isSymbolicLink()) throw new Error();
     if (relative(resolve(path), realpathSync(path)) !== "") throw new Error();
-    if (privateAccess) checkImageAccess(path, false);
+    if (issuing) checkResultSource(path, false);
     file = openSync(path, constants.O_RDONLY | (constants.O_NOFOLLOW ?? 0));
     if (result && expected.nlink === 2) cleanupResultTemporary(path, file, expected);
     check(fstatSync(file));
     const bytes = readFileSync(file, "utf8");
     check(fstatSync(file));
-    if (privateAccess) checkImageAccess(path, false);
+    if (issuing) checkResultSource(path, false);
     check(lstatSync(path));
     return bytes;
   } catch { throw new ImageInputError("storage"); }
@@ -1099,7 +1117,7 @@ export class SubagentRuntime {
       if (snapshot.resultPath !== join(artifactDir, `result-${snapshot.generation}.json`)) return unavailable("result_identity_mismatch");
       const directories = [scope, artifactDir].map(path => {
         const stat = checkedImageDirectory(path);
-        checkImageAccess(path, true);
+        checkResultSource(path, true);
         return { path, stat };
       });
       const manifest = this.readTaskRecord(join(artifactDir, "task.json"), scope, artifactDir, snapshot.subagentId, true);
@@ -1121,7 +1139,7 @@ export class SubagentRuntime {
       }
       for (const { path, stat } of directories) {
         const after = checkedImageDirectory(path);
-        checkImageAccess(path, true);
+        checkResultSource(path, true);
         if (after.dev !== stat.dev || after.ino !== stat.ino) return unavailable("invalid_task_storage");
       }
       const changed = current(); // Recheck even synchronous access probes may re-enter the runtime.
@@ -1634,11 +1652,11 @@ export class SubagentRuntime {
     };
   }
 
-  private readTaskRecord(path: string, tasksDir: string, artifactDir: string, subagentId: string, privateAccess = false): TaskRecord | undefined {
+  private readTaskRecord(path: string, tasksDir: string, artifactDir: string, subagentId: string, issuing = false): TaskRecord | undefined {
     try { checkedImageDirectory(artifactDir, false); }
     catch { throw new ImageInputError("storage"); }
     try {
-      const bytes = readTaskArtifact(path, false, privateAccess);
+      const bytes = readTaskArtifact(path, false, issuing);
       if (bytes === undefined) return;
       const value = JSON.parse(bytes) as Json;
       const legacy = isLegacySubagentId(subagentId);

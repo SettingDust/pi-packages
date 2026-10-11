@@ -5557,7 +5557,7 @@ describe("I-SOURCE trusted opaque Result issuance", () => {
       rejected(await f.call("subagent_join"), original, f.task.resultPath);
       expect(ledger(f)).toEqual(stale);
     }
-  }, 120_000); // Repeated fresh native ACL probes; no permission cache replaces them.
+  }, 120_000); // Repeated fresh native source probes; no cache replaces them.
 
   test("every join update is lifecycle-only before final opaque delivery", async () => {
     const marker = "CONSUMER_PRIVATE_LONG_REPORT";
@@ -5647,24 +5647,174 @@ describe("I-SOURCE trusted opaque Result issuance", () => {
     expect(readFileSync(foreign)).toEqual(readFileSync(f.task.resultPath));
   }, 30_000);
 
-  test("private-access failure on each source owner is fail-closed and never repaired", async () => {
+  test.each([16384, 16385])("readable inherited/shared sources issue %i decoded bytes without OS-owner or private-mode admission", async bytes => {
+    const prefix = 'status: completed\r\nsummary: "  exact summary 中文  "\r\nreport: |\r\n  中文😀 "\\\\\t';
+    const f = await fixture(prefix + "x".repeat(bytes - Buffer.byteLength(prefix, "utf8")));
+    // Recreate only this isolated fixture with natural inheritance, never chmod/SetAccessControl.
+    const held = `${f.scope}-private`;
+    fs.renameSync(f.scope, held);
+    const copy = (source: string, target: string) => {
+      mkdirSync(target, { mode: 0o755 });
+      for (const entry of readdirSync(source, { withFileTypes: true })) {
+        if (entry.isDirectory()) copy(join(source, entry.name), join(target, entry.name));
+        else writeFileSync(join(target, entry.name), readFileSync(join(source, entry.name)), { mode: 0o644 });
+      }
+    };
+    copy(held, f.scope); rmSync(held, { recursive: true });
+    const paths = [f.scope, f.artifact, f.manifest, f.task.resultPath];
+    const access = () => {
+      if (process.platform !== "win32") return paths.map(path => {
+        const stat = fs.lstatSync(path);
+        expect(stat.mode & 0o077).not.toBe(0);
+        return { mode: stat.mode, uid: stat.uid, gid: stat.gid };
+      });
+      const script = "$ErrorActionPreference = 'Stop'; @(" + paths.map(path => {
+        const kind = fs.statSync(path).isDirectory() ? "Directory" : "File";
+        return `$a = [IO.${kind}]::GetAccessControl([Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('${Buffer.from(path).toString("base64")}'))); `
+          + "$r = @($a.GetAccessRules($true, $true, [Security.Principal.SecurityIdentifier])); "
+          + "[pscustomobject]@{sddl=$a.Sddl; inherited=@($r | Where-Object IsInherited).Count; rules=$r.Count; protected=$a.AreAccessRulesProtected}";
+      }).join("; ") + ") | ConvertTo-Json -Compress";
+      const result = childProcess.spawnSync("powershell.exe", ["-NoLogo", "-NoProfile", "-NonInteractive", "-Command", script], { encoding: "utf8" });
+      expect(result.status).toBe(0);
+      const records = JSON.parse(result.stdout);
+      expect(records).toHaveLength(4);
+      for (const record of records) {
+        expect(record.protected).toBeFalse();
+        expect(record.inherited).toBeGreaterThan(0);
+        expect(record.rules).toBeGreaterThan(1);
+      }
+      return records;
+    };
+    const permissions = access();
+    const before = ledger(f);
+    const native = childProcess.spawnSync;
+    const lstat = fs.lstatSync;
+    let policyProbes = 0;
+    const nativeChecks = new Map<string, number>();
+    const ownerStats = new Set<string>();
+    spies.push(spyOn(childProcess, "spawnSync").mockImplementation(((command: any, args?: any, options?: any) => {
+      const script = String(options?.input);
+      const path = paths.find(path => script.includes(`'${Buffer.from(path).toString("base64")}'`));
+      if (path) {
+        if (/AccessControl|GetOwner|WindowsIdentity|SetOwner/.test(script)) {
+          policyProbes++;
+          throw new Error("OS owner/ACL policy probe unavailable");
+        }
+        if (script.includes("ReparsePoint")) nativeChecks.set(path, (nativeChecks.get(path) ?? 0) + 1);
+      }
+      return native(command, args, options);
+    }) as typeof childProcess.spawnSync));
+    spies.push(spyOn(fs, "lstatSync").mockImplementation(((path: any, options?: any) => {
+      const stat = lstat(path, options);
+      if (stat && paths.includes(String(path))) {
+        ownerStats.add(String(path));
+        // Only OS-account metadata is substituted; file shape/identity/times and all I/O remain real.
+        Object.defineProperty(stat, "uid", { value: (process.getuid?.() ?? 0) + 1 });
+      }
+      return stat;
+    }) as typeof fs.lstatSync));
+    for (const name of ["subagent_join", "subagent_inspect"]) {
+      const value = await f.call(name);
+      expect(value.details.result).toBe(f.original);
+      expect(Buffer.byteLength(value.details.result, "utf8")).toBe(bytes);
+      expect(value.details.resultPath).toBe(f.task.resultPath);
+      expect(value.details.resultSource).toEqual({ scopeIdentity: f.scope, parentSessionFile: f.parentSessionFile });
+      expect(JSON.parse(value.content[0].text)).toEqual(value.details);
+    }
+    expect(policyProbes).toBe(0);
+    expect([...ownerStats].sort()).toEqual([...paths].sort());
+    if (process.platform === "win32") for (const path of paths) expect(nativeChecks.get(path)).toBeGreaterThanOrEqual(4);
+    for (const spy of spies.splice(0).reverse()) spy.mockRestore();
+    expect(access()).toEqual(permissions);
+    expect(ledger(f)).toEqual(before);
+  }, 30_000);
+
+  test("real open/read errors cannot fall back to cached originals or summaries", async () => {
     const f = await fixture();
-    const original = childProcess.spawnSync;
-    for (const path of [f.scope, f.artifact, f.manifest, f.task.resultPath]) {
-      let hits = 0;
-      if (process.platform === "win32") {
-        spies.push(spyOn(childProcess, "spawnSync").mockImplementation((command: any, args?: any, options?: any) => {
-          if (command === "powershell.exe" && String(options?.input).includes("GetAccessControl") && String(options.input).includes(`'${Buffer.from(path).toString("base64")}'`) ) {
-            hits++; return { status: 1, stdout: "", stderr: "foreign private ACL diagnostic" } as any;
-          }
-          return original(command, args, options);
-        }));
-      } else fs.chmodSync(path, fs.statSync(path).isDirectory() ? 0o755 : 0o644);
+    const open = fs.openSync;
+    const read = fs.readFileSync;
+    for (const path of [f.manifest, f.task.resultPath]) for (const operation of ["open", "read"]) {
       const before = ledger(f);
-      rejected(await f.call("subagent_inspect"), f.original, f.task.resultPath);
+      const held = `${path}-held`;
+      let failure: string | undefined;
+      let target: number | undefined;
+      spies.push(spyOn(fs, "openSync").mockImplementation((file: any, flags: any, mode?: any) => {
+        if (file !== path) return open(file, flags, mode);
+        // ENOENT at the actual open boundary, or a real write-only descriptor that cannot be read.
+        if (operation === "open") fs.renameSync(path, held);
+        try { return target = open(file, operation === "read" ? fs.constants.O_WRONLY : flags, mode); }
+        catch (error) { failure = (error as NodeJS.ErrnoException).code; throw error; }
+      }));
+      spies.push(spyOn(fs, "readFileSync").mockImplementation(((file: any, options?: any) => {
+        try { return read(file, options); }
+        catch (error) { if (file === target) failure = (error as NodeJS.ErrnoException).code; throw error; }
+      }) as typeof fs.readFileSync));
+      const value = await f.call("subagent_inspect");
+      rejected(value, f.original, f.task.resultPath);
+      expect(value.details).not.toHaveProperty("resultSummary");
+      expect(failure).toBe(operation === "open" ? "ENOENT" : "EBADF");
+      for (const spy of spies.splice(0).reverse()) spy.mockRestore();
+      if (operation === "open") fs.renameSync(held, path);
       expect(ledger(f)).toEqual(before);
-      if (process.platform === "win32") { expect(hits).toBeGreaterThan(0); spies.pop()!.mockRestore(); }
-      else { expect(fs.statSync(path).mode & 0o077).not.toBe(0); fs.chmodSync(path, fs.statSync(path).isDirectory() ? 0o700 : 0o600); }
+    }
+  }, 30_000);
+
+  test("manifest and Result descriptor metadata must remain continuous after reading", async () => {
+    const f = await fixture();
+    const open = fs.openSync;
+    const stat = fs.fstatSync;
+    const read = fs.readFileSync;
+    for (const path of [f.manifest, f.task.resultPath]) for (const field of ["size", "mtimeMs", "ctimeMs", "dev", "ino"]) {
+      const before = ledger(f);
+      let target: number | undefined;
+      let readComplete = false;
+      let changed = false;
+      spies.push(spyOn(fs, "openSync").mockImplementation((file: any, flags: any, mode?: any) => {
+        const descriptor = open(file, flags, mode);
+        if (file === path) target = descriptor;
+        return descriptor;
+      }));
+      spies.push(spyOn(fs, "readFileSync").mockImplementation(((file: any, options?: any) => {
+        const value = read(file, options);
+        if (file === target) readComplete = true;
+        return value;
+      }) as typeof fs.readFileSync));
+      spies.push(spyOn(fs, "fstatSync").mockImplementation(((file: number, options?: any) => {
+        const value = stat(file, options);
+        if (file === target && readComplete) {
+          const previous = Number(value[field as keyof typeof value]);
+          // Native inode numbers may exceed safe integers; +1 need not change their JS value.
+          const next = previous + Math.max(1, Math.abs(previous) * Number.EPSILON * 2);
+          Object.defineProperty(value, field, { value: next });
+          changed = next !== previous;
+        }
+        return value;
+      }) as typeof fs.fstatSync));
+      const value = await f.call("subagent_inspect");
+      expect(changed, `${path}: ${field} fault reached post-read stat`).toBeTrue();
+      rejected(value, f.original, f.task.resultPath);
+      for (const spy of spies.splice(0).reverse()) spy.mockRestore();
+      expect(ledger(f)).toEqual(before);
+    }
+  }, 30_000);
+
+  test.skipIf(process.platform !== "win32")("native reparse probes remain mandatory before and after all four sources", async () => {
+    const f = await fixture();
+    const native = childProcess.spawnSync;
+    for (const path of [f.scope, f.artifact, f.manifest, f.task.resultPath]) for (const failAt of [1, 2]) {
+      let probes = 0;
+      const before = ledger(f);
+      spies.push(spyOn(childProcess, "spawnSync").mockImplementation((command: any, args?: any, options?: any) => {
+        const script = String(options?.input);
+        if (script.includes(`'${Buffer.from(path).toString("base64")}'`) && script.includes("ReparsePoint") && ++probes === failAt) {
+          return { status: 1, stdout: "", stderr: "native reparse rejection" } as any;
+        }
+        return native(command, args, options);
+      }));
+      rejected(await f.call("subagent_inspect"), f.original, f.task.resultPath);
+      expect(probes).toBe(failAt);
+      spies.pop()!.mockRestore();
+      expect(ledger(f)).toEqual(before);
     }
   }, 30_000);
 
