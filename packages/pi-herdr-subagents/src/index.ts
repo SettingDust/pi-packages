@@ -1917,9 +1917,25 @@ function renderSpawnCall(args: unknown, theme?: ThemeLike): Text {
   return new Text(`${title(theme, "spawn")}${suffix ? paint(theme, "dim", `  ${suffix}`) : ""}`, 0, 0);
 }
 
-function renderResumeCall(args: unknown, theme?: ThemeLike): Text {
-  const identity = callIdentity(args, "subagentId");
-  return new Text(`${title(theme, "resume")}${identity ? paint(theme, "dim", `  ${identity}`) : ""}`, 0, 0);
+function renderControlCall(action: "resume" | "steer") {
+  return (args: unknown, theme?: ThemeLike): Text => {
+    const identity = callIdentity(args, "subagentId");
+    return new Text(`${title(theme, action)}${identity ? paint(theme, "dim", `  ${identity}`) : ""}`, 0, 0);
+  };
+}
+
+function renderControlResult(action: "resume" | "steer") {
+  return (result: ToolResult, options: { expanded?: boolean; isPartial?: boolean } = {}, theme?: ThemeLike, context?: { isError?: boolean }): Text => {
+    const operation = action === "resume" ? "Resume" : "Text submission";
+    // Control acceptance is independent of task lifecycle and Result delivery.
+    const status = context?.isError ? `${operation} failed` : options.isPartial ? `${operation} in progress`
+      : action === "resume" ? "Execution resumed" : "Text submission accepted";
+    const color = context?.isError ? "error" : options.isPartial ? "warning" : "success";
+    const lines = [paint(theme, color, status)];
+    const task = taskFrom(result);
+    if (task) lines.push(paint(theme, "muted", `  Task: ${cleanIdentity(task.subagentId!)} · generation ${task.generation} · ${cleanIdentity(task.status!)}`));
+    return new Text(lines.join("\n"), 0, 0);
+  };
 }
 
 function renderSpawnResult(result: ToolResult, options: { expanded?: boolean; isPartial?: boolean } = {}, theme?: ThemeLike): Text {
@@ -2019,10 +2035,10 @@ export function createSubagentTools(runtime: SubagentRuntime, cwd: string, paren
         return { code: error.code, detail: error.detail, ...(error.operation ? { operation: error.operation } : {}) };
       }
     }, { renderCall: renderSpawnCall, renderResult: renderSpawnResult }),
-    tool("subagent_resume", "Resume a completed or failed subagent.", Type.Object({ subagentId: Type.String(), prompt: Type.String({ minLength: 1 }), images: imagesSchema }), params => runtime.resume(params.subagentId, params.prompt, readImages(params)), { renderCall: renderResumeCall, renderResult: renderJoinResult }),
+    tool("subagent_resume", "Resume a completed or failed subagent.", Type.Object({ subagentId: Type.String(), prompt: Type.String({ minLength: 1 }), images: imagesSchema }), params => runtime.resume(params.subagentId, params.prompt, readImages(params)), { renderCall: renderControlCall("resume"), renderResult: renderControlResult("resume") }),
     tool("subagent_inspect", "Return a non-blocking subagent snapshot for an explicit status check; do not poll this tool while waiting. Prefer the terminal completion notification, then one subagent_join. Available terminal Results use the same caller full/summary/unavailable projection; inspect is not a full-reading bypass. For summary navigation, ordinary read of the existing JSON resultPath and complete result decoding are required before adoption.", Type.Object({ subagentId: Type.String() }), params => Promise.resolve(runtime.inspect(params.subagentId)), { renderResult: renderJoinResult }),
     tool("subagent_join", "Wait for a subagent and return one caller-projected Result: full at <=16384 decoded UTF-8 bytes, otherwise the existing summary and resultPath, or unavailable. For summary navigation, use ordinary read of that existing JSON envelope and completely decode result; correlate task/generation and read all evidence before adoption. Incomplete or uncertain evidence permits no adoption. There is no second join mode or inspect full-reading branch. Use after a terminal completion notification, or when an explicit immediate Result wait is necessary; do not use it for routine polling. Caller cancellation, including ESC, stops only this wait and does not cancel the subagent; use subagent_cancel to cancel it.", Type.Object({ subagentId: Type.String(), generation: Type.Optional(Type.Number()) }), async (params, update, signal) => { update?.(runtime.inspect(params.subagentId)); return runtime.join(params.subagentId, params.generation, signal); }, { renderCall: renderJoinCall, renderResult: renderJoinResult }),
-    tool("subagent_steer", "Send a message to a running subagent.", Type.Object({ subagentId: Type.String(), message: Type.String({ minLength: 1 }) }), params => runtime.steer(params.subagentId, params.message), { renderResult: renderJoinResult }),
+    tool("subagent_steer", "Send a message to a running subagent.", Type.Object({ subagentId: Type.String(), message: Type.String({ minLength: 1 }) }), params => runtime.steer(params.subagentId, params.message), { renderCall: renderControlCall("steer"), renderResult: renderControlResult("steer") }),
     tool("subagent_cancel", "Best-effort cancel a running subagent.", Type.Object({ subagentId: Type.String() }), params => runtime.cancel(params.subagentId), { renderResult: renderJoinResult }),
     tool("subagent_remove", "Close and remove a subagent and its artifacts.", Type.Object({ subagentId: Type.String() }), async params => { await runtime.remove(params.subagentId); return { status: "removed" }; }),
   ];

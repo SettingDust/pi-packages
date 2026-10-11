@@ -125,7 +125,7 @@ test("renders named-Agent spawn and join actions", async () => {
   } finally { runtime.stop(); rmSync(root, { recursive: true, force: true }); }
 });
 
-for (const name of ["subagent_join", "subagent_inspect", "subagent_spawn", "subagent_resume", "subagent_cancel", "subagent_steer"]) {
+for (const name of ["subagent_join", "subagent_inspect", "subagent_spawn", "subagent_cancel"]) {
   test(`${name} renders only delivered full/summary/unavailable through installed Pi composition`, () => {
     const registry = new AgentRegistry();
     registry.setFiles([{ path: "/handler.md", content: "---\nname: handler\n---\nHandler" }]);
@@ -180,5 +180,75 @@ for (const name of ["subagent_join", "subagent_inspect", "subagent_spawn", "suba
     expect(render(tool.renderResult({ details: longSummary }, {}, theme))).toContain("SUMMARY_END");
     const plain = { ...base, agent: "reviewer", result: "opaque non-Handler original" };
     expect(render(tool.renderResult({ details: plain }, { expanded: true }, theme))).toContain(plain.result);
+  });
+}
+
+for (const name of ["subagent_resume", "subagent_steer"]) {
+  test(`${name} renders control state without reports through installed Pi composition`, () => {
+    const registry = new AgentRegistry();
+    registry.setFiles([{ path: "/handler.md", content: "---\nname: handler\n---\nHandler" }]);
+    const runtime = new SubagentRuntime({} as HerdrTransport, registry);
+    runtime.inspect = () => { throw new Error("renderer must not read runtime cache"); };
+    const tool = createSubagentTools(runtime, "/repo").find(tool => tool.name === name)!;
+    const base = { subagentId: "render-task", generation: 2, agent: "handler", label: "safe label", status: "completed" };
+    const original = "status: partial\nsummary: SUMMARY_PRIVATE\nreport: BODY_PRIVATE";
+    const path = "/fixture/render-task-artifacts/result-2.json";
+    const full = { ...base, result: original, resultPath: path, resultDelivery: { kind: "full", originalBytes: Buffer.byteLength(original), fullResultReturned: true } };
+    const cases = [
+      full,
+      { ...base, resultSummary: "SUMMARY_PRIVATE", resultPath: path, resultDelivery: { kind: "summary", originalBytes: 16385, fullResultReturned: false } },
+      { ...base, resultDelivery: { kind: "unavailable", fullResultReturned: false, code: "result_access_unavailable" } },
+      { ...base, agent: "reviewer", result: "OPAQUE_PRIVATE", resultPath: path },
+      { ...base, status: "running", resultDelivery: { kind: "unavailable", fullResultReturned: false, code: "result_not_delivered" } },
+      { ...base, status: "queued" },
+      { ...base, status: "failed", error: "TASK_ERROR_NOT_CONTROL" },
+      { ...base, status: "cancelled" },
+      undefined,
+    ];
+    const action = name === "subagent_resume" ? "Resume" : "Text submission";
+    const accepted = name === "subagent_resume" ? "Execution resumed" : "Text submission accepted";
+    const args = { subagentId: base.subagentId, prompt: "PRIVATE_PROMPT", message: "PRIVATE_MESSAGE" };
+    for (const details of cases) {
+      const value = { content: [{ type: "text", text: details ? JSON.stringify(details) : "CONTROL_CONTENT_PRIVATE" }], details };
+      const before = JSON.stringify(value);
+      const component = new ToolExecutionComponent(name, "control", args, {}, tool, { requestRender() {} }, "/repo");
+      component.setArgsComplete();
+      component.markExecutionStarted();
+      for (const expanded of [true, false]) {
+        component.setExpanded(expanded);
+        for (const isPartial of [false, true]) {
+          for (const isError of [false, true]) {
+            component.updateResult({ ...value, isError }, isPartial);
+            for (const width of [120, 40, 12]) {
+              const lines = component.render(width).map(stripTerminalSequences);
+              const text = lines.join("\n");
+              expect(text).not.toContain("BODY_PRIVATE");
+              expect(text).not.toContain("SUMMARY_PRIVATE");
+              expect(text).not.toContain("OPAQUE_PRIVATE");
+              expect(text).not.toContain(path);
+              expect(text).not.toContain("PRIVATE_PROMPT");
+              expect(text).not.toContain("PRIVATE_MESSAGE");
+              expect(text).not.toContain("CONTROL_CONTENT_PRIVATE");
+              expect(text).not.toContain("TASK_ERROR_NOT_CONTROL");
+              expect(text).not.toMatch(/result|summary|report|adopt|ordinary read|UTF-8 bytes/i);
+              for (const line of lines) expect(visibleWidth(line)).toBeLessThanOrEqual(width);
+              if (width === 120) {
+                expect(text).toContain(name.replace("_", " "));
+                expect(text).toContain(base.subagentId);
+                expect(text).toContain(isError ? `${action} failed` : isPartial ? `${action} in progress` : accepted);
+                if (isError || isPartial) expect(text).not.toContain(accepted);
+                if (isError) expect(text).not.toContain(`${action} in progress`);
+                if (details) {
+                  expect(text).toContain(`generation ${details.generation}`);
+                  expect(text).toContain(`Task: ${base.subagentId}`);
+                  expect(text).toContain(details.status);
+                }
+              }
+            }
+          }
+        }
+      }
+      expect(JSON.stringify(value)).toBe(before);
+    }
   });
 }
