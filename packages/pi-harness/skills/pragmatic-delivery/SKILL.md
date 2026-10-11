@@ -19,11 +19,3 @@ Apply this method on demand to the current Handoff's single terminal predicate, 
 6. **Reuse still-valid evidence.** Reuse relevant checks while code, inputs, configuration, environment, and required freshness conditions remain covered. Repeat or expand for changes, failures, stale evidence, explicit requirements, or unresolved concrete questions, not ritual or a new evidence ledger.
 7. **Identify real blocks.** Check whether a rule applies and authorization already covers the step; advice or personal caution is not an approval gate. Cite the concrete rule/tool refusal and gap, without changing paths to bypass rejection. Report checks not run or failed as such.
 8. **Deliver when conditions hold.** Stop when this predicate is satisfied, necessary checks pass, and no delivery-affecting issue remains. If unchanged state prompts repeated proof, stop that loop; do only necessary remaining work within this predicate or deliver, without extra proof bundles, frozen snapshots, or audit tasks.
-
-## Output
-
-Submit exactly one Result through the existing Handler completion contract. Report outputs, checks actually performed or reused with their validity basis, and remaining limitations. Keep `completed`, `partial`, `blocked`, and `failed` truthful; missing required verification cannot be `completed`.
-
-## Source and License Notice
-
-Harness-specific adaptation, not a verbatim copy, of [newmancai/sol-just-ship: pragmatic-delivery](https://raw.githubusercontent.com/newmancai/sol-just-ship/201bce6d401d1aa34842720060afb749b8ae2d2d/skills/pragmatic-delivery/SKILL.md), pinned to commit `201bce6d401d1aa34842720060afb749b8ae2d2d`. Handler boundaries and internal-contract/error-handling guidance are local adaptations. The [upstream MIT notice](https://raw.githubusercontent.com/newmancai/sol-just-ship/201bce6d401d1aa34842720060afb749b8ae2d2d/LICENSE) is preserved in [LICENSE](LICENSE) and applies to the referenced text and its adapted portions here only; it does not relicense the Harness package.
