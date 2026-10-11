@@ -100,6 +100,10 @@ describe("built-in Skill library", () => {
     for (const rule of ["sole executable graph", "one Handler and one Result", "prerequisite item IDs", "write ownership", "acyclic dependencies", "no dependencies or global barrier", "`partial`, `failed`, `blocked`", "explicit migration", "silent fallback"]) {
       expect(body).toContain(rule);
     }
+    expect(body).toContain("completely reads and reliably correlates full Results");
+    expect(body).toContain("communicates truthful facts through Todo or ordinary messages");
+    expect(body).toContain("judges release from item evidence and gate predicates independently of Todo mutation success");
+    expect(body).not.toContain("projects truthful Todo state before release decisions");
     const library = readFileSync(join(root, "docs/spec/skill-library.md"), "utf8");
     expect(library).toContain("Work/Context/Plan/Waves");
     expect(library).toContain("sole executable graph");
@@ -235,111 +239,139 @@ describe("built-in Skill library", () => {
     expect(body).toContain("Do not present an unaccepted proposal as an accepted ADR");
   });
 
-  test("delegation strategy covers cleanup T1-T16 in lifecycle order", () => {
+  test("delegation strategy covers one-way display T1-T16 and independent execution gates", () => {
     const { body } = readSkill("delegation-strategy");
-    // Static clauses/order only; this does not run a Router model or validate a provider's deletion effects.
-    const cleanupCases = [
+    // Static clauses/order only; no Router model or actual display-tool effects.
+    const displayCases = [
       ["T1", [
-        "After applying a complete correlated terminal Result and completing the relevant gate and dependency judgment",
-        "actively inspect cleanup before handing off to another current outcome, waiting, stopping, or making the final report",
-        "When eligible stable targets and a suitable actually callable tool are proven, execute cleanup",
-        "When no candidate qualifies or required identity",
-      ]],
+        "Rebuilding, replacement, whole-group removal, and full clear are allowed without old Result or role closure",
+        "Old cancelled, unstarted, missing-Result, current/active/unresolved, same-name records, source-derived status regression, and outstanding dependencies/gates/confirmations do not block display changes",
+        "Whole-view replacement requires no old identity continuity or preservation of survivor fields, order, or native states",
+      ], ["For each candidate, prove", "Age or native status alone never qualifies a record"]],
       ["T2", [
-        "A summary or backend terminal status, or an absent, incomplete, uncorrelatable, conflicting, or unapplied Result, cannot justify deletion, completion, or dependency release",
-      ]],
+        "A missing, incomplete, uncorrelatable, conflicting, or unapplied Result permits display changes but never Result adoption, business completion, or affected dependency release",
+      ], ["cannot justify deletion, completion, or dependency release"]],
       ["T3", [
-        "Keep the current record while validation, verification, repair/review, a related user decision, or another coordination responsibility remains, even if its native status is completed",
-        "Age or native status alone never qualifies a record",
-      ]],
+        "Actual active execution and coordination duties remain independent and must be communicated through ordinary messages when needed",
+        "prior effects accounting, duty closure, or retained active Todo records are not clear-before prerequisites",
+      ], ["Keep the current record while validation", "before requalifying it"]],
       ["T4", [
-        "explicitly close or hand off the current role, retaining necessary evidence in the Result or an ordinary coordination explanation, before requalifying it",
-      ]],
+        "Todo is a one-way derived display, not an execution ledger or permission",
+        "derive only from explicitly selected Work entries, accepted authority, selected Plan/Waves scope, reliable execution facts, and current explicitly identified coordination outcomes, including selected standalone temporary outcomes",
+        "Work is a delivery entry, not sole authority; display selection neither confirms nor rewrites implementation scope",
+        "one item per independently observable outcome within selected multi-step scope, without merging Results",
+      ], ["explicitly close or hand off the current role"]],
       ["T5", [
-        "prove clear non-contradictory identity and required fields, an already applied complete correlated terminal Result",
-        "no current, active, or unresolved role, and no pending dependency, gate, or confirmation still requiring the record",
-        "Local deletion must cover only the exact eligible record or set",
-        "preservation of every survivor's fields, relative order, and native status",
-      ]],
+        "todo_remove({removals:[{task,todo}]}) or group target {task} selects exact children, groups, or a disjoint mixed set in any native state",
+        "preserving all non-target fields, order, and native states, including other groups",
+        "This local preservation is not a whole-view survivor-continuity requirement",
+      ], ["Local deletion must cover only the exact eligible record or set"]],
       ["T6", [
-        "Whole-group deletion requires every child and the container's own coordination role to qualify; completed children alone are insufficient",
-      ]],
+        "Whole-group removal requires no child/container qualification",
+        "outstanding dependencies/gates/confirmations do not block display changes",
+        "preserving all non-target fields, order, and native states, including other groups",
+      ], ["Whole-group deletion requires every child and the container's own coordination role to qualify"]],
       ["T7", [
-        "whole-group deletion must preserve other groups",
-        "Full clear requires every record and container role to qualify, with no survivors",
-        "Verify the return against that tool's actual contract before claiming exact deletion or full clear and survivor preservation",
-      ]],
+        "todo_set({tasks: []}) clears it",
+        "Display success, a completed label, or an empty list proves no business completion or gate release and does not cancel actual active execution",
+        "never call subagent_remove or delete or modify Results, sessions, manifests, or artifacts",
+      ], ["Full clear requires every record and container role to qualify"]],
       ["T8", [
         "Inspect currently callable tools through their real schema, description, and known contract",
-        "Prove exact selection granularity, atomic success and failure",
-        "and return semantics",
-        "Existing stable provider IDs, exact targets, safe filtering, or a single atomic lossless replacement may qualify under any tool name or provider",
-        "neither packages/todo nor todo_remove is required",
         "a tool name, package installation, source code, or remembered convention proves no capability",
-      ]],
+        "Neither packages/todo nor a fixed tool name is required",
+        "no cross-call transaction, stable old ID, CAS, or new tool is required",
+        "Report specific capability or target-selection limitations rather than inventing a tool or demanding an old lifecycle audit",
+      ], ["single atomic lossless replacement may qualify", "Use only an established serialized mutation boundary with stable identities"]],
       ["T9", [
-        "A tool accepting arbitrary native statuses grants no permission to delete current, active, or unresolved work",
-        "Keep partial, failed, and blocked truthful; they may qualify only after explicit resolution or closure of remaining responsibilities and all other proofs, without satisfying an unsatisfied dependent completion predicate",
-      ]],
+        "pending for selected unstarted or not-yet-eligible outcomes",
+        "in_progress only for reliable actual active execution or a current coordination action",
+        "completed only for a safely correlated completed Result plus required outcome-completion evidence, with Wave gates judged separately",
+        "cancelled only for explicit withdrawal/cancellation before launch with no later launch planned, or reliably confirmed cancellation of actual execution under the effective backend contract",
+        "An unconfirmed active cancellation request is not cancelled execution",
+        "Handler partial, failed, and blocked remain explicit in descriptions or ordinary messages with the closest truthful non-success native state, never completed or invented native statuses",
+        "Reliable source facts take precedence over old UI labels",
+      ], ["A tool accepting arbitrary native statuses grants no permission to delete current, active, or unresolved work", "they may qualify only after explicit resolution"]],
       ["T10", [
-        "Do not emulate deletion by setting a reduced list and then transitioning survivors, rewrite statuses to enable deletion, hide UI, or invent an unavailable tool",
-      ]],
+        "todo_set({tasks:[{name,todos:[{name,description}]}]}) replaces the whole display and accepts no status input",
+        "todo_transition({transitions:[{task,todo,status}]}) using the new collection's unambiguous exact task/todo names to assign pending, in_progress, completed, or cancelled from source facts",
+        "Set followed by transition is normal derivation, not a cleanup bypass",
+        "Successful set alone proves no four-state alignment",
+      ], ["Do not emulate deletion by setting a reduced list and then transitioning survivors"]],
       ["T11", [
-        "Rejected, missing, ambiguous, invalid, or mixed-validity targets must leave the entire projection unchanged atomically",
-        "Confirmed failure or rejection is not success",
-        "Do not automatically retry failed or unknown cleanup",
-      ]],
+        "Under todo_remove's actual contract, missing, duplicate, overlapping, ambiguous, or otherwise invalid targets reject the whole batch without mutation",
+        "Confirmed rejection is not success",
+        "without blind retry, compensation, or restoration of the old snapshot",
+      ], ["Rejected, missing, ambiguous, invalid, or mixed-validity targets must leave the entire projection unchanged atomically"]],
       ["T12", [
-        "rule out concurrent changes to target qualification or contents, same-name recreation or retargeting, and replacement survivor-snapshot drift",
-        "Use only an established serialized mutation boundary with stable identities or existing atomic identity/state checks that reject drift without mutation",
-        "If stability or safe failure cannot be proven, retain affected records and explain the gap",
-      ]],
+        "A new Todo is not a continuation of old execution identity",
+        "old notifications must not directly update or remove a new same-name item by name alone, without reliable selected-source association",
+        "Whole-view replacement requires no old identity continuity",
+      ], ["replacement survivor-snapshot drift", "An orphan duplicate additionally requires"]],
       ["T13", [
-        "an error, missing return, or unknown effect proves neither deletion nor absence of effects",
-        "Do not automatically retry failed or unknown cleanup, reconstruct state, or delete further on that evidence",
-        "Preserve remaining visible records and report the failed or uncertain effect concretely",
-        "cleanup failure does not negate an otherwise completed work Result",
-      ]],
+        "Judge each tool return against its actual contract",
+        "If set succeeds but transition fails, report the confirmed new collection and partial alignment, not full four-state alignment",
+        "An error, missing return, or unknown effect proves neither success nor absence of effects",
+        "report the known portion and precise failure/uncertainty through ordinary messages without blind retry, compensation, or restoration of the old snapshot",
+        "A reliable work Result is not negated",
+      ], ["Preserve remaining visible records and report the failed or uncertain effect concretely"]],
       ["T14", [
-        "Equivalent duplicate notifications must not repeat Result projection or dependency release, replay deletion, or delete a new same-name record",
-        "After cleanup, restart, resume, or replay, uncertain correlation retains visible records; never manufacture identity from a name",
-        "An orphan duplicate additionally requires an observable matching identity and non-canonical identity",
-      ]],
+        "Re-deriving established selected facts is allowed without repeated Result adoption or dependency release",
+        "Equivalent duplicate notifications must not re-adopt a Result, release a dependency twice, or replay removals",
+        "On restart, resume, or replay, uncertain association blocks only that Result's adoption/release, not rebuilding or clearing from other established selected facts",
+        "Malformed or conflicting association fails closed for the affected semantic outcome and dependents, preserving the first established facts; it is not a display-retention gate",
+      ], ["must not repeat Result projection", "uncertain correlation retains visible records"]],
       ["T15", [
-        "On cancellation or changed direction, stop affected unlaunched work and first account for active work and completed effects, then perform this check",
-        "Cancellation alone never qualifies unresolved or unlaunched records for deletion",
-      ]],
+        "On cancellation or changed direction, stop affected unlaunched work and communicate active work and completed effects truthfully",
+        "that accounting is independent, not a prerequisite for rebuilding, removal, or clear",
+        "Actual active execution and coordination duties remain independent",
+        "prior effects accounting, duty closure, or retained active Todo records are not clear-before prerequisites",
+        "does not cancel actual active execution",
+      ], ["first account for active work and completed effects, then perform this check", "Cancellation alone never qualifies"]],
       ["T16", [
-        "retain affected Todos and explain the concrete limitation",
-        "Report completed work separately from cleanup limitations",
-        "Cleanup affects only the Todo projection: never call subagent_remove or delete or modify Results, sessions, manifests, or artifacts",
-        "Do not add a capability registry, scheduler, receipt, persistence, new IDs, revision/CAS, or automatic status-driven deletion",
-      ]],
+        "Absent or failed Todo projection must be reported through ordinary coordination messages and must not block otherwise satisfied execution admission or Result adoption",
+        "Complete Result reading/correlation, actual authorization, scope confirmation, tuple/current-call/JIT, prerequisites, conflicts, and item/Wave gates remain independent business checks",
+        "Display changes never alter the execution graph or Work/Plan/Waves predicates/status to fit the UI",
+        "never call subagent_remove or delete or modify Results, sessions, manifests, or artifacts",
+        "Do not add a capability registry, scheduler, receipt, ledger, queue, synchronizer, persistence, new IDs, revision/CAS, or automatic status-driven deletion",
+      ], ["retain affected Todos and explain the concrete limitation", "When no candidate qualifies or required identity"]],
     ] as const;
-    for (const [, clauses] of cleanupCases) {
-      for (const clause of clauses) expect(body).toContain(clause);
+    for (const [scenario, clauses, forbidden] of displayCases) {
+      for (const clause of clauses) expect(body, scenario).toContain(clause);
+      for (const clause of forbidden) expect(body, scenario).not.toContain(clause);
     }
-    const cleanupOrder = [
+    const adoptionOrder = [
       "Before first adoption of summary navigation, ordinary `read` must obtain the complete existing compact JSON envelope",
       "completely decode its `result` and read status, summary, report, artifacts and limitations",
       "Correlate existing `subagentId/generation/status/error` with the known task, selected outcome and current caller context",
       "Already visible complete Results still require full reading and correlation before adoption",
-      "updates Todo/Waves with the actual",
-      "checks completion predicates, and releases dependencies only when their required predicates hold",
-      "Cleanup 1 - Checkpoint.",
-      "Cleanup 2 - Qualify records.",
-      "Cleanup 3 - Prove capability.",
-      "Cleanup 4 - Prove stability.",
-      "Cleanup 5 - Execute and verify.",
-      "Cleanup 6 - Retain and report.",
-      "After this checkpoint, recompute ready branches",
+      "communicates the actual",
+      "First adoption requires complete reading and reliable correlation, not a successful Todo update",
+      "Make a fresh Router-owned decision, check completion predicates and Wave gate evidence",
+      "independently of Todo mutation success",
+      "each Wave gate separately requires every listed item and its stated verification",
     ].map((clause) => body.indexOf(clause));
-    expect(cleanupOrder.every((position) => position >= 0)).toBeTrue();
-    expect(cleanupOrder).toEqual([...cleanupOrder].sort((a, b) => a - b));
-    expect(body.indexOf("explicitly close or hand off the current role")).toBeLessThan(body.indexOf("For each candidate, prove"));
-    for (const obsolete of ["remove only records proven stale", "Use todo_remove for cleanup", "require packages/todo", "setting a reduced list and then transitioning survivors is safe"]) {
-      expect(body).not.toContain(obsolete);
-    }
+    expect(adoptionOrder.every((position) => position >= 0)).toBeTrue();
+    expect(adoptionOrder).toEqual([...adoptionOrder].sort((a, b) => a - b));
+    const displayOrder = [
+      "## Todo derived display",
+      "Display 1 - Select sources.",
+      "Display 2 - Replace or clear independently.",
+      "Display 3 - Use actual tools.",
+      "Display 4 - Derive truthful states.",
+      "Display 5 - Keep adoption separate.",
+      "Display 6 - Verify and report effects.",
+      "Independently of display derivation, recompute ready branches",
+    ].map((clause) => body.indexOf(clause));
+    expect(displayOrder.every((position) => position >= 0)).toBeTrue();
+    expect(displayOrder).toEqual([...displayOrder].sort((a, b) => a - b));
+    for (const clause of [
+      "truthfully expose current-action facts through Todo fields/descriptions or ordinary messages",
+      "Todo tool availability or mutation success is not a launch prerequisite when actual admission predicates hold",
+      "Never mark partial, blocked, or failed as completed",
+      "only completed plus required evidence satisfies an item predicate by default",
+    ]) expect(body).toContain(clause);
+    for (const obsolete of ["pre-action Todo projection before resolve", "updates Todo/Waves with the actual", "After this checkpoint", "Cleanup 1 - Checkpoint."]) expect(body).not.toContain(obsolete);
   });
 
   test("package metadata exposes the Skill directory", () => {
