@@ -26,6 +26,7 @@ const expected = [
   "implement-plan",
   "llm-instruction-writing",
   "plan-implementation",
+  "pragmatic-delivery",
   "research-audit",
   "research-compare",
   "research-deep",
@@ -47,7 +48,7 @@ function readSkill(name: string) {
 }
 
 describe("built-in Skill library", () => {
-  test("publishes exactly the specified 30 Skills", () => {
+  test("publishes exactly the specified 31 Skills", () => {
     const actual = readdirSync(skillsRoot, { withFileTypes: true })
       .filter((entry) => entry.isDirectory())
       .map(({ name }) => name)
