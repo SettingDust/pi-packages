@@ -350,6 +350,61 @@ describe("built-in Skill library", () => {
     for (const obsolete of ["pre-action Todo projection before resolve", "updates Todo/Waves with the actual", "After this checkpoint", "Cleanup 1 - Checkpoint."]) expect(body).not.toContain(obsolete);
   });
 
+  test("pragmatic delivery keeps cross-domain responsibility, safe correction, and separate notices", () => {
+    // Static clauses and license markers only; not live model behavior or full MIT comparison.
+    const body = readSkill("pragmatic-delivery").body.replaceAll("`", "");
+    expect([...body.matchAll(/^(\d)\. /gm)].map((match) => match[1])).toEqual(["1", "2", "3", "4", "5", "6", "7", "8"]);
+    const boundary = body.slice(body.indexOf("## Boundary"), body.indexOf("## Method"));
+    for (const clause of [
+      "Apply this method on demand", "single terminal predicate",
+      "fresh/current-call/JIT checks and completion evidence", "grants no permission",
+      "blocked without project work", "Do not ask the user, delegate, take over sibling outcomes",
+      "Router-owned Todo/Waves/Result state",
+    ]) expect(boundary).toContain(clause);
+    for (const clause of [
+      "affected consumers, failure paths, and existing support commitments",
+      "existing domain materials, methods, and tools first",
+      "required behavior, failure handling, and state lifetime",
+      "instead of exhausting the ecosystem",
+      "supported input, consumer, failure, or obligation it does not cover",
+      "a larger necessary change is not scope creep", "an easier subset is not completion",
+      "what it detects and what its rejection, recovery, diagnosis, or decision changes",
+      "Keep effective protection: real security/trust boundaries",
+      "authorization, data integrity, I/O failures, business invariants",
+      "Investigate an existing protection's relevant path when its role is unclear",
+      "missing evidence is not proof that it is unnecessary",
+      "Do not invent a consumer or verifier solely to justify a new optional manifest",
+      "Never swallow errors, silently fall back, or turn failure into success",
+      "Choose and run the smallest sufficient check", "honoring mandatory checks",
+      "For planning, check real dependencies, conflicts, gates",
+      "Keep review read-only", "match sources to the question, version, and conditions",
+      "check factual support, sources, conditions, and uncertainty",
+      "required freshness conditions remain covered",
+      "inspect the cause and completed or uncertain effects before correction",
+      "only within this same authorized outcome when repetition is safe",
+      "Unclear side effects or duplicate effects, missing permission, admission rejection",
+      "Do not change paths to bypass rejection",
+      "repair configuration/environment without authority, or retry unchanged failures without new information",
+      "no Handler continuation, resume, or dispatch and does not retry Resolver denial",
+      "Report checks not run or failed as such", "Stop when the entire predicate is satisfied",
+      "keep partial, failed, and blocked distinct, never success",
+    ]) expect(body).toContain(clause);
+    expect(body).not.toMatch(/^## (?:Output|Source and License Notice|Source Attribution)\s*$/m);
+    expect(body).not.toMatch(/Sentence Consumer Test|Claim Ledger|Guard hooks|agents=N/);
+
+    const original = readFileSync(join(skillsRoot, "pragmatic-delivery", "LICENSE"), "utf8");
+    const added = readFileSync(join(skillsRoot, "pragmatic-delivery", "LICENSE.stop-that-shit"), "utf8");
+    for (const marker of ["newmancai/sol-just-ship", "201bce6d401d1aa34842720060afb749b8ae2d2d", "Copyright (c) 2026 newmancai"]) expect(original).toContain(marker);
+    for (const marker of ["lennney/stop-that-shit", "694bbd59e26b522cd63801a01590ccaa77c7fe84", "skills/stop-that-shit/SKILL.md", "Copyright (c) 2026 Stop That Shit contributors"]) expect(added).toContain(marker);
+    expect(original).not.toContain("lennney/stop-that-shit");
+    expect(added).not.toContain("newmancai/sol-just-ship");
+    for (const notice of [original, added]) {
+      expect(notice).toContain("The above copyright notice and this permission notice shall be included in all");
+      expect(notice).toContain('THE SOFTWARE IS PROVIDED "AS IS"');
+      expect(notice).toContain("does not relicense the Harness package");
+    }
+  });
+
   test("package metadata exposes the Skill directory", () => {
     const manifest = JSON.parse(readFileSync(join(root, "package.json"), "utf8"));
     expect(manifest.files).toContain("skills");

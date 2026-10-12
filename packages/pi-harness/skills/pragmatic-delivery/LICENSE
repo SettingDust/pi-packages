@@ -2,6 +2,8 @@ Source and Adaptation Attribution
 
 Harness-specific adaptation, not a verbatim copy, of [newmancai/sol-just-ship: pragmatic-delivery](https://raw.githubusercontent.com/newmancai/sol-just-ship/201bce6d401d1aa34842720060afb749b8ae2d2d/skills/pragmatic-delivery/SKILL.md), pinned to commit `201bce6d401d1aa34842720060afb749b8ae2d2d`. Handler boundaries and internal-contract/error-handling guidance are local adaptations. The [upstream MIT notice](https://raw.githubusercontent.com/newmancai/sol-just-ship/201bce6d401d1aa34842720060afb749b8ae2d2d/LICENSE) is preserved below and applies to the referenced text and its adapted portions in SKILL.md only; it does not relicense the Harness package.
 
+This attribution covers the original pragmatic-delivery adaptation; it does not attribute later additions from other upstream sources to newmancai/sol-just-ship.
+
 MIT License
 
 Copyright (c) 2026 newmancai
