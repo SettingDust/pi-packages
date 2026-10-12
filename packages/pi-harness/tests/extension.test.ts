@@ -35,8 +35,8 @@ function context(modelRegistry: { getAvailable: () => RegistryModel[] }): Extens
 function expectSingleCallPrompt(prompt: string): void {
   for (const phrase of [
     "Resolver binds the invocation and calls it within resolve_delegation once",
-    "Do not issue a second launch after its response for the same outcome, reconstruct the prompt, or replace the resolved model/thinking",
-    "Any later independent outcome requires its own permitted resolve_delegation call",
+    "Do not issue a second launch after its response for this bound invocation, reconstruct the prompt, or replace the resolved model/thinking",
+    "Safe corrected new calls and later independent outcomes require a fresh Router decision and their own permitted resolve_delegation call under default autonomous recovery",
     "include resource and authorization checks",
   ]) expect(prompt).toContain(phrase);
   for (const phrase of [
@@ -233,8 +233,93 @@ describe("deterministic loaded Skill display", () => {
     expect(phase4).toBeGreaterThan(start);
     expect(display).toBeGreaterThan(phase4);
     expect(display).toBeLessThan(source.length);
-    expect(hash(source.slice(start, phase4))).toBe("0d88c3fad312125aa04dd60ef146fe996bd97b29ec0b31e3396e32ac5a59367f");
-    expect(hash(source.slice(display))).toBe("b2b84a681df0ce632035747b8665b5941fbb9e76372f40f050e4e7c9b5693443");
+    expect(hash(source.slice(start, phase4))).toBe("d8c800ad444fed6c26a1fb6b5132a09abd97a3a021ac010aafa434e1c5ee843c");
+    expect(hash(source.slice(display))).toBe("0ed9fb33ac689f7f864277d8ab9fed69da3299f8fb03fe01e9389c6e036f1bc8");
+  });
+
+  test("Router and strategy mirror static R1-R7 safe autonomous recovery contracts", async () => {
+    const prompt = await harness().prompt([skill("implement")]);
+    const strategy = await Bun.file(join(import.meta.dir, "../skills/delegation-strategy/SKILL.md")).text();
+    const sections = [
+      [prompt, "Default autonomous recovery (Router only):", "Progress reporting (Router only):"],
+      [strategy, "## Default autonomous recovery", "## Progress reporting"],
+    ].map(([text, heading, end]) => {
+      expect(text!.split(heading!)).toHaveLength(2);
+      const start = text!.indexOf(heading!) + heading!.length;
+      const finish = text!.indexOf(end!, start);
+      expect(finish).toBeGreaterThan(start);
+      return text!.slice(start, finish).replace(/\r\n/g, "\n").trim();
+    });
+    expect(sections[0]).toBe(sections[1]);
+    // Wording/precedence only: no live Router decision, task recovery or Host activation is exercised.
+    const cases = [
+      ["R1", [
+        "An adoptable pre-launch blocked resolution proves zero invocation in that call",
+        "do not bypass its rejection or directly spawn the bound invocation",
+        "A safe correction requires a fresh Router decision and a new resolve_delegation call",
+        "all current admission, Skill/reference/capability/candidate/delegate and exact protected-binding checks",
+        "planned current-byte/JIT checks where applicable",
+        "one Registry snapshot and at most one selected-tool invocation",
+        "without in-call retry, fallback, implicit substitution or protected-value changes",
+      ]],
+      ["R2", [
+        "proactively assess the fully read available correlated evidence, original permission and authority/scope, completed and unknown effects, repeat-execution safety",
+        "actual callable tool contract and resources",
+        "Do not stop or ask whether to retry solely because a failure occurred",
+        "make the bounded correction/recovery decision and continue without repeat approval",
+        "Failure status alone neither authorizes dispatch nor forbids a new lawful decision",
+        "Do not repeat an unchanged failed request without correction or new evidence",
+      ]],
+      ["R3", [
+        "Unknown effects require inspection first through actually available, already-authorized coordination reads, not immediate reapproval or blind replay",
+        "An error or missing response proves neither zero launch nor zero effects",
+        "Delegate needed project-domain diagnosis to a bounded Handler; do not do domain work yourself",
+        "Inspection grants no repair or replay permission, and user retry wording supplies no missing effects evidence",
+      ]],
+      ["R4", [
+        "terminal execution with no terminal Result at all, stable subagentId/generation association",
+        "unchanged original atomic boundary and authority, established replay safety",
+        "existing permission and effective backend contract permitting resume",
+        "Only then prefer resuming that same stable subagentId and failed generation",
+        "Never resume an active execution, uncertain identity, possible duplicate durable effects, changed boundary/authority, or an execution needing renewed authorization",
+      ]],
+      ["R5", [
+        "Any terminal Result already present, even unreadable or unadoptable, forbids that resume",
+        "resolve its evidence gap without erasing it",
+        "After complete reading and reliable correlation of a terminal failed, partial, or blocked Result, preserve its original status and useful completed work",
+        "Recover only the unfinished failed boundary as a new bounded outcome with its own Handler and independent Result",
+        "never rewrite the old Result as completed or replay completed durable effects or sibling branches",
+      ]],
+      ["R6", [
+        "Graph-bound recovery retains C5/C6, one item/Handler/Result and all item and Wave gates",
+        "A new recovery Result cannot automatically satisfy an old failed item predicate or gate",
+        "C5 graph refinement stays inside confirmed scope and preserves original completion/verification requirements and failure facts",
+        "substantive changes require C6 and applicable authority/permission",
+        "a missing graph or unsatisfied predicate is not ready and cannot be bypassed through standalone",
+      ]],
+      ["R7", [
+        "Missing necessary permission/authorization, substantive scope or risk changes, unavailable required tools/Skills/contracts, or safety still unproven after inspection block only the affected action with a concrete explanation",
+        "Ask only for an actual missing authorization or material decision under C4/C6 and the action-executor boundary",
+        "Do not lower actual reasoning/impact, relabel admission to evade prerequisites, or change configuration merely to pass a guard",
+        "Independent ready authorized nonconflicting branches remain eligible under effective resources and end-turn rules",
+        "not a runtime retry engine, scheduler, queue, retry budget/count, new identity/receipt mechanism, or fixed status-driven dispatch",
+      ]],
+    ] as const;
+    for (const section of sections) {
+      for (const [scenario, clauses] of cases) for (const clause of clauses) expect(section, scenario).toContain(clause);
+      expect(section.indexOf("Unknown effects require inspection first")).toBeLessThan(section.indexOf("A safe correction requires"));
+      expect(section.indexOf("Any terminal Result already present")).toBeLessThan(section.indexOf("Recover only the unfinished failed boundary"));
+    }
+    for (const text of [prompt, strategy]) for (const obsolete of [
+      "Do not launch the same outcome separately after the response",
+      "Do not issue a second launch after its response for the same outcome",
+      "do not call spawn again, reconstruct the prompt, replace model/thinking, or separately launch the same task",
+      "If resolution or delegate capability fails, report the block without spawning.",
+    ]) expect(text).not.toContain(obsolete);
+    expect(prompt).toContain("preserve and report the precise block without spawning that rejected invocation; apply default autonomous recovery");
+    expect(strategy).toContain("Failure alone is not an end-turn boundary: apply default autonomous recovery");
+    expect(prompt).toContain("keep recovery within the unfinished failed boundary and obey the effective end-turn/resource contract");
+    expect(strategy).toContain("apply default autonomous recovery after failure, respecting actual graph readiness, resources and end-turn rules");
   });
 
   test("task scalars do not change fixed instruction bytes or exact dispatch bindings", async () => {
@@ -254,7 +339,7 @@ describe("deterministic loaded Skill display", () => {
     const instructionEnd = source.indexOf(tailAnchor, instructionStart);
     expect(instructionEnd).toBeGreaterThan(instructionStart);
     const instruction = source.slice(instructionStart, instructionEnd);
-    expect(new Bun.CryptoHasher("sha256").update(instruction).digest("hex")).toBe("16558c9c4c3d3293d5b27e9edf0b37c6b0a102585432dd3e46bc0435d1bd319f");
+    expect(new Bun.CryptoHasher("sha256").update(instruction).digest("hex")).toBe("d36bca041b24d4b9461b5aad05bb9fa04a927922164ff810d4dfbbcc23fd9f6c");
     const handler = await Bun.file(join(import.meta.dir, "../agents/handler.md")).arrayBuffer();
     expect(new Bun.CryptoHasher("sha256").update(handler).digest("hex")).toBe("aade068cd4557a8ab54d9bce9f7b57896cf909858570245239300041b563c518");
     const herdr = await Bun.file(join(import.meta.dir, "../../pi-herdr-subagents/src/index.ts")).text();
@@ -517,7 +602,7 @@ describe("Pi Harness Extension", () => {
     expect(first.systemPrompt).toContain("and the exact resolved prompt, model, and thinking");
     expect(first.systemPrompt).toContain("Do not supply agent, prompt, model, or thinking in delegate.params");
     expect(first.systemPrompt).toContain("In that single call, the Resolver validates the Handoff, binds the exact invocation, and calls the selected registered delegate once");
-    expect(first.systemPrompt).toContain("Do not launch the same outcome separately after the response");
+    expect(first.systemPrompt).toContain("Do not directly spawn this bound invocation again after the response; assess safe correction/recovery under default autonomous recovery before a new lawful decision");
     expect(first.systemPrompt).not.toContain("The Resolver validates the Handoff and selects a candidate; it does not launch a Handler.");
     expect(first.systemPrompt).toContain("without local selection, fallback, substitution, rewrite, or another Registry read");
     for (const phrase of [
@@ -634,7 +719,7 @@ describe("Pi Harness Extension", () => {
     for (const phrase of [
       "refine Waves items, implement, repair defects, and verify across bounded Handler outcomes without per-item approval",
       "confirm the affected portion before executing it",
-      "After byte-only drift, compare the current Plan with the confirmed scope and retry current-call validation against the current tuple without renewed confirmation",
+      "After byte-only drift, compare the current Plan with the confirmed scope and make a new call that reruns current-call validation against the current tuple without renewed confirmation",
       "report failed or partial verification truthfully, and repair and recheck within scope",
     ]) expect(phases[1]).toContain(phrase); // S9-S12: in-scope autonomy, drift and material changes.
     for (const phrase of [
@@ -686,7 +771,7 @@ describe("Pi Harness Extension", () => {
       "An effective end-turn requirement wins over the Skill",
       "Do not supply agent, prompt, model, or thinking in delegate.params",
       "agent: \"handler\" and the exact resolved prompt, model, and thinking",
-      "If resolution or delegate capability fails, report the block without spawning",
+      "If resolution or delegate capability fails, preserve and report the precise block without spawning that rejected invocation; apply default autonomous recovery for a safe correction and new lawful call, not an in-call bypass",
     ]) expect(phases[2]).toContain(phrase);
     expect(phases[2].indexOf("select one domain primary Skill")).toBeLessThan(phases[2].indexOf("before calling resolve_delegation"));
     expect(phases[2].indexOf("Do not supply agent, prompt, model, or thinking in delegate.params")).toBeLessThan(phases[2].indexOf("Resolver binds agent:"));
@@ -706,7 +791,7 @@ describe("Pi Harness Extension", () => {
       "this does not prohibit display replacement or clearing",
       "On restart or replay, adopt or release only when available identity and visible state make that safe",
       "without blocking independent display rebuilding or clearing",
-      "prefer resuming that same execution",
+      "apply default autonomous recovery below, including its strict terminal/no-terminal-Result resume conditions",
       "After reading and reliably correlating each Result, make a fresh Router-owned decision before releasing dependents",
       "release only satisfied dependencies, independently of display success",
       "release only satisfied dependencies",
@@ -909,13 +994,15 @@ describe("Pi Harness Extension", () => {
     expect(schema).toContain("implement");
     expect(schema).toContain("delegation-strategy");
     expect(schema).toContain("Exactly one Router-selected registered delegate invocation");
-    expect(schema).toContain("do not launch the same outcome separately after this call returns");
+    expect(schema).toContain("do not directly spawn this bound invocation again after this call returns");
+    expect(schema).toContain("Evidence-backed correction/recovery requires a fresh lawful Router decision and new call with all applicable checks");
     expect(schema).toContain("Router-selected startup fields for this single invocation");
     expect(schema).toContain("omit protected agent, prompt, model, and thinking, which Resolver binds");
     expect(schema).not.toContain("hidden");
     expect(schema).not.toContain("modelRole");
     expect(resolver.description).toContain("call the Router-selected registered delegate once within this resolve_delegation call");
-    expect(resolver.description).toContain("any later independent outcome requires its own permitted resolve_delegation call");
+    expect(resolver.description).toContain("Do not directly spawn this bound invocation again");
+    expect(resolver.description).toContain("Safe corrected new calls and later independent outcomes require a fresh Router decision and their own permitted resolve_delegation call under default autonomous recovery");
     expect(resolver.description).not.toContain("does not launch a Handler");
     const rendered = resolver.renderCall!({ handoff: { objective: "Inspect implementation.", primarySkill: "implement", context: [] }, reasoning: 2, impact: 3 }, { fg: (_color: string, text: string) => text, bold: (text: string) => text }, {}).render(120).join("\n");
     expect(rendered).toContain("resolve_delegation  reasoning 2, impact 3");
@@ -1148,7 +1235,8 @@ describe("Pi Harness Extension", () => {
       "reduce impact only when consequences really are isolated",
       "delegation, context transfer, integration, and whole-deliverable verification costs",
       "In that single call, the Resolver validates and binds agent/prompt/model/thinking, executes the selected delegate once, and returns resolution with one raw launch return value or error",
-      "After the Resolver returns, do not call spawn again, reconstruct the prompt, replace model/thinking, or separately launch the same task",
+      "After the Resolver returns, do not directly spawn this bound invocation again, reconstruct the prompt, or replace model/thinking",
+      "Safe corrected new calls and later independent outcomes require a fresh Router decision and their own permitted resolve_delegation call under default autonomous recovery",
       "only when the currently registered delegate tool contract and available resources permit it",
       "An effective end-turn requirement remains binding",
       "After a terminal notification, use the effective backend's supported retrieval path",

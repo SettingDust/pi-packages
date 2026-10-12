@@ -37,7 +37,7 @@ resolution:
 
 If the Resolver response itself is missing or unusable, absence of `launch` is not proof that no invocation occurred; only an adoptable pre-launch blocked resolution establishes that fact. The Router preserves the available transport/backend evidence and treats unestablished effects as uncertain without synthesizing a Handler Result.
 
-There is no automatic retry, fallback, join, cancel, remove, or lifecycle orchestration. The Router owns semantic eligibility and must establish the effective tool contract before supplying the request.
+The Resolver executes the selected tool only once after validation and performs no automatic retry, fallback, join, cancel, remove, or lifecycle orchestration within that call. This does not prohibit the Router's evidence-backed, authorized correction/recovery or a new lawful call under [default autonomous recovery](router-delegation.md#default-autonomous-recovery); every new call passes the full applicable current admission, selection and binding checks. The Router owns semantic eligibility and must establish the effective tool contract before supplying the request.
 
 ### #42 Accepted Resolved-Selection Source
 
@@ -216,7 +216,7 @@ For Herdr, the Router uses the backend `subagentId` as stable task identity and 
 | malformed request, protected collision, or resolution failure | Return precise `resolution.status: blocked`; no launch | Preserve the admission block, distinct from a Handler `blocked` Result |
 | nested tool returns an error envelope | Preserve it as `launch.rawReturn` with resolved resolution | Interpret backend failure evidence; do not invent a Handler `failed` Result or infer absent effects |
 | Host rejects malformed tool arguments/schema before execute/hooks | Preserve the actual Host validation error, including any input echo; no Herdr error projection is assumed | No Handler Result, full-reading claim, adoption or release; Herdr runtime safe-error rules apply only if reached |
-| invocation throws | Preserve `launch.rawError` with resolved resolution | Determine failure/effect uncertainty from available evidence; no automatic retry or substitution |
+| invocation throws | Preserve `launch.rawError` with resolved resolution | Determine failure/effect uncertainty from available evidence; no blind repetition or implicit substitution in this call. Apply [Router recovery judgment](router-delegation.md#default-autonomous-recovery), with authorized inspection first for unknown effects and a new lawful call only when safe within authority/permission |
 | backend reports cancellation | Preserve the raw return/error as received | Record cancellation separately from Handler status; account for known or uncertain effects |
 | Resolver response missing or unusable | No adoptable response available to classify | Do not infer no launch; retain available evidence and report uncertain effects |
 | launch effect, active state, or identity ambiguous | Preserve raw evidence without synthesizing a status | Report uncertainty; do not claim running/completed or release affected dependents |
