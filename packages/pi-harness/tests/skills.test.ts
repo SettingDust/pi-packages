@@ -350,6 +350,35 @@ describe("built-in Skill library", () => {
     for (const obsolete of ["pre-action Todo projection before resolve", "updates Todo/Waves with the actual", "After this checkpoint", "Cleanup 1 - Checkpoint."]) expect(body).not.toContain(obsolete);
   });
 
+  test("persistent record methods retain adopted facts without external Result dependencies", () => {
+    const strategy = readSkill("delegation-strategy").body;
+    const plan = readSkill("documentation-plan-writing").body;
+    const work = readSkill("documentation-work").body;
+    // Method clauses only: the owning Spec remains authoritative; no historical records are inspected.
+    expect(strategy).toContain("When writing or delegating persistent Work/processed Context/Plan/Waves completion and evidence records");
+    expect(plan).toContain("For persistent Plan/Waves completion and evidence records");
+    expect(work).toContain("For persistent Work/processed Context completion and evidence records");
+    for (const body of [strategy, plan, work]) {
+      for (const phrase of [
+        "[Portable persistent records](../../docs/spec/router-delegation.md#portable-persistent-records)",
+        "Preserve reliably adopted status/scope, actual verification methods/results, gate judgments and material limitations",
+        "verified existing readable repository artifacts with project-relative references or stable public URLs",
+        "never a project-external local Result locator directly or through Context indirection",
+        "absent repository original alone does not reset adopted history or require reopening/reclosing old tasks",
+        "processed facts promise neither full originals, rerun verification nor permanent retrieval",
+      ]) expect(body).toContain(phrase);
+      expect(body).toMatch(/scope\/inputs\/source\/environment\/freshness/);
+      for (const forbidden of ["Ban all absolute paths", "Archive every full Result", "Reopen old tasks when the original is absent", "Adopt new Results from portable facts alone"])
+        expect(body).not.toContain(forbidden);
+    }
+    expect(strategy).toContain("Runtime navigation/later Handoff references keep the exact existing `resultPath`");
+    expect(plan).toContain("first full Result reading/correlation and actual item/Wave gates still apply");
+    expect(work).toContain("not a complete original or authority and cannot replace first Result adoption or actual item/Wave gates");
+    expect(work).toContain("Exclude raw transcripts, speculative proposals, duplicated authority, and task-level execution logs");
+    expect(work).toContain("Link source artifacts instead of copying them");
+    expect(plan).toContain("sole executable graph");
+  });
+
   test("pragmatic delivery keeps cross-domain responsibility, safe correction, and separate notices", () => {
     // Static clauses and license markers only; not live model behavior or full MIT comparison.
     const body = readSkill("pragmatic-delivery").body.replaceAll("`", "");

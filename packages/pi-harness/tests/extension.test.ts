@@ -241,8 +241,8 @@ describe("deterministic loaded Skill display", () => {
     const prompt = await harness().prompt([skill("implement")]);
     const strategy = await Bun.file(join(import.meta.dir, "../skills/delegation-strategy/SKILL.md")).text();
     const sections = [
-      [prompt, "Default autonomous recovery (Router only):", "Progress reporting (Router only):"],
-      [strategy, "## Default autonomous recovery", "## Progress reporting"],
+      [prompt, "Default autonomous recovery (Router only):", "Portable persistent records (Router only):"],
+      [strategy, "## Default autonomous recovery", "## Persistent records"],
     ].map(([text, heading, end]) => {
       expect(text!.split(heading!)).toHaveLength(2);
       const start = text!.indexOf(heading!) + heading!.length;
@@ -322,6 +322,39 @@ describe("deterministic loaded Skill display", () => {
     expect(strategy).toContain("apply default autonomous recovery after failure, respecting actual graph readiness, resources and end-turn rules");
   });
 
+  test("Router separates runtime navigation from portable persistent records", async () => {
+    const prompt = await harness().prompt([skill("implement")]);
+    const heading = "Portable persistent records (Router only):";
+    const start = prompt.indexOf(heading);
+    const end = prompt.indexOf("Progress reporting (Router only):", start);
+    expect(start).toBeGreaterThan(prompt.indexOf("Phase 4 - Receive and project Results."));
+    expect(end).toBeGreaterThan(start);
+    expect(prompt.split(heading)).toHaveLength(2);
+    const records = prompt.slice(start, end);
+    // Record-writing instructions only; not live adoption, historical cleanup or permanent retrieval evidence.
+    for (const phrase of [
+      "persistent Work, processed Context, Plan or Waves completion/evidence records",
+      "authorized runtime navigation and later Handoff references may use the exact existing resultPath",
+      "project-external local Result locator",
+      "portable original-evidence entry point or continuing repository dependency",
+      "absolute/home-relative paths, file URIs, project-escaping relative paths and Context indirection",
+      "Preserve reliably adopted completed, partial, failed and blocked facts",
+      "completed/incomplete scope, actual verification methods/results",
+      "established task/generation and item/Wave associations, gate judgments",
+      "material failure/deferred limitations",
+      "verified existing readable repository artifacts with project-relative references or stable public URLs",
+      "never invent artifacts or require full-report copies, a fixed record schema or a new evidence system",
+      "absence of an original Result from the repository alone must not reset history or require reopening/reclosing old tasks",
+      "not the complete original, rerun verification or guaranteed permanent original access",
+      "scope, inputs, source, environment and applicable freshness",
+      "cannot replace complete first reading/JSON decoding and current scope/task/generation correlation",
+      "recover lost/uncertain adoption evidence by assumption or bypass actual item/Wave gates",
+      "not a blanket absolute-path ban: image/SDK/tool-input fixtures and runtime examples remain outside it",
+    ]) expect(records).toContain(phrase);
+    for (const forbidden of ["Ban all absolute paths", "Archive every full Result", "Reopen old tasks when the original is absent", "Adopt new Results from portable facts alone"])
+      expect(prompt).not.toContain(forbidden);
+  });
+
   test("task scalars do not change fixed instruction bytes or exact dispatch bindings", async () => {
     const fixture = harness();
     const catalog = [skill("implement")];
@@ -339,7 +372,7 @@ describe("deterministic loaded Skill display", () => {
     const instructionEnd = source.indexOf(tailAnchor, instructionStart);
     expect(instructionEnd).toBeGreaterThan(instructionStart);
     const instruction = source.slice(instructionStart, instructionEnd);
-    expect(new Bun.CryptoHasher("sha256").update(instruction).digest("hex")).toBe("d36bca041b24d4b9461b5aad05bb9fa04a927922164ff810d4dfbbcc23fd9f6c");
+    expect(new Bun.CryptoHasher("sha256").update(instruction).digest("hex")).toBe("964115accb675cae6f1afc9b3f8b22ca1897e871f06609f6ad5a28e572a56507");
     const handler = await Bun.file(join(import.meta.dir, "../agents/handler.md")).arrayBuffer();
     expect(new Bun.CryptoHasher("sha256").update(handler).digest("hex")).toBe("aade068cd4557a8ab54d9bce9f7b57896cf909858570245239300041b563c518");
     const herdr = await Bun.file(join(import.meta.dir, "../../pi-herdr-subagents/src/index.ts")).text();

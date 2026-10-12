@@ -15,7 +15,7 @@ Root 已披露并完整采纳三 owner 修订。当前版本一致规定 Todo �
 
 [ADR-0007](../../adr/0007-authority-first-router-admission.md) 与 [Skill Library Spec](../../spec/skill-library.md) 的既有权限、standalone/planned、tuple/current-call/JIT、确认及 Skill/Handler 边界继续 `reuse`。没有重要未决产品/架构选择；已知 instruction drift 是实施影响面，不是 authority gap。assessment 不授予写 authority 或实施权限。
 
-修订证据入口：[三 owner 修订 Result envelope](c:/Users/WINDOWS/.pi/agent/sessions/--E--Projects-pi-packages--/2026-08-16T11-58-37-784Z_01a00a70-28d7-789b-8c64-0d784f30d9b4/tasks/sync-todo-derived-view-authority-artifacts/result-1.json)。初始准备时完整读取并实际 JSON 解码；`subagentId: sync-todo-derived-view-authority`、`generation: 1`、transport `status: completed`、无 `error`，解码后 Handler `status: completed`。其当前三 owner 修订、真实工具边界、未改指令/未启用/未验证模型等限制与 Handoff 中 Root 采纳事实共同构成复用依据；不追加历史评估/会话恢复任务。
+三 owner 修订 Result 的既有记录（原 envelope 未入库，非可移植原报告入口）：初始准备时完整读取并实际 JSON 解码；`subagentId: sync-todo-derived-view-authority`、`generation: 1`、transport `status: completed`、无 `error`，解码后 Handler `status: completed`。其当前三 owner 修订、真实工具边界、未改指令/未启用/未验证模型等限制与 Handoff 中 Root 采纳事实共同构成复用依据；不追加历史评估/会话恢复任务。
 
 ## 处理后的必要规则
 
@@ -43,7 +43,7 @@ Root 已披露并完整采纳三 owner 修订。当前版本一致规定 Todo �
 
 ## 当前源码完成证据与启用限制
 
-证据入口：[源码实施 Result envelope](c:/Users/WINDOWS/.pi/agent/sessions/--E--Projects-pi-packages--/2026-08-16T11-58-37-784Z_01a00a70-28d7-789b-8c64-0d784f30d9b4/tasks/implement-todo-derived-view-rules-artifacts/result-1.json)。本次完整读取并 JSON 解码：`subagentId: implement-todo-derived-view-rules`、`generation: 1`、transport `status: completed`、无 `error`，解码后 Handler `status: completed`。Root 已完整读取、关联并采纳该 Result；下列是已采纳证据摘要，不是本次重跑或独立评审。
+源码实施 Result 的既有记录（原 envelope 未入库）：当时完整读取并 JSON 解码：`subagentId: implement-todo-derived-view-rules`、`generation: 1`、transport `status: completed`、无 `error`，解码后 Handler `status: completed`。Root 已完整读取、关联并采纳该 Result；下列是已采纳证据摘要，不是完整原报告的替代，也不是本次重跑或独立评审。本次维护仅核对仓库记载，无法据此完整复核原报告与历史执行；不改变既有完成与 gate 判断。
 
 - 当前用户实际 `ask_response` 选择「确认修改（推荐）」，明确确认五处文件、两个测试/typecheck/active TS 及排除 Todo API、重建、模型、安装/reload/Git 的源码 scope。Root 随后启动并采纳实施；此前待确认只是准备 snapshot，不造确认日期、receipt 或 admission 字段。
 - 五个 artifact 对应 Router 模板、strategy、Method 10 镜像、两个测试 owner，限定源码 diff 为 270 additions / 198 deletions。旧显示阻塞及投影耦合已替换，真实执行/完整 Result/独立 gate 边界保留。

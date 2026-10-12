@@ -96,7 +96,7 @@ packages/pi-harness/tests/skills.test.ts
 
 ### Root 已采纳的源码完成事实
 
-- [源码实施 Result envelope](c:/Users/WINDOWS/.pi/agent/sessions/--E--Projects-pi-packages--/2026-08-16T11-58-37-784Z_01a00a70-28d7-789b-8c64-0d784f30d9b4/tasks/implement-todo-derived-view-rules-artifacts/result-1.json)：本次完整读取并 JSON 解码，`subagentId: implement-todo-derived-view-rules`、`generation: 1`、transport/Handler 均 `completed`，无 envelope error。
+- 源码实施 Result 的既有记录：当时完整读取并 JSON 解码，`subagentId: implement-todo-derived-view-rules`、`generation: 1`、transport/Handler 均 `completed`，无 envelope error。原 envelope 未入库；下列事实与 [Context 摘要](context.md#当前源码完成证据与启用限制)不是完整原报告的替代，本次维护不复核原报告或历史执行。
 - Root 已完整读取、关联并采纳 Result，核对五文件 scope 与证据，认定 `I-TDV-01` 源码范围完成、`W-TDV-01` 源码完成谓词满足；没有未解决的 scope 内错误。此处只记录既定 Parent 决定，不由本 Handler 重新评审、采纳或释放 gate；图无后继或依赖需释放。
 - 五个既定 owner 的源码 diff 为 270 additions / 198 deletions；两个测试 89 pass / 0 fail（38 + 51），typecheck 退出 0；三个 changed TS 的 primary-server/error 主动检查各 clean=1、0 diagnostics、0 inconclusive。
 - all-server 辅助检查仍有 43 条未改区域旧提示/警告，timeout 与 push-only silent-on-clean 两项覆盖未确认；后续 primary/error 结果不证明全部服务/全部严重度 clean。[Context](context.md#当前源码完成证据与启用限制)保留摘要与限制，本次未重跑测试/typecheck/LSP。
